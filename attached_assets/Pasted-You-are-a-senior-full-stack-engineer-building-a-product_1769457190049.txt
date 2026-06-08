@@ -1,0 +1,100 @@
+You are a senior full-stack engineer building a production-quality MVP web app for a school.
+
+Build a complete Next.js (App Router) + Prisma + SQLite web application called:
+“On Point Homework & Learning Portal” for Stage 1–3 learners.
+
+PRIMARY GOAL
+Teachers can create homework for Maths/English/Science, attach learning objectives and resources, students submit work, teachers mark it, and the system stores marks and generates weakness analytics.
+
+TECH STACK REQUIREMENTS
+- Next.js 14+ with App Router (TypeScript)
+- Prisma ORM + SQLite database
+- Use simple server actions or API route handlers (route.ts) for CRUD
+- Minimal UI using plain CSS or Tailwind (choose one and implement fully)
+- Must run successfully in Replit with npm install + npm run dev
+- Include setup instructions in README.md
+
+AUTH REQUIREMENTS (MVP)
+- Teacher login using email/password (bcrypt hashing)
+- Return a simple session using cookies OR localStorage (MVP acceptable)
+- Protect teacher pages (redirect to login if not logged in)
+- Student access uses Name + Stage + ClassName + PIN:
+  - Create student record if not exists
+  - If exists, PIN must match to submit or view results
+
+DATA MODEL REQUIREMENTS (Prisma schema)
+Create prisma/schema.prisma with these models at minimum:
+- Teacher(id, fullName, email unique, passwordHash, createdAt)
+- Student(id, fullName, stage Int, className, pin, createdAt)
+- Objective(id, subject enum MATHS/ENGLISH/SCIENCE, stage Int, code optional, description, source, createdAt)
+- Assignment(id, subject, stage, title, instructions, dueDate, totalMarks, createdAt, createdById FK)
+- AssignmentObjective(join table assignmentId + objectiveId unique pair)
+- Resource(id, assignmentId, type LINK/FILE/TEXTBOOK, value, note optional)
+- Submission(id, assignmentId, studentId, submittedAt, status SUBMITTED/MARKED, answerText optional, fileUrl optional)
+- Mark(id, submissionId unique, totalScore, feedback optional, markedAt, markedById FK)
+- MarkItem(id, submissionId FK, questionNo Int, score Int, maxScore Int, feedback optional, weaknessTags String optional comma-separated)
+
+SEED DATA
+Create prisma/seed.js (or seed.ts) and seed:
+- One teacher account:
+  email: teacher@onpoint.edu
+  password: onpoint123
+- Starter objectives for Stage 1, 2, 3 for all 3 subjects.
+Objectives must be stored and selectable by teachers.
+Also allow teachers to create custom objectives in the UI.
+
+CORE UI PAGES (App Router)
+Student pages:
+1) /student  (enter name, stage, class, PIN; store session)
+2) /student/homework  (list assignments filtered by student stage)
+3) /student/submit/[assignmentId] (submit answerText + optional fileUrl placeholder; save Submission)
+4) /student/results  (list submissions + marks + feedback)
+
+Teacher pages:
+1) /teacher/login
+2) /teacher/dashboard  (cards: Create Assignment, View Submissions, Insights)
+3) /teacher/assignments/new
+   - Form fields: subject, stage, title, instructions, dueDate, totalMarks
+   - Objectives picker (multi-select) filtered by subject + stage
+   - “Add custom objective” modal (creates Objective)
+   - Resource inputs: add LINK/TEXTBOOK notes (file upload can be placeholder)
+4) /teacher/assignments/[id]/submissions
+   - list submissions for that assignment
+   - open submission details
+   - button to mark submission
+5) /teacher/mark/[submissionId]
+   - marking form:
+     - totalScore, overall feedback
+     - per-question items: questionNo, score, maxScore, feedback, weaknessTags (multi input; store comma-separated)
+     - on submit: creates/updates Mark + replaces MarkItems; sets submission status MARKED
+6) /teacher/insights
+   - show top weakness tags aggregated (top 10) optionally filtered by stage and subject
+   - show simple stats: average score per subject, number of submissions, marked vs unmarked
+
+API / SERVER LOGIC
+Implement robust CRUD with validation:
+- POST /api/auth/login  (teacher login)
+- GET/POST /api/objectives  (list objectives; create custom)
+- GET/POST /api/assignments  (create assignment; list assignments by stage/subject)
+- GET/POST /api/submissions  (create submission; list submissions by assignmentId)
+- POST /api/marking  (mark submission as described)
+- GET /api/insights  (aggregate weaknessTags and return topWeaknesses)
+
+BEGINNER-FRIENDLY REQUIREMENTS
+- Add comments in code explaining what each section does.
+- Provide a README.md with:
+  1) How to install dependencies
+  2) How to run migrations
+  3) How to seed the database
+  4) How to start the app
+  5) Default teacher login credentials
+- Ensure there are no missing imports and the app runs without errors.
+
+QUALITY REQUIREMENTS
+- Use clean, consistent file structure under src/app and src/lib
+- Handle common errors:
+  - wrong teacher login
+  - wrong student PIN
+  - missing form fields
+- Use server-side protection for teacher routes if possible (middleware acceptable).
+- Keep UI simple and usable for a school setting (big button...

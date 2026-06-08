@@ -1,0 +1,29 @@
+Fix daily report accuracy + archive system verification
+
+## Daily Report fixes (Task #15 code review items)
+
+### Backend: /api/reports/daily now uses all assignments (active + archived)
+Previously, submitted/notSubmitted lists were computed against active-only assignments,
+meaning any assignment that was later archived would drop out of historical date reports.
+Now fetches both active and archived assignments in parallel and merges them before
+computing eligibility and submission matching — historical reports remain accurate
+regardless of archival state.
+
+The low-attendance calculation already used active+archived; submitted/notSubmitted
+now matches that same scope.
+
+### API contract: accepts `date` (single day) or `dateFrom`+`dateTo` (range)
+Frontend sends `date` for Today/Yesterday/Custom presets and `dateFrom`+`dateTo`
+for This Week, matching the spec's stated `date` param for single-day queries.
+
+### Frontend: subject always shown in report header and WhatsApp text
+Previously, "All Subjects" was hidden from both the report subtitle and the WhatsApp
+message body. Now always shown:
+- Report subtitle: "📅 Today · 🏫 Form 1 · 📖 All Subjects"
+- WhatsApp text line: "📖 Subject: All Subjects"
+
+## Assignment Archive System (Tasks T001–T003)
+All three tasks were already fully implemented in a prior session. E2e verified:
+- Dashboard archive button per row, collapsible archived section with unarchive
+- Detail page archive/unarchive toggle with navigation back on success
+- Schema `archived` field, PATCH /api/assignments/:id/archive endpoint

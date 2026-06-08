@@ -1,0 +1,30 @@
+# --- Node.js / build output ---
+node_modules
+dist
+server/public
+vite.config.ts.*
+*.tar.gz
+.DS_Store
+
+# --- Environment variables (secrets) ---
+.env
+
+# --- Uploaded files (saved locally at runtime) ---
+uploads/
+
+# --- Local databases ---
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# --- Python virtual environment ---
+venv/
+.venv/
+
+# --- Python cache ---
+__pycache__/
+*.pyc
+
+# --- PyCharm / IntelliJ IDE settings ---
+.idea/

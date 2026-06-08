@@ -1,0 +1,62 @@
+Create a Homework Daily Submission Report feature for the school homework system.
+
+Goal:
+The system must generate a simple daily report showing:
+1. Students who submitted homework today.
+2. Students who did not submit homework today.
+3. Students with low homework attendance who need to catch up.
+
+The report must be easy to copy and paste into a WhatsApp group.
+
+Required feature:
+Add a button or page called “Daily Homework Report”.
+
+The user should be able to select:
+- Date
+- Class
+- Subject or All Subjects
+
+When generated, the report must show:
+
+📚 Homework Submission Report
+Date: 5 May 2026
+Class: [Class Name]
+
+✅ Students who submitted homework today:
+1. Student Name
+2. Student Name
+3. Student Name
+
+❌ Students who did not submit homework today:
+1. Student Name
+2. Student Name
+3. Student Name
+
+⚠️ Students who need to improve homework attendance:
+1. Student Name — 45% completion
+2. Student Name — 50% completion
+
+Message for parents:
+Dear Parents, thank you to all learners who completed today’s homework. Your effort is noticed and appreciated.
+
+Learners who did not submit must please complete the work as soon as possible. Homework is part of academic discipline and helps us track progress. We strongly encourage parents to support their children daily so they do not fall behind.
+
+Those with low homework attendance are kindly reminded to improve and catch up. Consistent homework completion will help learners perform better and avoid being left behind.
+
+Requirements:
+- The report must use real submission data from the database.
+- A student is counted as “submitted” if they submitted at least one homework assignment on the selected date.
+- A student is counted as “not submitted” if homework was assigned to their class but they did not submit.
+- Low attendance means homework completion rate below 60% for the current term or selected period.
+- Add a “Copy WhatsApp Message” button.
+- Keep the layout simple, clean, and mobile-friendly.
+- Do not show technical data to parents.
+- Make the report professional, polite, slightly persuasive, and easy to understand.
+
+Also add filters:
+- Today
+- Yesterday
+- This Week
+- Custom Date
+
+Make sure the report works for each class separately and does not mix students from different classes.

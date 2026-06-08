@@ -1,0 +1,211 @@
+Add a Data Export feature to the existing homework app inside the 
+TEACHER PORTAL ONLY. Students must never see or access this feature.
+
+DO NOT create new data models or change any existing database structure.
+Read from the existing tables and models already in the app as they are.
+Pull everything and join it all into one flat master CSV download.
+
+WHERE TO ADD IT:
+- Inside the teacher portal dashboard
+- Add a dedicated "Export Data" section or page in the teacher navigation
+- Only visible and accessible to logged-in teacher and admin accounts
+- Students must be completely blocked from accessing this route
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WHAT THE CSV MUST CAPTURE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The most critical requirement of this export is that EVERY student 
+must appear on EVERY assignment — whether they wrote it or not.
+
+If a student did NOT submit an assignment they must still have a row 
+in the CSV for that assignment with:
+- Their name and details filled in
+- submission_status = "Not Submitted"
+- mark_achieved = blank
+- date_submitted = blank
+- days_late = blank
+
+This ensures the teacher can see the full picture of who wrote 
+what and who did not, all in one place, ready for data modelling.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+HOW TO BUILD THE DATA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Step 1 — Get every assignment that exists in the database
+Step 2 — Get every student enrolled in the class for that assignment
+Step 3 — For each student + assignment combination:
+          Check if a submission exists in the database
+          If YES — pull all submission and mark data
+          If NO  — create a row with student details + 
+                   assignment details + empty submission fields
+Step 4 — Combine all rows into one flat table
+Step 5 — Sort the rows in this order:
+          Grade → Class → Student Surname → 
+          Subject → Term → Assignment Date
+Step 6 — Generate and download the CSV
+
+This cross-join approach guarantees no student and no assignment 
+is ever missing from the export.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CSV COLUMN ORDER — GROUPED FOR DATA MODELLING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+GROUP 1 — SCHOOL & PERIOD IDENTITY
+school_name
+academic_year
+term
+week_number (if stored)
+
+GROUP 2 — CLASS & TEACHER
+grade_level
+class_name
+teacher_first_name
+teacher_surname
+teacher_full_name
+subject_name
+
+GROUP 3 — STUDENT IDENTITY
+student_id
+student_first_name
+student_surname
+student_full_name
+student_gender (if stored)
+student_date_of_birth (if stored)
+
+GROUP 4 — ASSIGNMENT DETAILS
+assignment_id
+assignment_title
+assignment_type 
+(Homework / Classwork / Test / Exam / Project / Drill / Essay)
+assignment_number
+date_assigned
+date_due
+total_marks_possible
+assignment_instructions_attached (Yes / No)
+attachment_count (number of files attached to the assignment)
+
+GROUP 5 — SUBMISSION STATUS
+submission_status (Submitted / Late / Not Submitted)
+date_submitted (blank if not submitted)
+time_submitted (blank if not submitted)
+submitted_on_time (Yes / No / Not Submitted)
+days_late 
+(calculated: date_submitted minus date_due
+ Negative = submitted early
+ Zero = on time
+ Positive number = number of days late
+ Blank = not submitted at all)
+attachment_submitted (Yes / No / Not Submitted)
+number_of_files_submitted
+
+GROUP 6 — MARKS & PERFORMANCE
+mark_achieved (blank if not submitted)
+total_marks_possible
+percentage 
+(calculated: mark_achieved / total_marks_possible x 100,
+ rounded to 2 decimal places, blank if not submitted)
+grade_symbol
+(A = 80-100% | B = 65-79% | C = 50-64% |
+ D = 35-49% | E = 20-34% | F = 0-19%
+ blank if not submitted)
+performance_band
+(Outstanding = 80-100% | Good = 65-79% |
+ Satisfactory = 50-64% | Needs Support = below 50%
+ blank if not submitted)
+marked_status (Marked / Ungraded / Not Submitted)
+
+GROUP 7 — TEACHER RECORD
+marked_by_teacher
+date_mark_recorded
+teacher_comments
+date_record_last_updated
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CSV FORMATTING RULES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+- Row 1 = header row with exact column names as listed above
+- One row per student per assignment (cross-joined as described)
+- All column names in lowercase with underscores: student_full_name
+- All dates in ISO format: YYYY-MM-DD
+- All times in 24hr format: HH:MM
+- All text fields wrapped in double quotes
+- All number fields (marks, percentage, days_late) NOT quoted 
+  so Excel reads them as numbers for calculations
+- Empty/null values export as truly blank — not "null", "N/A", 
+  "none", or "0"
+- Submission_status must always have a value — never blank — 
+  it must always say Submitted, Late, or Not Submitted
+- File encoding: UTF-8
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+EXPORT OPTIONS IN THE TEACHER PORTAL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Provide these four download options on the export page:
+
+OPTION 1 — FULL MASTER EXPORT
+Exports everything: all students, all assignments, all terms, 
+all subjects, all grades
+No filters applied
+Filename: HomeworkData_Master_YYYY-MM-DD.csv
+
+OPTION 2 — BY TERM
+Teacher selects a term from a dropdown
+Exports all students and all assignments for that term only
+Filename: HomeworkData_Term[X]_YYYY.csv
+
+OPTION 3 — BY CLASS & SUBJECT
+Teacher selects a grade/class and subject from dropdowns
+Exports all assignments and all students for that 
+class and subject only
+Filename: HomeworkData_[ClassName]_[Subject]_YYYY-MM-DD.csv
+
+OPTION 4 — BY ASSIGNMENT
+Teacher selects one specific assignment
+Exports every student in the class with their submission 
+status and mark for that one assignment
+This is the most useful for parent reporting
+Filename: HomeworkData_[AssignmentName]_YYYY-MM-DD.csv
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+EXPORT PAGE UI IN TEACHER PORTAL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+- Add "Export Data" to the teacher portal navigation menu
+- On the export page show:
+
+  PREVIEW PANEL (before downloading):
+  - Total number of students included
+  - Total number of assignments included
+  - Total number of rows that will be exported
+  - Breakdown: X submitted | X late | X not submitted
+  - Date range of data being exported
+
+  DOWNLOAD BUTTON:
+  - Label: "Download Master CSV"
+  - Show a loading spinner while generating
+  - Trigger automatic file download when ready
+  - Show confirmation: "Downloaded [X] records — [filename]"
+
+  EXPORT LOG (below the button):
+  - Show a table of previous exports:
+    Date exported | Exported by | Filter applied | Record count
+  - Keep last 20 export records
+  - Admin can see exports from all teachers
+  - Teacher can only see their own export history
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SECURITY REQUIREMENTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+- The export route must check authentication before running
+- If a non-teacher or student account tries to access the 
+  export URL directly they must be redirected to login
+- Teachers can only export data for their own classes
+- Admin accounts can export data for all classes
+- Every export attempt must be logged with the user account 
+  that triggered it

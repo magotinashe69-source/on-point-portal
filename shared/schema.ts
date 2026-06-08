@@ -1,0 +1,279 @@
+import { pgTable, text, serial, integer, timestamp, jsonb, boolean } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod";
+
+// Enums
+export const subjectEnum = z.enum(["MATHS", "ENGLISH", "SCIENCE", "PHYSICS", "CHEMISTRY", "BIOLOGY", "ECONOMICS", "BUSINESS_STUDIES", "GEOGRAPHY", "COMPUTER_SCIENCE", "HISTORY", "ACCOUNTING"]);
+export type Subject = z.infer<typeof subjectEnum>;
+
+export const formEnum = z.enum(["Stage 3", "Stage 4", "Stage 5", "Stage 6", "Form 1", "Form 2"]);
+export type Form = z.infer<typeof formEnum>;
+
+export const submissionStatusEnum = z.enum(["SUBMITTED", "MARKED"]);
+export type SubmissionStatus = z.infer<typeof submissionStatusEnum>;
+
+export const resourceTypeEnum = z.enum(["TEXTBOOK", "YOUTUBE", "LESSON_PLAN", "OTHER"]);
+export type ResourceType = z.infer<typeof resourceTypeEnum>;
+
+export const lessonTypeEnum = z.enum(["VIDEO", "AUDIO"]);
+export type LessonType = z.infer<typeof lessonTypeEnum>;
+
+// Teachers table
+export const teachers = pgTable("teachers", {
+  id: serial("id").primaryKey(),
+  fullName: text("full_name").notNull(),
+  email: text("email").notNull().unique(),
+  password: text("password").notNull(),
+  role: text("role").notNull().default("teacher"), // Role for access control
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const teachersRelations = relations(teachers, ({ many }) => ({
+  assignments: many(assignments),
+  marks: many(marks),
+  resources: many(resources),
+  lessons: many(lessons),
+}));
+
+export const insertTeacherSchema = createInsertSchema(teachers).omit({ id: true, createdAt: true });
+export type Teacher = typeof teachers.$inferSelect;
+export type InsertTeacher = z.infer<typeof insertTeacherSchema>;
+
+// Role enum for access control
+export const roleEnum = z.enum(["admin", "teacher", "student"]);
+export type Role = z.infer<typeof roleEnum>;
+
+// Students table
+export const students = pgTable("students", {
+  id: serial("id").primaryKey(),
+  studentId: text("student_id").notNull().unique(), // e.g., F1-001
+  fullName: text("full_name").notNull(),
+  gender: text("gender").notNull(), // Male/Female
+  form: text("form").notNull(), // Form 1, Form 2
+  password: text("password"), // Personalized password - set by student on first login
+  role: text("role").notNull().default("student"), // Role for access control
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const studentsRelations = relations(students, ({ many }) => ({
+  submissions: many(submissions),
+}));
+
+export const insertStudentSchema = createInsertSchema(students).omit({ id: true, createdAt: true });
+export type Student = typeof students.$inferSelect;
+export type InsertStudent = z.infer<typeof insertStudentSchema>;
+
+// Assignments table
+export const assignments = pgTable("assignments", {
+  id: serial("id").primaryKey(),
+  subject: text("subject").notNull(),
+  topic: text("topic"), // Optional topic within subject (e.g., "Algebra" under Maths)
+  form: text("form").notNull(), // Form 1, Form 2
+  title: text("title").notNull(),
+  instructions: text("instructions").notNull(),
+  questions: jsonb("questions").$type<Array<{
+    id: string;
+    questionText: string;
+    maxScore: number;
+    imageUrls?: string[];
+  }>>().notNull(),
+  attachments: jsonb("attachments").$type<Array<{
+    name: string;
+    url: string;
+    type: string;
+  }>>().default([]),
+  dueDate: text("due_date").notNull(),
+  totalMarks: integer("total_marks").notNull(),
+  targetStudentIds: jsonb("target_student_ids").$type<number[]>().default([]), // For tailored homework
+  extendedDeadlines: jsonb("extended_deadlines").$type<Array<{
+    studentId: number;
+    newDueDate: string;
+    reason?: string;
+  }>>().default([]),
+  archived: boolean("archived").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  createdById: integer("created_by_id").notNull().references(() => teachers.id),
+});
+
+export const assignmentsRelations = relations(assignments, ({ one, many }) => ({
+  createdBy: one(teachers, {
+    fields: [assignments.createdById],
+    references: [teachers.id],
+  }),
+  submissions: many(submissions),
+}));
+
+export const insertAssignmentSchema = createInsertSchema(assignments).omit({ id: true, createdAt: true });
+export type Assignment = typeof assignments.$inferSelect;
+export type InsertAssignment = z.infer<typeof insertAssignmentSchema>;
+
+// Submissions table
+export const submissions = pgTable("submissions", {
+  id: serial("id").primaryKey(),
+  assignmentId: integer("assignment_id").notNull().references(() => assignments.id),
+  studentId: integer("student_id").notNull().references(() => students.id),
+  submittedAt: timestamp("submitted_at").defaultNow().notNull(),
+  status: text("status").notNull().default("SUBMITTED"),
+  answers: jsonb("answers").$type<Array<{
+    questionId: string;
+    answerText: string;
+    imageUrls?: string[];
+  }>>().notNull(),
+  lateDays: integer("late_days").default(0).notNull(),
+  aiAnalysis: jsonb("ai_analysis").$type<{
+    overallScore: number;
+    flags: string[];
+    details: string;
+  } | null>().default(null),
+});
+
+export const submissionsRelations = relations(submissions, ({ one }) => ({
+  assignment: one(assignments, {
+    fields: [submissions.assignmentId],
+    references: [assignments.id],
+  }),
+  student: one(students, {
+    fields: [submissions.studentId],
+    references: [students.id],
+  }),
+}));
+
+export const insertSubmissionSchema = createInsertSchema(submissions).omit({ id: true, submittedAt: true, status: true, lateDays: true, aiAnalysis: true });
+export type Submission = typeof submissions.$inferSelect;
+export type InsertSubmission = z.infer<typeof insertSubmissionSchema>;
+
+// Marks table
+export const marks = pgTable("marks", {
+  id: serial("id").primaryKey(),
+  submissionId: integer("submission_id").notNull().references(() => submissions.id),
+  totalScore: integer("total_score").notNull(),
+  feedback: text("feedback"),
+  markedAt: timestamp("marked_at").defaultNow().notNull(),
+  markedById: integer("marked_by_id").notNull().references(() => teachers.id),
+  questionMarks: jsonb("question_marks").$type<Array<{
+    questionId: string;
+    score: number;
+    maxScore: number;
+    feedback?: string;
+  }>>().notNull(),
+});
+
+export const marksRelations = relations(marks, ({ one }) => ({
+  submission: one(submissions, {
+    fields: [marks.submissionId],
+    references: [submissions.id],
+  }),
+  markedBy: one(teachers, {
+    fields: [marks.markedById],
+    references: [teachers.id],
+  }),
+}));
+
+export const insertMarkSchema = createInsertSchema(marks).omit({ id: true, markedAt: true });
+export type Mark = typeof marks.$inferSelect;
+export type InsertMark = z.infer<typeof insertMarkSchema>;
+
+// Resources table (textbooks, YouTube links, lesson plans)
+export const resources = pgTable("resources", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description"),
+  type: text("type").notNull(), // TEXTBOOK, YOUTUBE, LESSON_PLAN, OTHER
+  url: text("url"), // For links
+  fileUrl: text("file_url"), // For uploaded files
+  subject: text("subject"),
+  form: text("form"), // Form 1, Form 2, or null for all
+  isTeacherOnly: boolean("is_teacher_only").default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  createdById: integer("created_by_id").notNull().references(() => teachers.id),
+});
+
+export const resourcesRelations = relations(resources, ({ one }) => ({
+  createdBy: one(teachers, {
+    fields: [resources.createdById],
+    references: [teachers.id],
+  }),
+}));
+
+export const insertResourceSchema = createInsertSchema(resources).omit({ id: true, createdAt: true });
+export type Resource = typeof resources.$inferSelect;
+export type InsertResource = z.infer<typeof insertResourceSchema>;
+
+// Announcements table
+export const announcements = pgTable("announcements", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  form: text("form"), // Form 1, Form 2, or null for all
+  priority: text("priority").default("normal"), // normal, important, urgent
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at"),
+  createdById: integer("created_by_id").notNull().references(() => teachers.id),
+});
+
+export const announcementsRelations = relations(announcements, ({ one }) => ({
+  createdBy: one(teachers, {
+    fields: [announcements.createdById],
+    references: [teachers.id],
+  }),
+}));
+
+export const insertAnnouncementSchema = createInsertSchema(announcements).omit({ id: true, createdAt: true });
+export type Announcement = typeof announcements.$inferSelect;
+export type InsertAnnouncement = z.infer<typeof insertAnnouncementSchema>;
+
+// Lessons table (video and audio lessons)
+export const lessons = pgTable("lessons", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description"),
+  subject: text("subject").notNull(),
+  form: text("form").notNull(),
+  type: text("type").notNull(), // VIDEO, AUDIO
+  fileUrl: text("file_url").notNull(),
+  duration: text("duration"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  createdById: integer("created_by_id").notNull().references(() => teachers.id),
+});
+
+export const lessonsRelations = relations(lessons, ({ one }) => ({
+  createdBy: one(teachers, {
+    fields: [lessons.createdById],
+    references: [teachers.id],
+  }),
+}));
+
+export const insertLessonSchema = createInsertSchema(lessons).omit({ id: true, createdAt: true });
+export type Lesson = typeof lessons.$inferSelect;
+export type InsertLesson = z.infer<typeof insertLessonSchema>;
+
+// Export Logs table — tracks teacher CSV export history
+export const exportLogs = pgTable("export_logs", {
+  id: serial("id").primaryKey(),
+  exportedAt: timestamp("exported_at").defaultNow().notNull(),
+  teacherEmail: text("teacher_email").notNull(),
+  filterType: text("filter_type").notNull(), // full | term | class | assignment
+  filterValue: text("filter_value").notNull().default(""), // e.g. "Term 2", "Form 1/MATHS", "Assignment #5"
+  recordCount: integer("record_count").notNull(),
+});
+
+export const insertExportLogSchema = createInsertSchema(exportLogs).omit({ id: true, exportedAt: true });
+export type ExportLog = typeof exportLogs.$inferSelect;
+export type InsertExportLog = z.infer<typeof insertExportLogSchema>;
+
+// Login schemas
+export const teacherLoginSchema = z.object({
+  email: z.string().email("Valid email is required"),
+  password: z.string().min(1, "Password is required"),
+});
+export type TeacherLogin = z.infer<typeof teacherLoginSchema>;
+
+export const studentLoginSchema = z.object({
+  fullName: z.string().min(1, "Your name is required"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+});
+export type StudentLogin = z.infer<typeof studentLoginSchema>;
+
+// Master password for admin access
+export const MASTER_PASSWORD = "onpoint_admin_2024";
