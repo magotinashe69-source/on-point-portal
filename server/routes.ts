@@ -902,8 +902,8 @@ export async function registerRoutes(
     type: z.enum(["TEXTBOOK", "YOUTUBE", "LESSON_PLAN", "OTHER"]),
     url: z.string().optional(),
     fileUrl: z.string().optional(),
-    subject: z.preprocess(v => v === "" ? undefined : v, z.string().optional()),
-    form: z.preprocess(v => v === "" ? undefined : v, z.enum(["Stage 3", "Stage 4", "Stage 5", "Stage 6", "Form 1", "Form 2"]).optional()),
+    subject: z.string().optional().transform(v => (v === "" ? undefined : v)),
+    form: z.enum(["Stage 3", "Stage 4", "Stage 5", "Stage 6", "Form 1", "Form 2"]).or(z.literal("")).optional().transform(v => (v === "" ? undefined : v)),
     isTeacherOnly: z.boolean().optional(),
     createdById: z.number(),
   });

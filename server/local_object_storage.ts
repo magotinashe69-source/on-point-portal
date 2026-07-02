@@ -44,7 +44,7 @@ export function registerObjectStorageRoutes(app: Express): void {
   // We also remember its content type (in a small ".type" file) so we can
   // serve it back correctly later.
   app.put("/api/uploads/local/:id", (req: Request, res: Response) => {
-    const id = path.basename(req.params.id); // basename blocks sneaky paths like "../"
+    const id = path.basename(String(req.params.id)); // basename blocks sneaky paths like "../"
     const filePath = path.join(UPLOAD_DIR, id);
     const writeStream = fs.createWriteStream(filePath);
 
