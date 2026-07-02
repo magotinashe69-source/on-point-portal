@@ -3,11 +3,13 @@ import { useLocation, Link, useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/lib/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { ArrowLeft, Loader2, CheckCircle, XCircle, Trophy, MessageSquare, Image as ImageIcon } from "lucide-react";
+import { ArrowLeft, Loader2, CheckCircle, XCircle, Trophy, MessageSquare, Image as ImageIcon, RotateCcw } from "lucide-react";
 import { Lightbox } from "@/components/Lightbox";
+import { isFullyAutoMarked } from "@shared/auto-marking";
 import type { Submission, Assignment, Mark } from "@shared/schema";
 import logoPath from "@assets/image_1769457206059.png";
 
@@ -107,6 +109,20 @@ export default function ViewResults() {
                   <p className="text-muted-foreground">{percentage}%</p>
                 </div>
                 <Progress value={percentage} className="h-3" />
+
+                {/* Auto-marked quizzes can be retried for a fresh instant score. */}
+                {assignment.questions && isFullyAutoMarked(assignment.questions) && (
+                  <div className="mt-6 flex justify-center">
+                    <Button
+                      onClick={() => setLocation(`/student/submit/${assignment.id}`)}
+                      size="lg"
+                      data-testid="button-try-again"
+                    >
+                      <RotateCcw className="h-4 w-4 mr-2" />
+                      Try Again
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
 

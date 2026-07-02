@@ -7,6 +7,7 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -15,10 +16,11 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { ArrowLeft, Loader2, Send, Calendar, BookOpen, Edit, AlertTriangle, ImagePlus, X, FileText, Paperclip } from "lucide-react";
+import { ArrowLeft, Loader2, Send, Calendar, BookOpen, Edit, AlertTriangle, ImagePlus, X, FileText, Paperclip, Circle, CheckCircle2 } from "lucide-react";
 import { AttachmentDisplay } from "@/components/FileAttachmentZone";
 import { Lightbox } from "@/components/Lightbox";
 import { useUpload } from "@/hooks/use-upload";
+import { isFullyAutoMarked } from "@shared/auto-marking";
 import type { Assignment, Submission } from "@shared/schema";
 import logoPath from "@assets/image_1769457206059.png";
 
@@ -76,6 +78,10 @@ export default function SubmitAssignment() {
   const existingSubmission = existingSubmissions?.[0];
   const isEditing = !!existingSubmission;
   const isMarked = existingSubmission?.status === "MARKED";
+  // Auto-marked assignments can be retried, so they stay editable even once
+  // they show as "marked".
+  const isAutoMarked = assignment ? isFullyAutoMarked(assignment.questions) : false;
+  const lockedByTeacherMark = isMarked && !isAutoMarked;
 
   const isDeadlinePassed = assignment ? new Date() > new Date(assignment.dueDate) : false;
   const hasExtension = assignment?.extendedDeadlines?.find(e => e.studentId === student?.id);
@@ -154,9 +160,12 @@ export default function SubmitAssignment() {
   }
 
   function onSubmit(values: SubmitForm) {
+    // Only warn about short answers on hand-marked (written) questions — a
+    // one-word or single-number answer is expected for auto-marked types.
     const thin: ThinAnswer[] = values.answers
-      .map((a, i) => ({ questionNumber: i + 1, charCount: a.answerText.trim().length }))
-      .filter(a => a.charCount < MIN_ANSWER_LENGTH);
+      .map((a, i) => ({ questionNumber: i + 1, charCount: a.answerText.trim().length, type: assignment?.questions[i]?.type }))
+      .filter(a => (!a.type || a.type === "written") && a.charCount < MIN_ANSWER_LENGTH)
+      .map(({ questionNumber, charCount }) => ({ questionNumber, charCount }));
 
     if (thin.length > 0) {
       setThinAnswers(thin);
@@ -335,27 +344,114 @@ export default function SubmitAssignment() {
                       )}
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <FormField
-                        control={form.control}
-                        name={`answers.${index}.answerText`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Your Answer</FormLabel>
-                            <FormControl>
-                              <Textarea
-                                placeholder="Type your answer here..."
-                                className="min-h-[120px]"
-                                data-testid={`textarea-answer-${index}`}
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                      {/* Multiple choice — tap an option */}
+                      {question.type === "multiple_choice" ? (
+                        <FormItem>
+                          <FormLabel>Choose one</FormLabel>
+                          <div className="space-y-2">
+                            {(question.options || []).map((opt, optIdx) => {
+                              const value = form.watch(`answers.${index}.answerText`) || "";
+                              const selected = value === String(optIdx);
+                              return (
+                                <button
+                                  key={optIdx}
+                                  type="button"
+                                  onClick={() => form.setValue(`answers.${index}.answerText`, String(optIdx), { shouldValidate: true })}
+                                  className={`flex w-full items-center gap-3 rounded-md border p-3 text-left transition-colors ${selected ? "border-primary bg-primary/5" : "hover:bg-muted/50"}`}
+                                  data-testid={`option-${index}-${optIdx}`}
+                                >
+                                  {selected
+                                    ? <CheckCircle2 className="h-5 w-5 text-primary shrink-0" />
+                                    : <Circle className="h-5 w-5 text-muted-foreground shrink-0" />}
+                                  <span>{opt}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </FormItem>
+                      ) : question.type === "true_false" ? (
+                        <FormItem>
+                          <FormLabel>Choose one</FormLabel>
+                          <div className="flex gap-3">
+                            {[{ v: "true", l: "True" }, { v: "false", l: "False" }].map(({ v, l }) => {
+                              const selected = (form.watch(`answers.${index}.answerText`) || "") === v;
+                              return (
+                                <Button
+                                  key={v}
+                                  type="button"
+                                  variant={selected ? "default" : "outline"}
+                                  className="flex-1"
+                                  onClick={() => form.setValue(`answers.${index}.answerText`, v, { shouldValidate: true })}
+                                  data-testid={`tf-${index}-${v}`}
+                                >
+                                  {l}
+                                </Button>
+                              );
+                            })}
+                          </div>
+                        </FormItem>
+                      ) : question.type === "numeric" ? (
+                        <FormField
+                          control={form.control}
+                          name={`answers.${index}.answerText`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Your Answer (number)</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  step="any"
+                                  inputMode="decimal"
+                                  placeholder="Type a number"
+                                  data-testid={`input-number-${index}`}
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      ) : question.type === "short_text" ? (
+                        <FormField
+                          control={form.control}
+                          name={`answers.${index}.answerText`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Your Answer</FormLabel>
+                              <FormControl>
+                                <Input
+                                  placeholder="Type a short answer"
+                                  data-testid={`input-short-${index}`}
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      ) : (
+                        <FormField
+                          control={form.control}
+                          name={`answers.${index}.answerText`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Your Answer</FormLabel>
+                              <FormControl>
+                                <Textarea
+                                  placeholder="Type your answer here..."
+                                  className="min-h-[120px]"
+                                  data-testid={`textarea-answer-${index}`}
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      )}
 
-                      {/* Answer Attachment Zone */}
-                      {(() => {
+                      {/* Answer Attachment Zone — only for written (hand-marked) questions */}
+                      {(question.type && question.type !== "written") ? null : (() => {
                         const currentUrls = form.watch(`answers.${index}.imageUrls`) || [];
                         const isDraggingHere = answerDragging[index] || false;
                         const isUploadingHere = answerUploading[index] || false;
@@ -472,7 +568,9 @@ export default function SubmitAssignment() {
                   <Alert className="mb-4">
                     <Edit className="h-4 w-4" />
                     <AlertDescription>
-                      {isMarked
+                      {isAutoMarked && isMarked
+                        ? "You've already had a go at this quiz. Change your answers and submit again for a fresh instant score."
+                        : isMarked
                         ? "This assignment has been marked. You can no longer make changes."
                         : "You've already submitted this assignment. You can update your answers until your teacher marks it."}
                     </AlertDescription>
@@ -483,7 +581,7 @@ export default function SubmitAssignment() {
                   type="submit"
                   className="w-full"
                   size="lg"
-                  disabled={isLoading || (isEditing && isMarked)}
+                  disabled={isLoading || lockedByTeacherMark}
                   data-testid="button-submit"
                 >
                   {isLoading ? (
@@ -493,7 +591,11 @@ export default function SubmitAssignment() {
                   ) : (
                     <Send className="h-4 w-4 mr-2" />
                   )}
-                  {isEditing ? "Update Submission" : "Submit Assignment"}
+                  {isAutoMarked && isMarked
+                    ? "Submit New Attempt"
+                    : isEditing
+                    ? "Update Submission"
+                    : "Submit Assignment"}
                 </Button>
               </form>
             </Form>

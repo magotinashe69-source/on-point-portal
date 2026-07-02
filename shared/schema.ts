@@ -77,6 +77,18 @@ export const assignments = pgTable("assignments", {
     questionText: string;
     maxScore: number;
     imageUrls?: string[];
+    // --- Auto-marking (all optional) ---
+    // When `type` is missing or "written", the question is marked by hand
+    // (the original behaviour). The other types are marked automatically in
+    // code against the answer key stored below. See shared/auto-marking.ts.
+    type?: "written" | "multiple_choice" | "true_false" | "numeric" | "short_text";
+    options?: string[];         // multiple_choice: the choices shown to students
+    correctOption?: number;     // multiple_choice: index (0-based) of the correct choice
+    correctBool?: boolean;      // true_false: the correct answer
+    correctNumber?: number;     // numeric: the correct value
+    tolerance?: number;         // numeric: how far off is still accepted (e.g. 0.05)
+    acceptedAnswers?: string[]; // short_text: any of these count as correct
+    explanation?: string;       // one-line note shown to students in their feedback
   }>>().notNull(),
   attachments: jsonb("attachments").$type<Array<{
     name: string;
