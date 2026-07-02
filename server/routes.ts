@@ -2,12 +2,44 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { registerObjectStorageRoutes } from "./local_object_storage";
-import { 
-  teacherLoginSchema, 
+import {
+  teacherLoginSchema,
   studentLoginSchema,
   MASTER_PASSWORD
 } from "@shared/schema";
+import type { Assignment, Submission } from "@shared/schema";
+import { isFullyAutoMarked, markSubmission, buildFeedback } from "@shared/auto-marking";
 import { z } from "zod";
+
+// Mark an auto-markable submission in code and save the result as a Mark.
+// Called right after a student submits (or re-submits) an assignment whose
+// questions are all auto-marking types. Does nothing for hand-marked
+// assignments and returns null so callers can fall back to the manual flow.
+async function autoMarkSubmission(
+  assignment: Assignment,
+  submission: Submission,
+) {
+  if (!isFullyAutoMarked(assignment.questions)) return null;
+
+  const { results, totalScore } = markSubmission(assignment.questions, submission.answers);
+
+  const questionMarks = results.map((r) => ({
+    questionId: r.questionId,
+    score: r.score,
+    maxScore: r.maxScore,
+    feedback: buildFeedback(r),
+  }));
+
+  const correctCount = results.filter((r) => r.correct).length;
+
+  return storage.createMark({
+    submissionId: submission.id,
+    totalScore,
+    feedback: `Auto-marked instantly: ${correctCount} of ${results.length} correct.`,
+    markedById: assignment.createdById, // credited to the teacher who set the work
+    questionMarks,
+  });
+}
 
 function validateRequest<T>(schema: z.ZodSchema<T>, data: unknown): { success: true; data: T } | { success: false; error: string } {
   try {
@@ -398,18 +430,32 @@ export async function registerRoutes(
     }
   });
 
+  // One question, including the optional auto-marking answer key. Zod drops any
+  // keys not listed here, so every auto-marking field must be named or it will
+  // be silently thrown away when an assignment is saved.
+  const questionSchema = z.object({
+    id: z.string(),
+    questionText: z.string().min(1),
+    maxScore: z.number().min(1),
+    imageUrls: z.array(z.string()).optional(),
+    // Auto-marking fields (all optional; see shared/auto-marking.ts).
+    type: z.enum(["written", "multiple_choice", "true_false", "numeric", "short_text"]).optional(),
+    options: z.array(z.string()).optional(),
+    correctOption: z.number().optional(),
+    correctBool: z.boolean().optional(),
+    correctNumber: z.number().optional(),
+    tolerance: z.number().optional(),
+    acceptedAnswers: z.array(z.string()).optional(),
+    explanation: z.string().optional(),
+  });
+
   const createAssignmentSchema = z.object({
     subject: z.enum(["MATHS", "ENGLISH", "SCIENCE", "PHYSICS", "CHEMISTRY", "BIOLOGY", "ECONOMICS", "BUSINESS_STUDIES", "GEOGRAPHY", "COMPUTER_SCIENCE", "HISTORY", "ACCOUNTING"]),
     topic: z.string().optional(),
     form: z.enum(["Stage 3", "Stage 4", "Stage 5", "Stage 6", "Form 1", "Form 2"]),
     title: z.string().min(1),
     instructions: z.string().min(1),
-    questions: z.array(z.object({
-      id: z.string(),
-      questionText: z.string().min(1),
-      maxScore: z.number().min(1),
-      imageUrls: z.array(z.string()).optional(),
-    })).min(1),
+    questions: z.array(questionSchema).min(1),
     attachments: z.array(z.object({
       name: z.string(),
       url: z.string(),
@@ -628,15 +674,19 @@ export async function registerRoutes(
         studentId,
         answers,
       });
-      
-      // Run AI analysis on text answers
-      const allText = answers.map(a => a.answerText).join(' ');
-      if (allText.length > 50) {
-        const analysis = analyzeForAI(allText);
-        await storage.updateSubmissionAiAnalysis(submission.id, analysis);
+
+      // If every question is an auto-marking type, mark it instantly in code
+      // and save the score. Otherwise fall back to the teacher's AI text check.
+      const mark = await autoMarkSubmission(assignment, submission);
+      if (!mark) {
+        const allText = answers.map(a => a.answerText).join(' ');
+        if (allText.length > 50) {
+          const analysis = analyzeForAI(allText);
+          await storage.updateSubmissionAiAnalysis(submission.id, analysis);
+        }
       }
-      
-      res.json({ success: true, submission });
+
+      res.json({ success: true, submission, mark: mark ?? undefined });
     } catch (error) {
       console.error("Create submission error:", error);
       res.status(500).json({ success: false, message: "Server error" });
@@ -652,35 +702,46 @@ export async function registerRoutes(
       if (!submission) {
         return res.status(404).json({ success: false, message: "Submission not found" });
       }
-      
-      // Check if already marked
-      if (submission.status === "MARKED") {
-        return res.status(403).json({ success: false, message: "Cannot edit a marked submission" });
-      }
-      
-      // Get assignment to check deadline
+
+      // Get assignment first — we need it to know whether this is an
+      // auto-marked assignment (which students may retry) or a hand-marked one.
       const assignment = await storage.getAssignment(submission.assignmentId);
       if (!assignment) {
         return res.status(404).json({ success: false, message: "Assignment not found" });
       }
-      
+
+      const autoMarked = isFullyAutoMarked(assignment.questions);
+
+      // A hand-marked submission is locked once the teacher has marked it.
+      // Auto-marked assignments stay open so students can use "Try Again".
+      if (submission.status === "MARKED" && !autoMarked) {
+        return res.status(403).json({ success: false, message: "Cannot edit a marked submission" });
+      }
+
       // Validate answers
       const { answers } = req.body;
       if (!answers || !Array.isArray(answers)) {
         return res.status(400).json({ success: false, message: "Answers are required" });
       }
-      
+
       // Update the submission
       const updatedSubmission = await storage.updateSubmission(submissionId, { answers });
-      
-      // Re-run AI analysis
-      const allText = answers.map((a: { answerText: string }) => a.answerText).join(' ');
-      if (allText.length > 50) {
-        const analysis = analyzeForAI(allText);
-        await storage.updateSubmissionAiAnalysis(submissionId, analysis);
+
+      // Re-mark instantly for auto-marked assignments; otherwise re-run the AI
+      // text check for the teacher.
+      let mark = null;
+      if (updatedSubmission) {
+        mark = await autoMarkSubmission(assignment, updatedSubmission);
       }
-      
-      res.json({ success: true, submission: updatedSubmission });
+      if (!mark) {
+        const allText = answers.map((a: { answerText: string }) => a.answerText).join(' ');
+        if (allText.length > 50) {
+          const analysis = analyzeForAI(allText);
+          await storage.updateSubmissionAiAnalysis(submissionId, analysis);
+        }
+      }
+
+      res.json({ success: true, submission: updatedSubmission, mark: mark ?? undefined });
     } catch (error) {
       console.error("Update submission error:", error);
       res.status(500).json({ success: false, message: "Server error" });
@@ -841,8 +902,8 @@ export async function registerRoutes(
     type: z.enum(["TEXTBOOK", "YOUTUBE", "LESSON_PLAN", "OTHER"]),
     url: z.string().optional(),
     fileUrl: z.string().optional(),
-    subject: z.preprocess(v => v === "" ? undefined : v, z.string().optional()),
-    form: z.preprocess(v => v === "" ? undefined : v, z.enum(["Stage 3", "Stage 4", "Stage 5", "Stage 6", "Form 1", "Form 2"]).optional()),
+    subject: z.string().optional().transform(v => (v === "" ? undefined : v)),
+    form: z.enum(["Stage 3", "Stage 4", "Stage 5", "Stage 6", "Form 1", "Form 2"]).or(z.literal("")).optional().transform(v => (v === "" ? undefined : v)),
     isTeacherOnly: z.boolean().optional(),
     createdById: z.number(),
   });
