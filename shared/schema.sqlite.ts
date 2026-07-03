@@ -165,6 +165,17 @@ export const exportLogs = sqliteTable("export_logs", {
   recordCount: integer("record_count").notNull(),
 });
 
+// --- Student Rewards (gamification: Treasure Hunt collectibles etc.) ---
+// Stands alone: only points at a student, does not touch any existing table.
+export const studentRewards = sqliteTable("student_rewards", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  studentId: integer("student_id").notNull().references(() => students.id),
+  rewardType: text("reward_type").notNull(), // e.g. "collectible"
+  rewardName: text("reward_name").notNull(), // e.g. "Golden Compass"
+  assignmentId: integer("assignment_id"),     // which assignment earned it (plain id, optional)
+  earnedAt: timestamp("earned_at").notNull().$defaultFn(() => new Date()),
+});
+
 // Plain SQL that creates every table above if it does not exist yet.
 // We run this once on startup so a fresh SQLite database is ready to use
 // with no manual migration step.
@@ -273,5 +284,14 @@ CREATE TABLE IF NOT EXISTS export_logs (
   filter_type TEXT NOT NULL,
   filter_value TEXT NOT NULL DEFAULT '',
   record_count INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS student_rewards (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  student_id INTEGER NOT NULL,
+  reward_type TEXT NOT NULL,
+  reward_name TEXT NOT NULL,
+  assignment_id INTEGER,
+  earned_at INTEGER NOT NULL
 );
 `;

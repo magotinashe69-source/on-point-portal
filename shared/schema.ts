@@ -274,6 +274,24 @@ export const insertExportLogSchema = createInsertSchema(exportLogs).omit({ id: t
 export type ExportLog = typeof exportLogs.$inferSelect;
 export type InsertExportLog = z.infer<typeof insertExportLogSchema>;
 
+// Student Rewards table — gamification (e.g. the "Treasure Hunt" collectibles).
+// This table stands on its own: it only points at a student and does NOT modify
+// or add columns to any existing table. The assignment that earned the reward is
+// kept as a plain id (not a foreign key), so rewards can also come from other
+// sources later (streaks, badges) without a hard link to assignments.
+export const studentRewards = pgTable("student_rewards", {
+  id: serial("id").primaryKey(),
+  studentId: integer("student_id").notNull().references(() => students.id), // who earned it
+  rewardType: text("reward_type").notNull(), // e.g. "collectible"
+  rewardName: text("reward_name").notNull(), // e.g. "Golden Compass"
+  assignmentId: integer("assignment_id"),     // which assignment earned it (plain id, optional)
+  earnedAt: timestamp("earned_at").defaultNow().notNull(), // when it was earned
+});
+
+export const insertStudentRewardSchema = createInsertSchema(studentRewards).omit({ id: true, earnedAt: true });
+export type StudentReward = typeof studentRewards.$inferSelect;
+export type InsertStudentReward = z.infer<typeof insertStudentRewardSchema>;
+
 // Login schemas
 export const teacherLoginSchema = z.object({
   email: z.string().email("Valid email is required"),

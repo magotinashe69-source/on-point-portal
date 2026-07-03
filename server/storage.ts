@@ -3,7 +3,7 @@ import { eq, and, inArray, or, isNull, desc } from "drizzle-orm";
 // the right database (SQLite or PostgreSQL) at runtime.
 import {
   db,
-  teachers, students, assignments, submissions, marks, resources, announcements, lessons, exportLogs,
+  teachers, students, assignments, submissions, marks, resources, announcements, lessons, exportLogs, studentRewards,
 } from "./db";
 // The TypeScript types are the same for both databases, so they come from the shared schema.
 import {
@@ -16,6 +16,7 @@ import {
   type Announcement, type InsertAnnouncement,
   type Lesson, type InsertLesson,
   type ExportLog, type InsertExportLog,
+  type StudentReward, type InsertStudentReward,
   MASTER_PASSWORD
 } from "@shared/schema";
 
@@ -78,7 +79,11 @@ export interface IStorage {
   // Export Logs
   createExportLog(log: InsertExportLog): Promise<ExportLog>;
   getExportLogs(teacherEmail: string, limit?: number): Promise<ExportLog[]>;
-  
+
+  // Student Rewards (gamification)
+  createStudentReward(reward: InsertStudentReward): Promise<StudentReward>;
+  getStudentRewards(studentId: number): Promise<StudentReward[]>;
+
   // Seed data
   seedInitialData(): Promise<void>;
 }
@@ -427,6 +432,16 @@ export class DatabaseStorage implements IStorage {
   async createExportLog(log: InsertExportLog): Promise<ExportLog> {
     const [entry] = await db.insert(exportLogs).values(log).returning();
     return entry;
+  }
+
+  // Student Rewards
+  async createStudentReward(reward: InsertStudentReward): Promise<StudentReward> {
+    const [created] = await db.insert(studentRewards).values(reward).returning();
+    return created;
+  }
+
+  async getStudentRewards(studentId: number): Promise<StudentReward[]> {
+    return db.select().from(studentRewards).where(eq(studentRewards.studentId, studentId));
   }
 
   async getExportLogs(teacherEmail: string, limit = 20): Promise<ExportLog[]> {
