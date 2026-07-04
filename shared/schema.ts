@@ -10,6 +10,14 @@ export type Subject = z.infer<typeof subjectEnum>;
 export const formEnum = z.enum(["Stage 3", "Stage 4", "Stage 5", "Stage 6", "Form 1", "Form 2"]);
 export type Form = z.infer<typeof formEnum>;
 
+// Primary classes are the "Stage" forms; secondary are the "Form" classes.
+// Shared by the server (who to award) and the client (who sees the Treasure
+// Island map) so "primary" means the same thing everywhere.
+export const PRIMARY_FORMS = ["Stage 3", "Stage 4", "Stage 5", "Stage 6"];
+export function isPrimaryForm(form: string | null | undefined): boolean {
+  return !!form && PRIMARY_FORMS.includes(form);
+}
+
 export const submissionStatusEnum = z.enum(["SUBMITTED", "MARKED"]);
 export type SubmissionStatus = z.infer<typeof submissionStatusEnum>;
 

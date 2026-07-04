@@ -8,7 +8,9 @@ import {
   MASTER_PASSWORD
 } from "@shared/schema";
 import type { Assignment, Submission } from "@shared/schema";
+import { isPrimaryForm } from "@shared/schema";
 import { isFullyAutoMarked, markSubmission, buildFeedback } from "@shared/auto-marking";
+import { awardRandomCollectible } from "./rewards";
 import { z } from "zod";
 
 // Mark an auto-markable submission in code and save the result as a Mark.
@@ -686,7 +688,21 @@ export async function registerRoutes(
         }
       }
 
-      res.json({ success: true, submission, mark: mark ?? undefined });
+      // Primary students (Stages 3-6) earn a Treasure Hunt collectible for
+      // completing an assignment. This runs once per assignment because a
+      // duplicate submission is blocked above. Secondary students are not
+      // affected at all. A reward failure must never break the submission,
+      // so it is best-effort.
+      let reward;
+      if (isPrimaryForm(student.form)) {
+        try {
+          reward = await awardRandomCollectible(studentId, assignmentId);
+        } catch (rewardError) {
+          console.error("Award collectible failed (submission still saved):", rewardError);
+        }
+      }
+
+      res.json({ success: true, submission, mark: mark ?? undefined, reward });
     } catch (error) {
       console.error("Create submission error:", error);
       res.status(500).json({ success: false, message: "Server error" });
@@ -810,6 +826,23 @@ export async function registerRoutes(
       res.json({ success: true, mark });
     } catch (error) {
       console.error("Create mark error:", error);
+      res.status(500).json({ success: false, message: "Server error" });
+    }
+  });
+
+  // Student rewards endpoint — the collectibles a student has earned.
+  // Used by the primary students' Treasure Island map.
+  app.get("/api/students/:id/rewards", async (req, res) => {
+    try {
+      const studentId = parseInt(req.params.id);
+      const student = await storage.getStudent(studentId);
+      if (!student) {
+        return res.status(404).json({ success: false, message: "Student not found" });
+      }
+      const rewards = await storage.getStudentRewards(studentId);
+      res.json({ success: true, rewards });
+    } catch (error) {
+      console.error("Get student rewards error:", error);
       res.status(500).json({ success: false, message: "Server error" });
     }
   });
