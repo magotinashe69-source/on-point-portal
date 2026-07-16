@@ -247,3 +247,62 @@
     inset: -1px;
   }
 }
+
+/* ============================================================
+   Landing page animations ("op-" = On Point).
+   All movement is CSS transform/opacity only — cheap to run on
+   low-end Android phones (no JavaScript, no heavy repaints).
+   Every effect is turned off under prefers-reduced-motion below.
+   ============================================================ */
+
+/* Sections gently slide up and fade in when the page loads. Add a
+   delay with an inline style (e.g. style="animation-delay: .2s") to
+   stagger several sections one after another. */
+@keyframes op-slide-in {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.op-slide-in {
+  opacity: 0;                        /* stay hidden until the animation runs */
+  animation: op-slide-in 0.7s ease-out forwards;
+}
+
+/* Icons and the mascot bob up and down forever, like they're floating. */
+@keyframes op-bob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-10px); }
+}
+.op-bob { animation: op-bob 3s ease-in-out infinite; }
+
+/* A slower, bigger float for background decorations (planet, backpack). */
+@keyframes op-float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50%      { transform: translateY(-16px) rotate(4deg); }
+}
+.op-float { animation: op-float 6s ease-in-out infinite; }
+
+/* Gold stars drift slowly upward and fade — set position + delay inline. */
+@keyframes op-drift {
+  0%   { transform: translateY(0) scale(1);    opacity: 0.9; }
+  50%  { opacity: 0.35; }
+  100% { transform: translateY(-40px) scale(0.6); opacity: 0; }
+}
+.op-drift { animation: op-drift 5s ease-in-out infinite; }
+
+/* Cards sink slightly and grow a shadow when tapped/held — that quick
+   "press" feedback reads well on touch screens. Desktop gets it on hover. */
+.op-lift {
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.op-lift:hover  { transform: translateY(-6px); box-shadow: 0 14px 30px -12px rgba(31, 56, 100, 0.45); }
+.op-lift:active { transform: translateY(-2px) scale(0.99); }
+
+/* Accessibility: if the visitor asked their phone to reduce motion,
+   hold everything still. Content still appears — just without movement. */
+@media (prefers-reduced-motion: reduce) {
+  .op-slide-in { opacity: 1; animation: none; }
+  .op-bob,
+  .op-float,
+  .op-drift { animation: none; }
+  .op-lift  { transition: none; }
+}
