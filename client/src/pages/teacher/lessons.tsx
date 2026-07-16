@@ -33,7 +33,7 @@ import {
   Circle,
 } from "lucide-react";
 import type { Lesson } from "@shared/schema";
-import logoPath from "@assets/image_1769457206059.png";
+import logoPath from "@assets/logo.webp";
 
 const createLessonSchema = z.object({
   title: z.string().min(1, "Title is required"),

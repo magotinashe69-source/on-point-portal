@@ -13,7 +13,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { ArrowLeft, LogIn, Loader2, Eye, EyeOff } from "lucide-react";
 import { Link } from "wouter";
 import { ThemeToggle } from "@/components/theme-toggle";
-import logoPath from "@assets/image_1769457206059.png";
+import logoPath from "@assets/logo.webp";
 
 export default function TeacherLogin() {
   const [location, setLocation] = useLocation();

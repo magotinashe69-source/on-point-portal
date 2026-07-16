@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/lib/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ArrowLeft, CheckCircle, XCircle, Download, Printer, Loader2, BookOpen } from "lucide-react";
-import logoPath from "@assets/image_1769457206059.png";
+import logoPath from "@assets/logo.webp";
 
 interface GradebookRow {
   studentId: number;

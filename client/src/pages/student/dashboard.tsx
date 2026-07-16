@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import type { Assignment, Announcement } from "@shared/schema";
 import { isPrimaryForm } from "@shared/schema";
-import logoPath from "@assets/image_1769457206059.png";
+import logoPath from "@assets/logo.webp";
 
 interface EnrichedSubmission {
   id: number;

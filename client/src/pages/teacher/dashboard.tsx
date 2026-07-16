@@ -35,7 +35,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import type { Assignment, Student, Announcement } from "@shared/schema";
-import logoPath from "@assets/image_1769457206059.png";
+import logoPath from "@assets/logo.webp";
 
 interface EnrichedSubmission {
   id: number;

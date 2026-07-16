@@ -8,7 +8,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { ArrowLeft, Loader2, Lock, CheckCircle } from "lucide-react";
 import { COLLECTIBLES, TREASURE_HUNT_TOTAL } from "@shared/collectibles";
 import { isPrimaryForm, type StudentReward } from "@shared/schema";
-import logoPath from "@assets/image_1769457206059.png";
+import logoPath from "@assets/logo.webp";
 
 // A little picture for each collectible. This is just for show on the map,
 // so it lives here (not in the shared data) as a simple name -> emoji lookup.

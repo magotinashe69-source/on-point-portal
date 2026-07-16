@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import logoPath from "@assets/image_1769457206059.png";
+import logoPath from "@assets/logo.webp";
 
 // ---------------------------------------------------------------------------
 // On Point landing page — a playful, kid-focused homepage.

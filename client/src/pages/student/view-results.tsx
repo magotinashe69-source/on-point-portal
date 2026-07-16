@@ -11,7 +11,7 @@ import { ArrowLeft, Loader2, CheckCircle, XCircle, Trophy, MessageSquare, Image 
 import { Lightbox } from "@/components/Lightbox";
 import { isFullyAutoMarked } from "@shared/auto-marking";
 import type { Submission, Assignment, Mark } from "@shared/schema";
-import logoPath from "@assets/image_1769457206059.png";
+import logoPath from "@assets/logo.webp";
 
 export default function ViewResults() {
   const { id } = useParams<{ id: string }>();

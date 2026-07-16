@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 import { Lightbox } from "@/components/Lightbox";
 import type { Submission, Assignment, Mark, Student } from "@shared/schema";
-import logoPath from "@assets/image_1769457206059.png";
+import logoPath from "@assets/logo.webp";
 
 const markQuestionSchema = z.object({
   questionId: z.string(),

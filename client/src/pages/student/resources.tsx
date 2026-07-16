@@ -18,7 +18,7 @@ import {
   Download
 } from "lucide-react";
 import type { Resource } from "@shared/schema";
-import logoPath from "@assets/image_1769457206059.png";
+import logoPath from "@assets/logo.webp";
 
 export default function StudentResources() {
   const [, setLocation] = useLocation();

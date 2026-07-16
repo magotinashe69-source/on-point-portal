@@ -8,7 +8,7 @@ import { useAuth } from "@/lib/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ArrowLeft, Loader2, BarChart3, TrendingUp, Users, BookOpen, ClipboardList } from "lucide-react";
 import { useState } from "react";
-import logoPath from "@assets/image_1769457206059.png";
+import logoPath from "@assets/logo.webp";
 import {
   ChartContainer,
   ChartTooltip,

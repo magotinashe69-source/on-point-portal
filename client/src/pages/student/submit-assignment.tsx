@@ -22,7 +22,7 @@ import { Lightbox } from "@/components/Lightbox";
 import { useUpload } from "@/hooks/use-upload";
 import { isFullyAutoMarked } from "@shared/auto-marking";
 import type { Assignment, Submission } from "@shared/schema";
-import logoPath from "@assets/image_1769457206059.png";
+import logoPath from "@assets/logo.webp";
 
 const MIN_ANSWER_LENGTH = 30;
 

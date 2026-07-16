@@ -14,7 +14,7 @@ import {
   Users, BookOpen, CheckCircle, Clock, XCircle, History,
   Database, Filter, Calendar, AlertTriangle,
 } from "lucide-react";
-import logoPath from "@assets/image_1769457206059.png";
+import logoPath from "@assets/logo.webp";
 import type { Assignment } from "@shared/schema";
 
 interface PreviewData {

@@ -32,7 +32,7 @@ import {
   Lock
 } from "lucide-react";
 import type { Resource } from "@shared/schema";
-import logoPath from "@assets/image_1769457206059.png";
+import logoPath from "@assets/logo.webp";
 
 const createResourceSchema = z.object({
   title: z.string().min(1, "Title is required"),

@@ -13,7 +13,7 @@ import { useAuth } from "@/lib/auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ArrowLeft, PlusCircle, Pencil, Trash2, KeyRound, Loader2, Users } from "lucide-react";
-import logoPath from "@assets/image_1769457206059.png";
+import logoPath from "@assets/logo.webp";
 import type { Student } from "@shared/schema";
 
 export default function StudentManagement() {

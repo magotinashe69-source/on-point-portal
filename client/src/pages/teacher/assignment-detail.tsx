@@ -19,7 +19,7 @@ import { AttachmentDisplay } from "@/components/FileAttachmentZone";
 import type { Assignment, Student } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import logoPath from "@assets/image_1769457206059.png";
+import logoPath from "@assets/logo.webp";
 
 interface EnrichedSubmission {
   id: number;
