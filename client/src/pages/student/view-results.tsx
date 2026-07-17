@@ -11,6 +11,8 @@ import { ArrowLeft, Loader2, CheckCircle, XCircle, Trophy, MessageSquare, Image 
 import { Lightbox } from "@/components/Lightbox";
 import { isFullyAutoMarked } from "@shared/auto-marking";
 import type { Submission, Assignment, Mark } from "@shared/schema";
+import { XpRewardBadge } from "@/components/XpRewardBadge";
+import { takePendingXp } from "@/lib/xp-handoff";
 import logoPath from "@assets/logo.webp";
 
 export default function ViewResults() {
@@ -19,6 +21,10 @@ export default function ViewResults() {
   const { student } = useAuth();
   const [lightboxImages, setLightboxImages] = useState<string[]>([]);
   const [lightboxIndex, setLightboxIndex] = useState(0);
+  // The XP just earned for this submission, handed off from the submit page.
+  // Read once on mount (and cleared) so the animation shows only right after
+  // submitting, not every time old results are reopened.
+  const [xpAward] = useState(() => (id ? takePendingXp(Number(id)) : undefined));
 
   useEffect(() => {
     if (!student) {
@@ -109,6 +115,13 @@ export default function ViewResults() {
                   <p className="text-muted-foreground">{percentage}%</p>
                 </div>
                 <Progress value={percentage} className="h-3" />
+
+                {/* The "+X XP earned" reward moment (with a level-up burst). */}
+                {xpAward && (
+                  <div className="mt-5 flex justify-center">
+                    <XpRewardBadge award={xpAward} />
+                  </div>
+                )}
 
                 {/* Auto-marked quizzes can be retried for a fresh instant score. */}
                 {assignment.questions && isFullyAutoMarked(assignment.questions) && (

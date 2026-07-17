@@ -6,14 +6,17 @@
 import { Button } from "@/components/ui/button";
 import { COLLECTIBLES } from "@shared/collectibles";
 import { collectibleEmoji } from "@/lib/collectible-emoji";
+import { XpRewardBadge } from "@/components/XpRewardBadge";
+import type { XpAward } from "@/lib/xp-handoff";
 
 interface TreasureRewardModalProps {
-  rewardName: string;    // e.g. "Golden Compass"
-  onClose: () => void;   // "Continue" — usually back to the dashboard
-  onViewMap: () => void; // "See it on the map" — go to Treasure Island
+  rewardName: string;        // e.g. "Golden Compass"
+  xp?: XpAward | null;       // XP earned alongside the treasure, if any
+  onClose: () => void;       // "Continue" — usually back to the dashboard
+  onViewMap: () => void;     // "See it on the map" — go to Treasure Island
 }
 
-export function TreasureRewardModal({ rewardName, onClose, onViewMap }: TreasureRewardModalProps) {
+export function TreasureRewardModal({ rewardName, xp, onClose, onViewMap }: TreasureRewardModalProps) {
   const emoji = collectibleEmoji(rewardName);
   const description = COLLECTIBLES.find((c) => c.name === rewardName)?.description ?? "";
 
@@ -117,6 +120,14 @@ export function TreasureRewardModal({ rewardName, onClose, onViewMap }: Treasure
         <p className="text-sm font-semibold uppercase tracking-wide text-primary mt-2">Treasure Found!</p>
         <h2 className="text-2xl font-bold mt-1" data-testid="text-reward-name">{rewardName}</h2>
         {description && <p className="text-sm text-muted-foreground mt-1">{description}</p>}
+
+        {/* XP earned for completing this spot, shown alongside the chest. */}
+        {xp && (
+          <div className="mt-3 flex justify-center">
+            <XpRewardBadge award={xp} />
+          </div>
+        )}
+
         <p className="text-xs text-muted-foreground mt-3">Added to your Treasure Island collection 🏝️</p>
 
         <div className="mt-5 flex flex-col sm:flex-row gap-2">

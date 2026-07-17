@@ -23,6 +23,7 @@ import { useUpload } from "@/hooks/use-upload";
 import { isFullyAutoMarked } from "@shared/auto-marking";
 import type { Assignment, Submission, StudentReward } from "@shared/schema";
 import { TreasureRewardModal } from "@/components/TreasureRewardModal";
+import { setPendingXp, type XpAward } from "@/lib/xp-handoff";
 import logoPath from "@assets/logo.webp";
 
 const MIN_ANSWER_LENGTH = 30;
@@ -61,6 +62,8 @@ export default function SubmitAssignment() {
   const [pendingValues, setPendingValues] = useState<SubmitForm | null>(null);
   // The treasure just earned, if any — shows the chest-opening reward pop-up.
   const [earnedReward, setEarnedReward] = useState<StudentReward | null>(null);
+  // The XP earned on this submission, shown inside the chest pop-up.
+  const [earnedXp, setEarnedXp] = useState<XpAward | null>(null);
 
   useEffect(() => {
     if (!student) {
@@ -139,16 +142,30 @@ export default function SubmitAssignment() {
       if (data.success) {
         queryClient.invalidateQueries({ queryKey: ["/api/submissions"] });
         queryClient.invalidateQueries({ queryKey: ["/api/assignments"] });
+        // XP may have changed — refresh the dashboard's level bar.
+        queryClient.invalidateQueries({ queryKey: ["/api/students", student.id, "stats"] });
 
-        // Primary students may earn a Treasure Hunt collectible on a new
-        // submission. When they do, celebrate with the chest-opening pop-up and
-        // let it handle navigation. Everyone else goes straight to the dashboard.
+        const submissionId: number | undefined = data.submission?.id;
+
+        // Primary students may earn a Treasure Hunt collectible. Celebrate with
+        // the chest-opening pop-up, which also shows the XP earned, and let it
+        // handle navigation.
         if (data.reward) {
           queryClient.invalidateQueries({ queryKey: ["/api/students/" + student.id + "/rewards"] });
+          setEarnedXp(data.xp ?? null);
           setEarnedReward(data.reward);
           return;
         }
 
+        // Auto-marked submissions earned XP and have an instant score: hand the
+        // XP to the results screen and show the "+X XP" moment there.
+        if (data.xp && submissionId) {
+          setPendingXp(submissionId, data.xp);
+          setLocation(`/student/results/${submissionId}`);
+          return;
+        }
+
+        // Hand-marked submissions have no instant score or XP — keep it simple.
         toast({
           title: isEditing ? "Updated successfully!" : "Submitted successfully!",
           description: isEditing ? "Your changes have been saved." : "Your work has been submitted for review.",
@@ -229,6 +246,7 @@ export default function SubmitAssignment() {
       {earnedReward && (
         <TreasureRewardModal
           rewardName={earnedReward.rewardName}
+          xp={earnedXp}
           onClose={() => setLocation("/student/dashboard")}
           onViewMap={() => setLocation("/student/treasure")}
         />
