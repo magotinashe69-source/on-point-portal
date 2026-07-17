@@ -300,6 +300,25 @@ export const insertStudentRewardSchema = createInsertSchema(studentRewards).omit
 export type StudentReward = typeof studentRewards.$inferSelect;
 export type InsertStudentReward = z.infer<typeof insertStudentRewardSchema>;
 
+// Student XP + levels (gamification). Like studentRewards, this table stands on
+// its own and references a student id ONLY — it does not add columns to, or
+// depend on, any existing table. One row per student holds their lifetime XP,
+// current level, and a small daily counter used to cap how much XP can be
+// earned in a single day.
+export const studentXp = pgTable("student_xp", {
+  id: serial("id").primaryKey(),
+  studentId: integer("student_id").notNull().references(() => students.id), // who this belongs to
+  totalXp: integer("total_xp").notNull().default(0),   // lifetime XP
+  level: integer("level").notNull().default(0),        // derived from totalXp (every 500 XP = 1 level)
+  dailyXp: integer("daily_xp").notNull().default(0),   // XP earned during the day named in dailyDate
+  dailyDate: text("daily_date").notNull().default(""), // the day dailyXp counts for (YYYY-MM-DD, UTC)
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertStudentXpSchema = createInsertSchema(studentXp).omit({ id: true, updatedAt: true });
+export type StudentXp = typeof studentXp.$inferSelect;
+export type InsertStudentXp = z.infer<typeof insertStudentXpSchema>;
+
 // Login schemas
 export const teacherLoginSchema = z.object({
   email: z.string().email("Valid email is required"),

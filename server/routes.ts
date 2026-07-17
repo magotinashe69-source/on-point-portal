@@ -11,6 +11,7 @@ import type { Assignment, Submission } from "@shared/schema";
 import { isPrimaryForm } from "@shared/schema";
 import { isFullyAutoMarked, markSubmission, buildFeedback } from "@shared/auto-marking";
 import { awardRandomCollectible } from "./rewards";
+import { awardXp, xpProgress, XP_PER_CORRECT, XP_COMPLETION_BONUS, XP_IMPROVEMENT_BONUS } from "./xp";
 import { z } from "zod";
 
 // Mark an auto-markable submission in code and save the result as a Mark.
@@ -702,7 +703,27 @@ export async function registerRoutes(
         }
       }
 
-      res.json({ success: true, submission, mark: mark ?? undefined, reward });
+      // XP + levels. Only auto-marked submissions earn XP here (that is when we
+      // have an instant score). This runs after marking and is best-effort, so
+      // it can never break or slow the marking response. First completion earns
+      // 10 XP per correct answer plus a 25 completion bonus (subject to the
+      // daily cap). A "correct answer" is a question awarded full marks.
+      let xp;
+      if (mark) {
+        try {
+          const correct = mark.questionMarks.filter((q) => q.score >= q.maxScore).length;
+          const requested = correct * XP_PER_CORRECT + XP_COMPLETION_BONUS;
+          xp = await awardXp(studentId, requested, {
+            correct,
+            perCorrect: XP_PER_CORRECT,
+            completionBonus: XP_COMPLETION_BONUS,
+          });
+        } catch (xpError) {
+          console.error("XP award failed (submission still saved):", xpError);
+        }
+      }
+
+      res.json({ success: true, submission, mark: mark ?? undefined, reward, xp });
     } catch (error) {
       console.error("Create submission error:", error);
       res.status(500).json({ success: false, message: "Server error" });
@@ -734,6 +755,10 @@ export async function registerRoutes(
         return res.status(403).json({ success: false, message: "Cannot edit a marked submission" });
       }
 
+      // The score from the previous attempt — read BEFORE re-marking overwrites
+      // it — so we can award an XP bonus when a retry beats it.
+      const previousMark = await storage.getMark(submissionId);
+
       // Validate answers
       const { answers } = req.body;
       if (!answers || !Array.isArray(answers)) {
@@ -757,7 +782,25 @@ export async function registerRoutes(
         }
       }
 
-      res.json({ success: true, submission: updatedSubmission, mark: mark ?? undefined });
+      // XP for a retry: a flat 50 bonus only when this attempt beats the
+      // student's previous score (subject to the daily cap). Best-effort, and
+      // only for auto-marked assignments (where we have an instant score). When
+      // the score isn't beaten we still return the current totals with awarded
+      // 0 so the results screen can show a friendly "no new XP" message.
+      let xp;
+      if (mark) {
+        try {
+          const improved = mark.totalScore > (previousMark?.totalScore ?? -1);
+          const requested = improved ? XP_IMPROVEMENT_BONUS : 0;
+          xp = await awardXp(submission.studentId, requested, {
+            improvementBonus: improved ? XP_IMPROVEMENT_BONUS : 0,
+          });
+        } catch (xpError) {
+          console.error("XP award failed (submission still saved):", xpError);
+        }
+      }
+
+      res.json({ success: true, submission: updatedSubmission, mark: mark ?? undefined, xp });
     } catch (error) {
       console.error("Update submission error:", error);
       res.status(500).json({ success: false, message: "Server error" });
@@ -882,6 +925,11 @@ export async function registerRoutes(
 
       const averageScore = totalMaxScore > 0 ? Math.round((totalScore / totalMaxScore) * 100) : 0;
 
+      // XP + level for the dashboard bar. Included here (rather than a separate
+      // endpoint) so it loads in the same request the dashboard already makes.
+      const xpRow = await storage.getStudentXp(studentId);
+      const xp = xpProgress(xpRow?.totalXp ?? 0, xpRow?.level ?? 0);
+
       res.json({
         success: true,
         stats: {
@@ -889,6 +937,7 @@ export async function registerRoutes(
           pending: submissions.filter(s => s.status === "SUBMITTED").length,
           averageScore,
           totalSubmissions: submissions.length,
+          xp,
         }
       });
     } catch (error) {

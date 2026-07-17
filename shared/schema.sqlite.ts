@@ -176,6 +176,19 @@ export const studentRewards = sqliteTable("student_rewards", {
   earnedAt: timestamp("earned_at").notNull().$defaultFn(() => new Date()),
 });
 
+// --- Student XP + levels (gamification) ---
+// One row per student: lifetime XP, current level, and a small daily counter.
+// References a student id only; does not touch any existing table.
+export const studentXp = sqliteTable("student_xp", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  studentId: integer("student_id").notNull().references(() => students.id),
+  totalXp: integer("total_xp").notNull().default(0),
+  level: integer("level").notNull().default(0),
+  dailyXp: integer("daily_xp").notNull().default(0),
+  dailyDate: text("daily_date").notNull().default(""),
+  updatedAt: timestamp("updated_at").notNull().$defaultFn(() => new Date()),
+});
+
 // Plain SQL that creates every table above if it does not exist yet.
 // We run this once on startup so a fresh SQLite database is ready to use
 // with no manual migration step.
@@ -293,5 +306,15 @@ CREATE TABLE IF NOT EXISTS student_rewards (
   reward_name TEXT NOT NULL,
   assignment_id INTEGER,
   earned_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS student_xp (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  student_id INTEGER NOT NULL,
+  total_xp INTEGER NOT NULL DEFAULT 0,
+  level INTEGER NOT NULL DEFAULT 0,
+  daily_xp INTEGER NOT NULL DEFAULT 0,
+  daily_date TEXT NOT NULL DEFAULT '',
+  updated_at INTEGER NOT NULL
 );
 `;

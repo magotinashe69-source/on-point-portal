@@ -3,7 +3,7 @@ import { eq, and, inArray, or, isNull, desc } from "drizzle-orm";
 // the right database (SQLite or PostgreSQL) at runtime.
 import {
   db,
-  teachers, students, assignments, submissions, marks, resources, announcements, lessons, exportLogs, studentRewards,
+  teachers, students, assignments, submissions, marks, resources, announcements, lessons, exportLogs, studentRewards, studentXp,
 } from "./db";
 // The TypeScript types are the same for both databases, so they come from the shared schema.
 import {
@@ -17,6 +17,7 @@ import {
   type Lesson, type InsertLesson,
   type ExportLog, type InsertExportLog,
   type StudentReward, type InsertStudentReward,
+  type StudentXp, type InsertStudentXp,
   MASTER_PASSWORD
 } from "@shared/schema";
 
@@ -83,6 +84,11 @@ export interface IStorage {
   // Student Rewards (gamification)
   createStudentReward(reward: InsertStudentReward): Promise<StudentReward>;
   getStudentRewards(studentId: number): Promise<StudentReward[]>;
+
+  // Student XP + levels (gamification)
+  getStudentXp(studentId: number): Promise<StudentXp | undefined>;
+  createStudentXp(row: InsertStudentXp): Promise<StudentXp>;
+  updateStudentXp(studentId: number, data: Partial<InsertStudentXp>): Promise<StudentXp>;
 
   // Seed data
   seedInitialData(): Promise<void>;
@@ -442,6 +448,25 @@ export class DatabaseStorage implements IStorage {
 
   async getStudentRewards(studentId: number): Promise<StudentReward[]> {
     return db.select().from(studentRewards).where(eq(studentRewards.studentId, studentId));
+  }
+
+  // Student XP + levels
+  async getStudentXp(studentId: number): Promise<StudentXp | undefined> {
+    const [row] = await db.select().from(studentXp).where(eq(studentXp.studentId, studentId));
+    return row || undefined;
+  }
+
+  async createStudentXp(row: InsertStudentXp): Promise<StudentXp> {
+    const [created] = await db.insert(studentXp).values(row).returning();
+    return created;
+  }
+
+  async updateStudentXp(studentId: number, data: Partial<InsertStudentXp>): Promise<StudentXp> {
+    const [updated] = await db.update(studentXp)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(studentXp.studentId, studentId))
+      .returning();
+    return updated;
   }
 
   async getExportLogs(teacherEmail: string, limit = 20): Promise<ExportLog[]> {
