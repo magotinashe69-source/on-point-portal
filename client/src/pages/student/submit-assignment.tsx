@@ -21,7 +21,8 @@ import { AttachmentDisplay } from "@/components/FileAttachmentZone";
 import { Lightbox } from "@/components/Lightbox";
 import { useUpload } from "@/hooks/use-upload";
 import { isFullyAutoMarked } from "@shared/auto-marking";
-import type { Assignment, Submission } from "@shared/schema";
+import type { Assignment, Submission, StudentReward } from "@shared/schema";
+import { TreasureRewardModal } from "@/components/TreasureRewardModal";
 import logoPath from "@assets/logo.webp";
 
 const MIN_ANSWER_LENGTH = 30;
@@ -58,6 +59,8 @@ export default function SubmitAssignment() {
   const [showWarningDialog, setShowWarningDialog] = useState(false);
   const [thinAnswers, setThinAnswers] = useState<ThinAnswer[]>([]);
   const [pendingValues, setPendingValues] = useState<SubmitForm | null>(null);
+  // The treasure just earned, if any — shows the chest-opening reward pop-up.
+  const [earnedReward, setEarnedReward] = useState<StudentReward | null>(null);
 
   useEffect(() => {
     if (!student) {
@@ -136,6 +139,16 @@ export default function SubmitAssignment() {
       if (data.success) {
         queryClient.invalidateQueries({ queryKey: ["/api/submissions"] });
         queryClient.invalidateQueries({ queryKey: ["/api/assignments"] });
+
+        // Primary students may earn a Treasure Hunt collectible on a new
+        // submission. When they do, celebrate with the chest-opening pop-up and
+        // let it handle navigation. Everyone else goes straight to the dashboard.
+        if (data.reward) {
+          queryClient.invalidateQueries({ queryKey: ["/api/students/" + student.id + "/rewards"] });
+          setEarnedReward(data.reward);
+          return;
+        }
+
         toast({
           title: isEditing ? "Updated successfully!" : "Submitted successfully!",
           description: isEditing ? "Your changes have been saved." : "Your work has been submitted for review.",
@@ -213,6 +226,14 @@ export default function SubmitAssignment() {
 
   return (
     <div className="min-h-screen bg-background">
+      {earnedReward && (
+        <TreasureRewardModal
+          rewardName={earnedReward.rewardName}
+          onClose={() => setLocation("/student/dashboard")}
+          onViewMap={() => setLocation("/student/treasure")}
+        />
+      )}
+
       {lightboxImages.length > 0 && (
         <Lightbox
           images={lightboxImages}

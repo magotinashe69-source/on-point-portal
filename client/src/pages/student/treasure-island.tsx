@@ -8,24 +8,8 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { ArrowLeft, Loader2, Lock, CheckCircle } from "lucide-react";
 import { COLLECTIBLES, TREASURE_HUNT_TOTAL } from "@shared/collectibles";
 import { isPrimaryForm, type StudentReward } from "@shared/schema";
+import { collectibleEmoji } from "@/lib/collectible-emoji";
 import logoPath from "@assets/logo.webp";
-
-// A little picture for each collectible. This is just for show on the map,
-// so it lives here (not in the shared data) as a simple name -> emoji lookup.
-const COLLECTIBLE_EMOJI: Record<string, string> = {
-  "Ruby Gem": "💎",
-  "Golden Compass": "🧭",
-  "Old Map Piece": "🗺️",
-  "Parrot": "🦜",
-  "Pearl": "🦪",
-  "Anchor": "⚓",
-  "Spyglass": "🔭",
-  "Treasure Key": "🗝️",
-  "Silver Coin": "🪙",
-  "Message in a Bottle": "📜",
-  "Pirate Flag": "🏴‍☠️",
-  "Crown": "👑",
-};
 
 // Where each of the 12 treasures sits on the island. The order matches
 // COLLECTIBLES (spot 1 is the first item, spot 12 the last), and the trail is
@@ -231,7 +215,7 @@ function IslandMap({ earnedNames }: { earnedNames: Set<string> }) {
               : "locked";
           return (
             <g key={c.name} transform={`translate(${p.x} ${p.y})`}>
-              <TreasureSpot state={state} emoji={COLLECTIBLE_EMOJI[c.name] ?? "🎁"} name={c.name} />
+              <TreasureSpot state={state} emoji={collectibleEmoji(c.name)} name={c.name} />
             </g>
           );
         })}
@@ -327,7 +311,7 @@ export default function TreasureIsland() {
                   <CardContent className="p-4 text-center flex flex-col items-center gap-2 h-full">
                     {/* Earned treasures show their picture; locked ones stay a mystery. */}
                     <div className={`text-4xl ${earned ? "" : "grayscale opacity-40"}`}>
-                      {earned ? COLLECTIBLE_EMOJI[collectible.name] ?? "🎁" : "❓"}
+                      {earned ? collectibleEmoji(collectible.name) : "❓"}
                     </div>
                     {earned ? (
                       <>

@@ -31,12 +31,12 @@ const SUBJECTS = [
 ];
 
 // The four feature cards. Pastel backgrounds keep them light and playful.
-// Two features are not built yet, so they carry a "Coming soon" ribbon.
+// Features that aren't built yet carry a "Coming soon" ribbon.
 const FEATURES = [
   { title: "Homework Help", emoji: "📝", bg: "#E3F2FD", desc: "See your tasks and hand in your work.", href: "/student/login", soon: false },
   { title: "Practice Quizzes", emoji: "🧠", bg: "#E8F5E9", desc: "Get an instant score the moment you finish.", href: "/student/login", soon: false },
   { title: "Earn Rewards", emoji: "🏆", bg: "#FFF3E0", desc: "Collect treasures for finishing your work.", href: "/rewards", soon: true },
-  { title: "Fun Games", emoji: "🎮", bg: "#F3E8FF", desc: "Learn while you play — battles and more.", href: "/games", soon: true },
+  { title: "Fun Games", emoji: "🎮", bg: "#F3E8FF", desc: "Learn while you play — battles and more.", href: "/student/login", soon: false },
 ];
 
 // Honest facts about the app (checked against the code — no exaggeration).
