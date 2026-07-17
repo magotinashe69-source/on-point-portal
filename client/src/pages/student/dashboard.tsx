@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import type { Assignment, Announcement } from "@shared/schema";
 import { isPrimaryForm } from "@shared/schema";
+import { XpLevelBar } from "@/components/XpLevelBar";
 import logoPath from "@assets/logo.webp";
 
 interface EnrichedSubmission {
@@ -62,6 +63,13 @@ export default function StudentDashboard() {
     pending: number;
     averageScore: number;
     totalSubmissions: number;
+    xp?: {
+      totalXp: number;
+      level: number;
+      xpIntoLevel: number;
+      xpForNextLevel: number;
+      progressPercent: number;
+    };
   }
 
   const { data: statsData, isLoading: statsLoading } = useQuery<{ success: boolean; stats: StudentStats }>({
@@ -124,10 +132,19 @@ export default function StudentDashboard() {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        <div className="mb-8">
+        <div className="mb-6">
           <h1 className="text-3xl font-bold mb-2">Welcome, {student.fullName}!</h1>
           <p className="text-muted-foreground">{student.form} - ID: {student.studentId}</p>
         </div>
+
+        {/* Level + XP progress. Uses the stats already loaded above, so it adds
+            no extra request. Shows a zeroed bar until stats arrive. */}
+        <XpLevelBar
+          level={statsData?.stats.xp?.level ?? 0}
+          xpIntoLevel={statsData?.stats.xp?.xpIntoLevel ?? 0}
+          xpForNextLevel={statsData?.stats.xp?.xpForNextLevel ?? 500}
+          progressPercent={statsData?.stats.xp?.progressPercent ?? 0}
+        />
 
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
           <Card>
