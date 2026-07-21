@@ -3,6 +3,7 @@ import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { XpLevelBar } from "@/components/XpLevelBar";
 import { useAuth } from "@/lib/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ArrowLeft, Loader2, Lock, CheckCircle } from "lucide-react";
@@ -242,6 +243,18 @@ export default function TreasureIsland() {
     enabled: !!student && isPrimaryForm(student.form),
   });
 
+  // The student's XP/level, from the same stats endpoint the dashboard uses,
+  // so the treasure map can show XP right alongside the chests (no new call).
+  const { data: statsData } = useQuery<{
+    success: boolean;
+    stats: {
+      xp?: { level: number; xpIntoLevel: number; xpForNextLevel: number; progressPercent: number };
+    };
+  }>({
+    queryKey: ["/api/students", student?.id, "stats"],
+    enabled: !!student && isPrimaryForm(student.form),
+  });
+
   if (!student || !isPrimaryForm(student.form)) return null;
 
   // The set of collectible names this student has already earned. We use a set
@@ -274,6 +287,15 @@ export default function TreasureIsland() {
             Finish assignments to collect all {TREASURE_HUNT_TOTAL} treasures!
           </p>
         </div>
+
+        {/* Level + XP, shown alongside the chests. Uses the stats already
+            fetched above, so it adds no extra request. Zeroed until it loads. */}
+        <XpLevelBar
+          level={statsData?.stats.xp?.level ?? 0}
+          xpIntoLevel={statsData?.stats.xp?.xpIntoLevel ?? 0}
+          xpForNextLevel={statsData?.stats.xp?.xpForNextLevel ?? 500}
+          progressPercent={statsData?.stats.xp?.progressPercent ?? 0}
+        />
 
         {/* Progress towards collecting the whole set. */}
         <Card className="mb-6">
