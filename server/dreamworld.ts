@@ -1,30 +1,29 @@
 // Dream World — server logic for the primary-only town-building game.
 //
-// Self-contained, like xp.ts / streaks.ts / rewards.ts: it reads and writes the
-// dream_world table and never touches auto-marking, XP, or streaks. Resource
-// payouts are awarded best-effort by the submission handler (see routes.ts), and
-// building placement is validated here so a client can never spend resources it
-// does not have or drop a building off the grid / onto another.
+// Self-contained, like xp.ts / streaks.ts: it reads and writes the dream_world
+// table (and reads submissions/assignments to count progress and find overdue
+// work) and never modifies auto-marking, XP, or streaks. The server is the
+// source of truth for the wallet AND for unlocks, so the browser can't cheat by
+// editing resources or pretending a building is unlocked.
 
 import { storage } from "./storage";
-import type { DreamWorld } from "@shared/schema";
+import type { DreamWorld, Student } from "@shared/schema";
 import {
-  BUILDINGS, buildingById, canAfford, footprint, inBounds, occupiedCells,
-  payoutForPercent, refundOf, type Payout, type Placed, type Wallet,
+  buildingById, canAfford, footprint, inBounds, occupiedCells,
+  payoutForPercent, refundOf, subjectToCategory, unlockedIds, isUnlocked,
+  EMPTY_PROGRESS, type Payout, type Placed, type Progress, type Wallet,
 } from "@shared/dreamworld";
 
-// Load a student's Dream World row, creating an empty one the first time.
 async function loadOrCreate(studentId: number): Promise<DreamWorld> {
   let row = await storage.getDreamWorld(studentId);
   if (!row) {
     row = await storage.createDreamWorld({
-      studentId, coins: 0, bricks: 0, wood: 0, gems: 0, layout: "[]",
+      studentId, coins: 0, bricks: 0, wood: 0, gems: 0, layout: "[]", seenUnlocks: "",
     });
   }
   return row;
 }
 
-// Parse the stored layout JSON defensively — a bad value must never throw.
 function parseLayout(raw: string): Placed[] {
   try {
     const parsed = JSON.parse(raw);
@@ -42,20 +41,72 @@ function walletOf(row: DreamWorld): Wallet {
   return { coins: row.coins, bricks: row.bricks, wood: row.wood, gems: row.gems };
 }
 
+// Count a student's completed (submitted + marked) assignments per subject, and
+// the grand total. This is computed from the real submissions/assignments each
+// time, so it can never drift or be spoofed by the client.
+export async function computeProgress(studentId: number): Promise<Progress> {
+  const submissions = await storage.getSubmissions({ studentId });
+  const marked = submissions.filter((s) => s.status === "MARKED");
+  const p: Progress = { ...EMPTY_PROGRESS };
+  for (const sub of marked) {
+    p.total += 1;
+    const assignment = await storage.getAssignment(sub.assignmentId);
+    if (assignment) {
+      const cat = subjectToCategory(assignment.subject);
+      if (cat) p[cat] += 1;
+    }
+  }
+  return p;
+}
+
+// Find one assignment that is overdue for this student: assigned to them, not
+// archived, past its (possibly extended) due date, and not yet submitted.
+export async function computeOverdue(student: Student): Promise<{ id: number; title: string } | null> {
+  const assignments = await storage.getAssignments(student.form, student.id, false);
+  const submissions = await storage.getSubmissions({ studentId: student.id });
+  const submitted = new Set(submissions.map((s) => s.assignmentId));
+  const now = Date.now();
+
+  for (const a of assignments) {
+    if (submitted.has(a.id)) continue;
+    // A per-student extended deadline overrides the assignment due date.
+    const ext = (a.extendedDeadlines ?? []).find((e) => e.studentId === student.id);
+    const due = ext ? ext.newDueDate : a.dueDate;
+    const dueMs = Date.parse(due);
+    if (!Number.isNaN(dueMs) && dueMs < now) {
+      return { id: a.id, title: a.title };
+    }
+  }
+  return null;
+}
+
 export interface DreamState {
   wallet: Wallet;
   layout: Placed[];
+  progress: Progress;
+  overdue: { id: number; title: string } | null;
+  justUnlocked: string[]; // buildings unlocked since the last visit (for the celebration)
 }
 
-// The wallet + town a student currently has.
-export async function getState(studentId: number): Promise<DreamState> {
-  const row = await loadOrCreate(studentId);
-  return { wallet: walletOf(row), layout: parseLayout(row.layout) };
+// The full Dream World state for the plot screen. Also detects buildings that
+// have become unlocked since the last visit (so the client can celebrate them
+// once) and remembers that they've been shown.
+export async function getState(student: Student): Promise<DreamState> {
+  const row = await loadOrCreate(student.id);
+  const progress = await computeProgress(student.id);
+  const overdue = await computeOverdue(student);
+
+  const unlocked = unlockedIds(progress);
+  const seen = row.seenUnlocks ? row.seenUnlocks.split(",").filter(Boolean) : [];
+  const justUnlocked = unlocked.filter((id) => !seen.includes(id));
+  if (justUnlocked.length > 0) {
+    await storage.updateDreamWorld(student.id, { seenUnlocks: unlocked.join(",") });
+  }
+
+  return { wallet: walletOf(row), layout: parseLayout(row.layout), progress, overdue, justUnlocked };
 }
 
 // Award resources for completing an assignment (base payout + score gems).
-// Called best-effort from the submission handler; returns what was granted so
-// the results screen / reward modal can show it.
 export async function awardResources(studentId: number, percent: number): Promise<Payout> {
   const row = await loadOrCreate(studentId);
   const payout = payoutForPercent(percent);
@@ -68,14 +119,12 @@ export async function awardResources(studentId: number, percent: number): Promis
   return payout;
 }
 
-// A place/remove result: either the new authoritative state, or a friendly
-// reason it could not happen (translated to a 400 by the route).
 export type MutationResult =
   | { ok: true; wallet: Wallet; layout: Placed[] }
   | { ok: false; message: string };
 
-// Place a building at (x, y) after checking bounds, that the tiles are free,
-// and that the student can afford it. Deducts the cost and saves the layout.
+// Place a building after checking it is unlocked, fits, the tiles are free, and
+// the student can afford it. All four checks are authoritative here.
 export async function placeBuilding(
   studentId: number, buildingId: string, x: number, y: number,
 ): Promise<MutationResult> {
@@ -85,6 +134,10 @@ export async function placeBuilding(
 
   const row = await loadOrCreate(studentId);
   const layout = parseLayout(row.layout);
+
+  // Unlock check — computed from real completions, never trusted from the client.
+  const progress = await computeProgress(studentId);
+  if (!isUnlocked(def, progress)) return { ok: false, message: "That building isn't unlocked yet." };
 
   if (!inBounds(x, y, def.size)) return { ok: false, message: "That doesn't fit on the map." };
 
@@ -100,6 +153,7 @@ export async function placeBuilding(
     coins: row.coins - (def.cost.coins ?? 0),
     bricks: row.bricks - (def.cost.bricks ?? 0),
     wood: row.wood - (def.cost.wood ?? 0),
+    gems: row.gems - (def.cost.gems ?? 0),
     layout: JSON.stringify(newLayout),
   });
   return { ok: true, wallet: walletOf(updated), layout: newLayout };
@@ -117,17 +171,15 @@ export async function removeBuilding(
   if (!target) return { ok: false, message: "Nothing to remove there." };
 
   const def = buildingById(target.id);
-  const refund = def ? refundOf(def.cost) : {};
+  const refund = def ? refundOf(def.cost) : { coins: 0, bricks: 0, wood: 0, gems: 0 };
   const newLayout = layout.filter((b) => !(b.x === target.x && b.y === target.y && b.id === target.id));
 
   const updated = await storage.updateDreamWorld(studentId, {
-    coins: row.coins + (refund.coins ?? 0),
-    bricks: row.bricks + (refund.bricks ?? 0),
-    wood: row.wood + (refund.wood ?? 0),
+    coins: row.coins + refund.coins,
+    bricks: row.bricks + refund.bricks,
+    wood: row.wood + refund.wood,
+    gems: row.gems + refund.gems,
     layout: JSON.stringify(newLayout),
   });
   return { ok: true, wallet: walletOf(updated), layout: newLayout };
 }
-
-// Re-exported so routes can keep the building list in one place if needed.
-export { BUILDINGS };

@@ -64,6 +64,7 @@ CREATE TABLE IF NOT EXISTS dream_world (
   wood INTEGER NOT NULL DEFAULT 0,
   gems INTEGER NOT NULL DEFAULT 0,
   layout TEXT NOT NULL DEFAULT '[]',
+  seen_unlocks TEXT NOT NULL DEFAULT '',
   updated_at TIMESTAMP NOT NULL DEFAULT now()
 );
 `;
@@ -87,6 +88,10 @@ if (usePostgres) {
   // is completely safe and does nothing when they already exist.
   ensureSchemaFn = async () => {
     await pgPoolInstance!.query(PG_GAMIFICATION_DDL);
+    // Add columns introduced after a table first shipped (idempotent).
+    await pgPoolInstance!.query(
+      "ALTER TABLE dream_world ADD COLUMN IF NOT EXISTS seen_unlocks TEXT NOT NULL DEFAULT ''",
+    );
   };
 
   console.log("[db] Using PostgreSQL (DATABASE_URL is set)");
@@ -102,6 +107,14 @@ if (usePostgres) {
   // Create the tables on first run if the file is new.
   ensureSchemaFn = async () => {
     await client.executeMultiple(sqliteSchema.SQLITE_DDL);
+    // Add columns introduced after a table first shipped. SQLite has no
+    // "ADD COLUMN IF NOT EXISTS", so ignore the error when it already exists.
+    const migrations = [
+      "ALTER TABLE dream_world ADD COLUMN seen_unlocks TEXT NOT NULL DEFAULT ''",
+    ];
+    for (const stmt of migrations) {
+      try { await client.execute(stmt); } catch { /* column already present */ }
+    }
   };
 
   console.log(`[db] Using local SQLite database at ${dbFile}`);

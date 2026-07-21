@@ -352,7 +352,8 @@ export const dreamWorld = pgTable("dream_world", {
   bricks: integer("bricks").notNull().default(0),
   wood: integer("wood").notNull().default(0),
   gems: integer("gems").notNull().default(0),
-  layout: text("layout").notNull().default("[]"), // JSON: [{ id, x, y }, ...]
+  layout: text("layout").notNull().default("[]"),       // JSON: [{ id, x, y }, ...]
+  seenUnlocks: text("seen_unlocks").notNull().default(""), // CSV of building ids whose unlock was celebrated
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 

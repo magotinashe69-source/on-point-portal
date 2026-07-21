@@ -214,6 +214,7 @@ export const dreamWorld = sqliteTable("dream_world", {
   wood: integer("wood").notNull().default(0),
   gems: integer("gems").notNull().default(0),
   layout: text("layout").notNull().default("[]"),
+  seenUnlocks: text("seen_unlocks").notNull().default(""),
   updatedAt: timestamp("updated_at").notNull().$defaultFn(() => new Date()),
 });
 
@@ -366,6 +367,7 @@ CREATE TABLE IF NOT EXISTS dream_world (
   wood INTEGER NOT NULL DEFAULT 0,
   gems INTEGER NOT NULL DEFAULT 0,
   layout TEXT NOT NULL DEFAULT '[]',
+  seen_unlocks TEXT NOT NULL DEFAULT '',
   updated_at INTEGER NOT NULL
 );
 `;

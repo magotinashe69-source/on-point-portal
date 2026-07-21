@@ -1085,8 +1085,15 @@ export async function registerRoutes(
     try {
       const student = await requirePrimaryStudent(parseInt(req.params.id), res);
       if (!student) return;
-      const state = await getDreamState(student.id);
-      res.json({ success: true, wallet: state.wallet, layout: state.layout });
+      const state = await getDreamState(student);
+      res.json({
+        success: true,
+        wallet: state.wallet,
+        layout: state.layout,
+        progress: state.progress,
+        overdue: state.overdue,
+        justUnlocked: state.justUnlocked,
+      });
     } catch (error) {
       console.error("Get Dream World error:", error);
       res.status(500).json({ success: false, message: "Server error" });
