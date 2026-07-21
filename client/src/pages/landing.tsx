@@ -55,7 +55,6 @@ const NAV_LINKS = [
   { label: "Subjects", href: "#subjects" },
   { label: "Games", href: "/student/login" },
   { label: "Rewards", href: "/student/login" },
-  { label: "Parents", href: "/parents" },
 ];
 
 // A friendly star "study buddy" drawn as SVG so it costs nothing to download
@@ -234,13 +233,6 @@ export default function Landing() {
                 data-testid="button-student-start"
               >
                 Let's Start! 🚀
-              </Link>
-              <Link
-                href="/parents"
-                className="op-lift rounded-full px-7 py-4 font-bold text-lg text-white border-2 border-white/70 hover:bg-white/10"
-                data-testid="button-parent"
-              >
-                I'm a Parent
               </Link>
             </div>
           </div>
