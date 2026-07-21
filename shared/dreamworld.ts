@@ -199,6 +199,7 @@ export interface Placed {
   id: BuildingId;
   x: number;
   y: number;
+  placedAt?: number; // ms timestamp when placed (used for the "Rising Town" award)
 }
 
 export function footprint(x: number, y: number, size: 1 | 2): { x: number; y: number }[] {
@@ -252,4 +253,111 @@ export function refundOf(cost: Partial<Wallet>): Wallet {
 // drives the friendly "go earn more" nudge.
 export function canBuildAnything(wallet: Wallet, p: Progress): boolean {
   return BUILDINGS.some((b) => isUnlocked(b, p) && canAfford(wallet, b.cost));
+}
+
+// ---------------------------------------------------------------------------
+// Town identity — naming a town.
+// ---------------------------------------------------------------------------
+export const TOWN_NAME_MAX = 20;
+export const RENAME_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000; // once per week
+
+// ===========================================================================
+// EDIT THIS LIST to add or remove blocked words. Matching is a simple
+// case-insensitive substring check, so keep entries lowercase.
+// ===========================================================================
+export const BLOCKED_WORDS: string[] = [
+  "damn", "hell", "crap", "stupid", "idiot", "dumb", "shutup", "hate", "loser",
+];
+
+// Validate and tidy a proposed town name. Letters, numbers and single spaces
+// only, at most TOWN_NAME_MAX characters, and no blocked words.
+export function cleanTownName(raw: string): { ok: true; value: string } | { ok: false; message: string } {
+  const trimmed = (raw ?? "").trim().replace(/\s+/g, " ");
+  if (!trimmed) return { ok: false, message: "Please type a town name." };
+  if (trimmed.length > TOWN_NAME_MAX) return { ok: false, message: `Keep it to ${TOWN_NAME_MAX} characters or fewer.` };
+  if (!/^[A-Za-z0-9 ]+$/.test(trimmed)) return { ok: false, message: "Use letters, numbers and spaces only." };
+  const squashed = trimmed.toLowerCase().replace(/\s+/g, "");
+  if (BLOCKED_WORDS.some((w) => squashed.includes(w))) return { ok: false, message: "Let's pick a friendlier name!" };
+  return { ok: true, value: trimmed };
+}
+
+// The mayor's name is just the student's first name.
+export function firstName(fullName: string): string {
+  return (fullName || "").trim().split(/\s+/)[0] || "Mayor";
+}
+
+// ---------------------------------------------------------------------------
+// Town Awards — one per student so every town wins something.
+// ---------------------------------------------------------------------------
+export type AwardId = "grandest" | "greenest" | "planned" | "scholar" | "rising" | "happy";
+
+export interface AwardDef {
+  id: AwardId;
+  name: string;
+  emoji: string;
+  blurb: string; // shown on the certificate, e.g. "for the most buildings of all"
+}
+
+export const AWARDS: Record<AwardId, AwardDef> = {
+  grandest: { id: "grandest", name: "Grandest Town",      emoji: "🏛️", blurb: "for building the grandest town of all" },
+  greenest: { id: "greenest", name: "Greenest Town",      emoji: "🌳", blurb: "for the most trees and flowers" },
+  planned:  { id: "planned",  name: "Best Planned Town",  emoji: "🛣️", blurb: "for the tidiest, best-planned roads" },
+  scholar:  { id: "scholar",  name: "Scholar's City",     emoji: "🎓", blurb: "for building a grand School" },
+  rising:   { id: "rising",   name: "Rising Town",        emoji: "🚀", blurb: "for growing the fastest this month" },
+  happy:    { id: "happy",    name: "Happy Town",         emoji: "😊", blurb: "for being a wonderful place to live" },
+};
+
+export interface TownMetrics {
+  total: number;      // total buildings
+  green: number;      // trees + flowers
+  roads: number;      // road tiles
+  hasSchool: boolean; // built the School
+  recent: number;     // buildings added in the last 30 days
+}
+
+export function townMetrics(layout: Placed[], now: number): TownMetrics {
+  let green = 0, roads = 0, hasSchool = false, recent = 0;
+  const cutoff = now - 30 * 24 * 60 * 60 * 1000;
+  for (const b of layout) {
+    if (b.id === "tree" || b.id === "flower") green += 1;
+    if (b.id === "road") roads += 1;
+    if (b.id === "school") hasSchool = true;
+    if (typeof b.placedAt === "number" && b.placedAt >= cutoff) recent += 1;
+  }
+  return { total: layout.length, green, roads, hasSchool, recent };
+}
+
+// Assign exactly one award to every entry so every town wins something. The
+// four "most X" superlatives go to the single top town (positive score only);
+// Scholar's City goes to any remaining town that built a School; everyone else
+// gets Happy Town. Pure — the caller supplies the metrics.
+export function assignAwards(entries: { studentId: number; metrics: TownMetrics }[]): Map<number, AwardId> {
+  const result = new Map<number, AwardId>();
+  const taken = new Set<number>();
+
+  const topBy = (score: (m: TownMetrics) => number): number | null => {
+    let best: number | null = null;
+    let bestVal = 0; // must be strictly positive to win a superlative
+    for (const e of entries) {
+      if (taken.has(e.studentId)) continue;
+      const v = score(e.metrics);
+      if (v > bestVal) { bestVal = v; best = e.studentId; }
+    }
+    return best;
+  };
+
+  const give = (studentId: number | null, award: AwardId) => {
+    if (studentId === null || taken.has(studentId)) return;
+    result.set(studentId, award);
+    taken.add(studentId);
+  };
+
+  give(topBy((m) => m.total), "grandest");
+  give(topBy((m) => m.green), "greenest");
+  give(topBy((m) => m.roads), "planned");
+  for (const e of entries) if (!taken.has(e.studentId) && e.metrics.hasSchool) give(e.studentId, "scholar");
+  give(topBy((m) => m.recent), "rising");
+  for (const e of entries) if (!taken.has(e.studentId)) give(e.studentId, "happy");
+
+  return result;
 }

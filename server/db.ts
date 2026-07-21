@@ -65,9 +65,25 @@ CREATE TABLE IF NOT EXISTS dream_world (
   gems INTEGER NOT NULL DEFAULT 0,
   layout TEXT NOT NULL DEFAULT '[]',
   seen_unlocks TEXT NOT NULL DEFAULT '',
+  town_name TEXT NOT NULL DEFAULT '',
+  town_named_at TEXT NOT NULL DEFAULT '',
+  founded_at TEXT NOT NULL DEFAULT '',
+  award TEXT NOT NULL DEFAULT '',
+  award_term TEXT NOT NULL DEFAULT '',
   updated_at TIMESTAMP NOT NULL DEFAULT now()
 );
 `;
+
+// Columns added to dream_world after it first shipped. Each dialect's startup
+// runs these idempotently so existing tables gain the new columns.
+const DREAM_WORLD_ADDED_COLUMNS: { name: string; type: string }[] = [
+  { name: "seen_unlocks",   type: "TEXT NOT NULL DEFAULT ''" },
+  { name: "town_name",      type: "TEXT NOT NULL DEFAULT ''" },
+  { name: "town_named_at",  type: "TEXT NOT NULL DEFAULT ''" },
+  { name: "founded_at",     type: "TEXT NOT NULL DEFAULT ''" },
+  { name: "award",          type: "TEXT NOT NULL DEFAULT ''" },
+  { name: "award_term",     type: "TEXT NOT NULL DEFAULT ''" },
+];
 
 // Filled in below depending on which database we use.
 let activeDb: unknown;
@@ -89,9 +105,9 @@ if (usePostgres) {
   ensureSchemaFn = async () => {
     await pgPoolInstance!.query(PG_GAMIFICATION_DDL);
     // Add columns introduced after a table first shipped (idempotent).
-    await pgPoolInstance!.query(
-      "ALTER TABLE dream_world ADD COLUMN IF NOT EXISTS seen_unlocks TEXT NOT NULL DEFAULT ''",
-    );
+    for (const col of DREAM_WORLD_ADDED_COLUMNS) {
+      await pgPoolInstance!.query(`ALTER TABLE dream_world ADD COLUMN IF NOT EXISTS ${col.name} ${col.type}`);
+    }
   };
 
   console.log("[db] Using PostgreSQL (DATABASE_URL is set)");
@@ -109,11 +125,9 @@ if (usePostgres) {
     await client.executeMultiple(sqliteSchema.SQLITE_DDL);
     // Add columns introduced after a table first shipped. SQLite has no
     // "ADD COLUMN IF NOT EXISTS", so ignore the error when it already exists.
-    const migrations = [
-      "ALTER TABLE dream_world ADD COLUMN seen_unlocks TEXT NOT NULL DEFAULT ''",
-    ];
-    for (const stmt of migrations) {
-      try { await client.execute(stmt); } catch { /* column already present */ }
+    for (const col of DREAM_WORLD_ADDED_COLUMNS) {
+      try { await client.execute(`ALTER TABLE dream_world ADD COLUMN ${col.name} ${col.type}`); }
+      catch { /* column already present */ }
     }
   };
 

@@ -215,6 +215,11 @@ export const dreamWorld = sqliteTable("dream_world", {
   gems: integer("gems").notNull().default(0),
   layout: text("layout").notNull().default("[]"),
   seenUnlocks: text("seen_unlocks").notNull().default(""),
+  townName: text("town_name").notNull().default(""),
+  townNamedAt: text("town_named_at").notNull().default(""),
+  foundedAt: text("founded_at").notNull().default(""),
+  award: text("award").notNull().default(""),
+  awardTerm: text("award_term").notNull().default(""),
   updatedAt: timestamp("updated_at").notNull().$defaultFn(() => new Date()),
 });
 
@@ -368,6 +373,11 @@ CREATE TABLE IF NOT EXISTS dream_world (
   gems INTEGER NOT NULL DEFAULT 0,
   layout TEXT NOT NULL DEFAULT '[]',
   seen_unlocks TEXT NOT NULL DEFAULT '',
+  town_name TEXT NOT NULL DEFAULT '',
+  town_named_at TEXT NOT NULL DEFAULT '',
+  founded_at TEXT NOT NULL DEFAULT '',
+  award TEXT NOT NULL DEFAULT '',
+  award_term TEXT NOT NULL DEFAULT '',
   updated_at INTEGER NOT NULL
 );
 `;

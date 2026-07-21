@@ -13,7 +13,7 @@ import { isFullyAutoMarked, markSubmission, buildFeedback } from "@shared/auto-m
 import { awardRandomCollectible } from "./rewards";
 import { awardXp, xpProgress, XP_PER_CORRECT, XP_COMPLETION_BONUS, XP_IMPROVEMENT_BONUS } from "./xp";
 import { recordActivity, grantFreezeForLevelUp, refreshStreak, setSimulatedToday, getSimulatedToday, resetStreak, streakToday } from "./streaks";
-import { awardResources, getState as getDreamState, placeBuilding, removeBuilding } from "./dreamworld";
+import { awardResources, getState as getDreamState, placeBuilding, removeBuilding, setTownName, getNeighbours, getTownView, runTermAwards } from "./dreamworld";
 import { z } from "zod";
 
 // Mark an auto-markable submission in code and save the result as a Mark.
@@ -1086,14 +1086,7 @@ export async function registerRoutes(
       const student = await requirePrimaryStudent(parseInt(req.params.id), res);
       if (!student) return;
       const state = await getDreamState(student);
-      res.json({
-        success: true,
-        wallet: state.wallet,
-        layout: state.layout,
-        progress: state.progress,
-        overdue: state.overdue,
-        justUnlocked: state.justUnlocked,
-      });
+      res.json({ success: true, ...state });
     } catch (error) {
       console.error("Get Dream World error:", error);
       res.status(500).json({ success: false, message: "Server error" });
@@ -1126,6 +1119,61 @@ export async function registerRoutes(
       res.json({ success: true, wallet: result.wallet, layout: result.layout });
     } catch (error) {
       console.error("Remove building error:", error);
+      res.status(500).json({ success: false, message: "Server error" });
+    }
+  });
+
+  // Name (or rename) the town — once a week, server-validated.
+  app.post("/api/students/:id/dreamworld/name", async (req, res) => {
+    try {
+      const student = await requirePrimaryStudent(parseInt(req.params.id), res);
+      if (!student) return;
+      const result = await setTownName(student, req.body?.name ?? "");
+      if (!result.ok) return res.status(400).json({ success: false, message: result.message });
+      res.json({ success: true, townName: result.townName });
+    } catch (error) {
+      console.error("Name town error:", error);
+      res.status(500).json({ success: false, message: "Server error" });
+    }
+  });
+
+  // Classmates (same class only) to visit.
+  app.get("/api/students/:id/dreamworld/neighbours", async (req, res) => {
+    try {
+      const student = await requirePrimaryStudent(parseInt(req.params.id), res);
+      if (!student) return;
+      res.json({ success: true, neighbours: await getNeighbours(student) });
+    } catch (error) {
+      console.error("Neighbours error:", error);
+      res.status(500).json({ success: false, message: "Server error" });
+    }
+  });
+
+  // View a classmate's town (read-only, same class only).
+  app.get("/api/students/:id/dreamworld/town/:otherId", async (req, res) => {
+    try {
+      const student = await requirePrimaryStudent(parseInt(req.params.id), res);
+      if (!student) return;
+      const result = await getTownView(student, parseInt(req.params.otherId));
+      if (!result.ok) return res.status(result.code).json({ success: false, message: result.message });
+      res.json({ success: true, town: result.town });
+    } catch (error) {
+      console.error("View town error:", error);
+      res.status(500).json({ success: false, message: "Server error" });
+    }
+  });
+
+  // Teacher action: run Town Awards for the term (one award per town, per class).
+  app.post("/api/teacher/dream-world/awards", async (req, res) => {
+    try {
+      const validatedEmail = await requireTeacherAuth(req, res);
+      if (!validatedEmail) return;
+      const raw = typeof req.body?.term === "string" ? req.body.term.trim() : "";
+      const term = raw || "This Term";
+      const results = await runTermAwards(term);
+      res.json({ success: true, term, count: results.length, results });
+    } catch (error) {
+      console.error("Run term awards error:", error);
       res.status(500).json({ success: false, message: "Server error" });
     }
   });

@@ -8,10 +8,12 @@
 
 import { storage } from "./storage";
 import type { DreamWorld, Student } from "@shared/schema";
+import { isPrimaryForm, PRIMARY_FORMS } from "@shared/schema";
 import {
   buildingById, canAfford, footprint, inBounds, occupiedCells,
   payoutForPercent, refundOf, subjectToCategory, unlockedIds, isUnlocked,
-  EMPTY_PROGRESS, type Payout, type Placed, type Progress, type Wallet,
+  cleanTownName, firstName, townMetrics, assignAwards, RENAME_COOLDOWN_MS,
+  EMPTY_PROGRESS, type AwardId, type Payout, type Placed, type Progress, type Wallet,
 } from "@shared/dreamworld";
 
 async function loadOrCreate(studentId: number): Promise<DreamWorld> {
@@ -19,6 +21,7 @@ async function loadOrCreate(studentId: number): Promise<DreamWorld> {
   if (!row) {
     row = await storage.createDreamWorld({
       studentId, coins: 0, bricks: 0, wood: 0, gems: 0, layout: "[]", seenUnlocks: "",
+      foundedAt: new Date().toISOString(),
     });
   }
   return row;
@@ -86,6 +89,13 @@ export interface DreamState {
   progress: Progress;
   overdue: { id: number; title: string } | null;
   justUnlocked: string[]; // buildings unlocked since the last visit (for the celebration)
+  townName: string;
+  mayorFirstName: string;
+  foundedAt: string;
+  canRename: boolean;     // false while the once-a-week cooldown is active
+  award: string;          // current award id (or "")
+  awardTerm: string;
+  buildingCount: number;
 }
 
 // The full Dream World state for the plot screen. Also detects buildings that
@@ -99,11 +109,119 @@ export async function getState(student: Student): Promise<DreamState> {
   const unlocked = unlockedIds(progress);
   const seen = row.seenUnlocks ? row.seenUnlocks.split(",").filter(Boolean) : [];
   const justUnlocked = unlocked.filter((id) => !seen.includes(id));
-  if (justUnlocked.length > 0) {
-    await storage.updateDreamWorld(student.id, { seenUnlocks: unlocked.join(",") });
-  }
 
-  return { wallet: walletOf(row), layout: parseLayout(row.layout), progress, overdue, justUnlocked };
+  // Backfill a founding date for towns created before this existed.
+  let foundedAt = row.foundedAt;
+  const patch: Record<string, string> = {};
+  if (!foundedAt) { foundedAt = new Date().toISOString(); patch.foundedAt = foundedAt; }
+  if (justUnlocked.length > 0) patch.seenUnlocks = unlocked.join(",");
+  if (Object.keys(patch).length > 0) await storage.updateDreamWorld(student.id, patch);
+
+  const layout = parseLayout(row.layout);
+  const canRename = !row.townNamedAt || (Date.now() - Date.parse(row.townNamedAt) >= RENAME_COOLDOWN_MS);
+
+  return {
+    wallet: walletOf(row), layout, progress, overdue, justUnlocked,
+    townName: row.townName, mayorFirstName: firstName(student.fullName), foundedAt, canRename,
+    award: row.award, awardTerm: row.awardTerm, buildingCount: layout.length,
+  };
+}
+
+// Name (or rename) the town, once a week. Server-validated (length, allowed
+// characters, blocked words) so the browser can't slip anything through.
+export async function setTownName(
+  student: Student, raw: string,
+): Promise<{ ok: true; townName: string } | { ok: false; message: string }> {
+  const cleaned = cleanTownName(raw);
+  if (!cleaned.ok) return { ok: false, message: cleaned.message };
+  const row = await loadOrCreate(student.id);
+  if (row.townNamedAt && Date.now() - Date.parse(row.townNamedAt) < RENAME_COOLDOWN_MS) {
+    return { ok: false, message: "You can rename your town once a week — try again in a few days!" };
+  }
+  await storage.updateDreamWorld(student.id, { townName: cleaned.value, townNamedAt: new Date().toISOString() });
+  return { ok: true, townName: cleaned.value };
+}
+
+// Classmates in the SAME class (same form), with their town name and building
+// count. The caller has already checked the requester is a primary student, and
+// getStudentsByForm returns only the same class — so this never leaks other
+// classes or Forms.
+export interface Neighbour { studentId: number; firstName: string; townName: string; buildingCount: number; }
+
+export async function getNeighbours(student: Student): Promise<Neighbour[]> {
+  const classmates = await storage.getStudentsByForm(student.form);
+  const out: Neighbour[] = [];
+  for (const c of classmates) {
+    if (c.id === student.id) continue;
+    const row = await storage.getDreamWorld(c.id);
+    const layout = row ? parseLayout(row.layout) : [];
+    out.push({ studentId: c.id, firstName: firstName(c.fullName), townName: row?.townName || "", buildingCount: layout.length });
+  }
+  return out;
+}
+
+// A read-only view of another student's town — allowed ONLY when the target is
+// a primary student in the SAME class as the viewer. No editing, no social
+// features: just the town to look at.
+export interface TownView {
+  studentId: number;
+  townName: string;
+  mayorFirstName: string;
+  foundedAt: string;
+  layout: Placed[];
+  award: string;
+  buildingCount: number;
+}
+
+export async function getTownView(
+  viewer: Student, targetId: number,
+): Promise<{ ok: true; town: TownView } | { ok: false; code: number; message: string }> {
+  const target = await storage.getStudent(targetId);
+  if (!target) return { ok: false, code: 404, message: "Town not found." };
+  if (!isPrimaryForm(target.form) || target.form !== viewer.form) {
+    return { ok: false, code: 403, message: "You can only visit towns in your own class." };
+  }
+  const row = await storage.getDreamWorld(targetId);
+  const layout = row ? parseLayout(row.layout) : [];
+  return {
+    ok: true,
+    town: {
+      studentId: targetId, townName: row?.townName || "", mayorFirstName: firstName(target.fullName),
+      foundedAt: row?.foundedAt || "", layout, award: row?.award || "", buildingCount: layout.length,
+    },
+  };
+}
+
+// Teacher action: award one Town Award to every town, computed per class so each
+// class has its own winners. Only students who have a town (a dream_world row)
+// are awarded. Returns a summary for the teacher.
+export interface AwardResult { studentId: number; form: string; firstName: string; townName: string; award: AwardId; }
+
+export async function runTermAwards(term: string): Promise<AwardResult[]> {
+  const now = Date.now();
+  const results: AwardResult[] = [];
+
+  for (const form of PRIMARY_FORMS) {
+    const students = await storage.getStudentsByForm(form);
+    const played: { student: Student; layout: Placed[] }[] = [];
+    for (const s of students) {
+      const row = await storage.getDreamWorld(s.id);
+      if (!row) continue; // no town yet — nothing to award
+      played.push({ student: s, layout: parseLayout(row.layout) });
+    }
+    if (played.length === 0) continue;
+
+    const awards = assignAwards(played.map((p) => ({ studentId: p.student.id, metrics: townMetrics(p.layout, now) })));
+    for (const p of played) {
+      const award = (awards.get(p.student.id) ?? "happy") as AwardId;
+      const updated = await storage.updateDreamWorld(p.student.id, { award, awardTerm: term });
+      results.push({
+        studentId: p.student.id, form, firstName: firstName(p.student.fullName),
+        townName: updated.townName || "", award,
+      });
+    }
+  }
+  return results;
 }
 
 // Award resources for completing an assignment (base payout + score gems).
@@ -148,7 +266,7 @@ export async function placeBuilding(
   const wallet = walletOf(row);
   if (!canAfford(wallet, def.cost)) return { ok: false, message: "Not enough resources yet." };
 
-  const newLayout = [...layout, { id: def.id, x, y }];
+  const newLayout: Placed[] = [...layout, { id: def.id, x, y, placedAt: Date.now() }];
   const updated = await storage.updateDreamWorld(studentId, {
     coins: row.coins - (def.cost.coins ?? 0),
     bricks: row.bricks - (def.cost.bricks ?? 0),

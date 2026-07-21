@@ -352,8 +352,13 @@ export const dreamWorld = pgTable("dream_world", {
   bricks: integer("bricks").notNull().default(0),
   wood: integer("wood").notNull().default(0),
   gems: integer("gems").notNull().default(0),
-  layout: text("layout").notNull().default("[]"),       // JSON: [{ id, x, y }, ...]
+  layout: text("layout").notNull().default("[]"),       // JSON: [{ id, x, y, placedAt }, ...]
   seenUnlocks: text("seen_unlocks").notNull().default(""), // CSV of building ids whose unlock was celebrated
+  townName: text("town_name").notNull().default(""),      // the student's chosen town name
+  townNamedAt: text("town_named_at").notNull().default(""), // ISO time of the last rename (once-per-week limit)
+  foundedAt: text("founded_at").notNull().default(""),    // ISO time the town was founded
+  award: text("award").notNull().default(""),             // current Town Award id (set by the teacher run)
+  awardTerm: text("award_term").notNull().default(""),    // the term the award is for
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
