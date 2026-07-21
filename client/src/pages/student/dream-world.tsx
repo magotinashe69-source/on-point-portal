@@ -1,11 +1,9 @@
 // Dream World — the town-building plot for primary students (Stages 3-6).
 //
-// Session 2 adds a subject shop: buildings are grouped by subject and unlock as
-// the student completes assignments. Locked buildings show as silhouettes with
-// the exact number of completions still needed. Unlocking a tier plays a small
-// one-time celebration. If any assignment is overdue, the build menu is locked
-// with a warm nudge (the town stays visible). The server is the source of truth
-// for the wallet AND unlocks, so nothing here can be cheated from the browser.
+// Session 3 adds town identity (name your town, mayor, founded date), a "Visit
+// Towns" button, a Town Award banner + certificate link, and ambient life on
+// the plot (handled by <TownPlot/>). The server stays the source of truth for
+// the wallet, unlocks, town name, and awards.
 
 import { useEffect, useState } from "react";
 import { useLocation, Link } from "wouter";
@@ -13,19 +11,19 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { ArrowLeft, Loader2, Lock } from "lucide-react";
+import { ArrowLeft, Loader2, Lock, Pencil, Users } from "lucide-react";
 import { isPrimaryForm } from "@shared/schema";
 import {
-  GRID_SIZE, RESOURCE_ICON, CATEGORY_ORDER, CATEGORY_META, EMPTY_PROGRESS,
-  buildingById, buildingsInCategory, canAfford, canBuildAnything, footprint,
+  RESOURCE_ICON, CATEGORY_ORDER, CATEGORY_META, EMPTY_PROGRESS, AWARDS, TOWN_NAME_MAX,
+  buildingById, buildingsInCategory, canAfford, canBuildAnything, cleanTownName, footprint,
   inBounds, isUnlocked, occupiedCells, remainingToUnlock, unlockHint,
-  type BuildingDef, type BuildingId, type Placed, type Progress, type Wallet,
+  type AwardId, type BuildingDef, type BuildingId, type Placed, type Progress, type Wallet,
 } from "@shared/dreamworld";
 import { DreamBuilding, TILE } from "@/components/DreamBuilding";
+import { TownPlot } from "@/components/TownPlot";
 import logoPath from "@assets/logo.webp";
 
 const ZERO: Wallet = { coins: 0, bricks: 0, wood: 0, gems: 0 };
-const SIZE_PX = GRID_SIZE * TILE;
 
 interface DreamData {
   success: boolean;
@@ -34,6 +32,12 @@ interface DreamData {
   progress: Progress;
   overdue: { id: number; title: string } | null;
   justUnlocked: BuildingId[];
+  townName: string;
+  mayorFirstName: string;
+  foundedAt: string;
+  canRename: boolean;
+  award: string;
+  awardTerm: string;
 }
 
 export default function DreamWorld() {
@@ -45,7 +49,7 @@ export default function DreamWorld() {
     else if (!isPrimaryForm(student.form)) setLocation("/student/dashboard");
   }, [student, setLocation]);
 
-  const { data, isLoading } = useQuery<DreamData>({
+  const { data, isLoading, refetch } = useQuery<DreamData>({
     queryKey: ["/api/students/" + student?.id + "/dreamworld"],
     enabled: !!student && isPrimaryForm(student.form),
   });
@@ -54,11 +58,15 @@ export default function DreamWorld() {
   const [layout, setLayout] = useState<Placed[]>([]);
   const [progress, setProgress] = useState<Progress>(EMPTY_PROGRESS);
   const [overdue, setOverdue] = useState<{ id: number; title: string } | null>(null);
+  const [town, setTown] = useState<{ name: string; mayor: string; founded: string; canRename: boolean; award: string; term: string }>({ name: "", mayor: "", founded: "", canRename: true, award: "", term: "" });
   const [selected, setSelected] = useState<BuildingId | null>(null);
   const [popping, setPopping] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [celebrate, setCelebrate] = useState<BuildingId[] | null>(null);
   const [busy, setBusy] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState("");
+  const [nameError, setNameError] = useState<string | null>(null);
 
   useEffect(() => {
     if (data?.success) {
@@ -66,6 +74,7 @@ export default function DreamWorld() {
       setLayout(data.layout ?? []);
       setProgress(data.progress ?? EMPTY_PROGRESS);
       setOverdue(data.overdue ?? null);
+      setTown({ name: data.townName, mayor: data.mayorFirstName, founded: data.foundedAt, canRename: data.canRename, award: data.award, term: data.awardTerm });
       if (data.justUnlocked && data.justUnlocked.length > 0) setCelebrate(data.justUnlocked);
     }
   }, [data]);
@@ -73,7 +82,7 @@ export default function DreamWorld() {
   if (!student || !isPrimaryForm(student.form)) return null;
 
   const occupied = occupiedCells(layout);
-  const locked = !!overdue; // build/edit locked while homework is overdue
+  const locked = !!overdue;
 
   async function placeAt(x: number, y: number) {
     if (busy || locked || !selected) return;
@@ -123,16 +132,14 @@ export default function DreamWorld() {
         gems: wallet.gems + Math.floor((def.cost.gems ?? 0) / 2),
       });
     }
-
     setBusy(true);
     try {
       const res = await apiRequest("POST", `/api/students/${student!.id}/dreamworld/remove`, { x, y });
       const body = await res.json();
       if (body.success) { setWallet(body.wallet); setLayout(body.layout); }
       else { setWallet(prevWallet); setLayout(prevLayout); setMessage(body.message || "Couldn't remove that."); }
-    } catch {
-      setWallet(prevWallet); setLayout(prevLayout);
-    } finally { setBusy(false); }
+    } catch { setWallet(prevWallet); setLayout(prevLayout); }
+    finally { setBusy(false); }
   }
 
   function handleTileTap(x: number, y: number) {
@@ -142,19 +149,32 @@ export default function DreamWorld() {
     else setMessage("Pick something to build first!");
   }
 
+  async function saveName() {
+    const check = cleanTownName(nameInput);
+    if (!check.ok) { setNameError(check.message); return; }
+    setBusy(true);
+    try {
+      const res = await apiRequest("POST", `/api/students/${student!.id}/dreamworld/name`, { name: nameInput });
+      const body = await res.json();
+      if (body.success) { setEditingName(false); setNameError(null); refetch(); }
+      else setNameError(body.message || "Couldn't save that name.");
+    } catch { setNameError("Couldn't save that name — try again."); }
+    finally { setBusy(false); }
+  }
+
   const showNudge = !locked && !canBuildAnything(wallet, progress);
+  const foundedDate = town.founded ? new Date(town.founded).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : "";
+  const award = town.award ? AWARDS[town.award as AwardId] : null;
 
   return (
     <div className="min-h-screen bg-background">
       <style>{`
-        @keyframes dw-pop { 0% { transform: scale(.5); opacity: 0 } 65% { transform: scale(1.12) } 100% { transform: scale(1); opacity: 1 } }
-        .dw-pop { animation: dw-pop .42s cubic-bezier(.2,.8,.3,1) both; transform-box: fill-box; transform-origin: center bottom; }
         @keyframes dw-modal { 0% { transform: scale(.7); opacity: 0 } 60% { transform: scale(1.04) } 100% { transform: scale(1); opacity: 1 } }
         .dw-modal { animation: dw-modal .4s ease-out both; }
         @keyframes dw-twinkle { 0%,100% { transform: scale(.6); opacity: .4 } 50% { transform: scale(1); opacity: 1 } }
         .dw-twinkle { animation: dw-twinkle 1.1s ease-in-out infinite; }
         .dw-locked-preview { filter: brightness(0); opacity: .26; }
-        @media (prefers-reduced-motion: reduce) { .dw-pop, .dw-modal, .dw-twinkle { animation-duration: .001s !important; } }
+        @media (prefers-reduced-motion: reduce) { .dw-modal, .dw-twinkle { animation-duration: .001s !important; } }
       `}</style>
 
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur">
@@ -171,12 +191,56 @@ export default function DreamWorld() {
       </header>
 
       <main className="container mx-auto px-4 py-6 max-w-2xl">
-        <div className="text-center mb-4">
-          <h1 className="text-2xl font-bold">🏙️ My Dream World</h1>
-          <p className="text-muted-foreground text-sm mt-1">Finish assignments to earn resources and unlock new buildings!</p>
+        {/* Town identity banner. */}
+        <div className="rounded-xl border bg-gradient-to-br from-primary/10 to-transparent px-4 py-3 mb-3 text-center">
+          {editingName ? (
+            <div className="flex flex-col items-center gap-2">
+              <input
+                autoFocus value={nameInput} maxLength={TOWN_NAME_MAX}
+                onChange={(e) => { setNameInput(e.target.value); setNameError(null); }}
+                placeholder="Name your town"
+                className="w-full max-w-xs rounded-lg border bg-background px-3 py-2 text-center text-sm"
+                data-testid="input-town-name"
+              />
+              <div className="flex gap-2">
+                <button className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-50" onClick={saveName} disabled={busy} data-testid="button-save-town-name">Save</button>
+                <button className="rounded-lg border px-3 py-1.5 text-xs" onClick={() => { setEditingName(false); setNameError(null); }}>Cancel</button>
+              </div>
+              {nameError && <p className="text-xs text-destructive" data-testid="text-name-error">{nameError}</p>}
+              <p className="text-[11px] text-muted-foreground">Letters, numbers &amp; spaces • up to {TOWN_NAME_MAX} • rename once a week</p>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center gap-2 flex-wrap">
+              <span className="font-bold" data-testid="text-town-banner">
+                🏙️ {town.name || "My Town"}
+                {town.mayor && <span className="text-muted-foreground font-normal"> • Mayor {town.mayor}</span>}
+                {foundedDate && <span className="text-muted-foreground font-normal"> • Founded {foundedDate}</span>}
+              </span>
+              {town.canRename && (
+                <button
+                  className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs hover-elevate"
+                  onClick={() => { setNameInput(town.name); setEditingName(true); }}
+                  data-testid="button-edit-town-name"
+                >
+                  <Pencil className="h-3 w-3" /> {town.name ? "Rename" : "Name it"}
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Wallet strip. */}
+        {/* Award banner + certificate link. */}
+        {award && (
+          <Link href="/student/certificate">
+            <div className="mb-3 rounded-xl border-2 border-[#BF9000]/50 bg-[#BF9000]/10 px-4 py-3 text-center cursor-pointer" data-testid="award-banner">
+              <span className="font-bold">{award.emoji} {award.name}</span>
+              {town.term && <span className="text-muted-foreground"> • {town.term}</span>}
+              <span className="block text-xs text-primary mt-0.5">View &amp; print your certificate →</span>
+            </div>
+          </Link>
+        )}
+
+        {/* Wallet + Visit Towns. */}
         <div className="flex items-center justify-center gap-2 sm:gap-3 mb-3 flex-wrap" data-testid="wallet-strip">
           {(["coins", "bricks", "wood", "gems"] as const).map((k) => (
             <div key={k} className="flex items-center gap-1.5 rounded-full border bg-card px-3 py-1.5 text-sm font-bold tabular-nums">
@@ -184,6 +248,11 @@ export default function DreamWorld() {
               <span data-testid={`wallet-${k}`}>{wallet[k]}</span>
             </div>
           ))}
+          <Link href="/student/visit">
+            <div className="flex items-center gap-1.5 rounded-full border bg-card px-3 py-1.5 text-sm font-semibold hover-elevate cursor-pointer" data-testid="button-visit-towns">
+              <Users className="h-4 w-4" /> Visit Towns 🏘️
+            </div>
+          </Link>
         </div>
 
         {showNudge && (
@@ -198,43 +267,12 @@ export default function DreamWorld() {
           <div className="mb-3 rounded-lg bg-muted px-4 py-2 text-center text-sm" data-testid="dream-message">{message}</div>
         )}
 
-        {/* The plot. */}
         {isLoading ? (
           <div className="flex items-center justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
         ) : (
-          <div className="rounded-xl border overflow-hidden shadow-sm bg-[#8FD673] dark:bg-[#3c6b39]">
-            <svg viewBox={`0 0 ${SIZE_PX} ${SIZE_PX}`} className="w-full h-auto block touch-manipulation" role="img" aria-label="Your town plot, an 8 by 8 grid">
-              {Array.from({ length: GRID_SIZE }).map((_, y) =>
-                Array.from({ length: GRID_SIZE }).map((_, x) => (
-                  <rect
-                    key={`t${x}-${y}`}
-                    x={x * TILE} y={y * TILE} width={TILE} height={TILE}
-                    fill={(x + y) % 2 === 0 ? "#8FD673" : "#83CD66"}
-                    stroke="#ffffff" strokeOpacity="0.18" strokeWidth="1"
-                    onClick={() => handleTileTap(x, y)}
-                    style={{ cursor: "pointer" }}
-                    data-testid={`tile-${x}-${y}`}
-                  />
-                )),
-              )}
-              {layout.map((b, i) => (
-                <g
-                  key={`b${i}-${b.id}-${b.x}-${b.y}`}
-                  transform={`translate(${b.x * TILE} ${b.y * TILE})`}
-                  className={popping === `${b.x},${b.y}` ? "dw-pop" : undefined}
-                  onClick={() => handleTileTap(b.x, b.y)}
-                  style={{ cursor: "pointer" }}
-                  data-testid={`placed-${b.id}-${b.x}-${b.y}`}
-                >
-                  <title>{buildingById(b.id)?.name} — tap to remove (half refund)</title>
-                  <DreamBuilding id={b.id} />
-                </g>
-              ))}
-            </svg>
-          </div>
+          <TownPlot layout={layout} popping={popping} onTileTap={handleTileTap} interactive />
         )}
 
-        {/* Overdue lock — warm nudge naming one overdue assignment. */}
         {overdue && (
           <Link href={`/student/submit/${overdue.id}`}>
             <div className="mt-4 rounded-xl border border-orange-400/50 bg-orange-500/10 px-4 py-3 text-sm cursor-pointer" data-testid="overdue-lock">
@@ -244,7 +282,7 @@ export default function DreamWorld() {
           </Link>
         )}
 
-        {/* The shop — buildings grouped by subject. */}
+        {/* The shop. */}
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mt-6 mb-2">Build shop</h2>
         <div className={locked ? "opacity-40 pointer-events-none select-none" : ""} aria-disabled={locked} data-testid="build-shop">
           {CATEGORY_ORDER.map((cat) => {
@@ -285,12 +323,8 @@ export default function DreamWorld() {
         </p>
       </main>
 
-      {/* One-time unlock celebration. */}
       {celebrate && celebrate.length > 0 && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-          role="dialog" aria-modal="true" onClick={() => setCelebrate(null)} data-testid="unlock-celebration"
-        >
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" role="dialog" aria-modal="true" onClick={() => setCelebrate(null)} data-testid="unlock-celebration">
           <div className="dw-modal w-full max-w-xs rounded-2xl border bg-card p-6 text-center shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="text-3xl mb-1"><span className="dw-twinkle inline-block">🎉</span></div>
             <p className="text-sm font-semibold uppercase tracking-wide text-primary">New building unlocked!</p>
@@ -309,13 +343,7 @@ export default function DreamWorld() {
                 );
               })}
             </div>
-            <button
-              className="mt-5 w-full rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
-              onClick={() => setCelebrate(null)}
-              data-testid="celebration-continue"
-            >
-              Let’s build!
-            </button>
+            <button className="mt-5 w-full rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground" onClick={() => setCelebrate(null)} data-testid="celebration-continue">Let’s build!</button>
           </div>
         </div>
       )}
@@ -323,19 +351,11 @@ export default function DreamWorld() {
   );
 }
 
-// One build-menu tile: an unlocked building you can pick, or a locked silhouette
-// with the exact number of completions still needed.
 function BuildingTile({ def, unlocked, affordable, active, remaining, onPick }: {
-  def: BuildingDef;
-  unlocked: boolean;
-  affordable: boolean;
-  active: boolean;
-  remaining: number;
-  onPick: () => void;
+  def: BuildingDef; unlocked: boolean; affordable: boolean; active: boolean; remaining: number; onPick: () => void;
 }) {
   const previewSize = def.size === 2 ? 80 : TILE;
   const canPick = unlocked && affordable;
-
   return (
     <button
       type="button"
@@ -352,9 +372,7 @@ function BuildingTile({ def, unlocked, affordable, active, remaining, onPick }: 
           <DreamBuilding id={def.id} />
         </g>
       </svg>
-      {!unlocked && (
-        <Lock className="absolute right-2 top-2 h-3.5 w-3.5 text-muted-foreground" />
-      )}
+      {!unlocked && <Lock className="absolute right-2 top-2 h-3.5 w-3.5 text-muted-foreground" />}
       <div className="min-w-0">
         <div className="text-xs font-bold truncate">{unlocked ? def.name : "Locked"}</div>
         {unlocked ? (
@@ -365,9 +383,7 @@ function BuildingTile({ def, unlocked, affordable, active, remaining, onPick }: 
               .join(" ")}
           </div>
         ) : (
-          <div className="text-[11px] text-muted-foreground" data-testid={`hint-${def.id}`}>
-            {remaining} more to unlock
-          </div>
+          <div className="text-[11px] text-muted-foreground" data-testid={`hint-${def.id}`}>{remaining} more to unlock</div>
         )}
       </div>
     </button>

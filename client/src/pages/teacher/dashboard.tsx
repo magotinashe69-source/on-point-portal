@@ -101,6 +101,24 @@ export default function TeacherDashboard() {
   const [announcementPriority, setAnnouncementPriority] = useState<string>("normal");
   const [activeClassFilter, setActiveClassFilter] = useState<string>("all");
   const [showMissingSubmissions, setShowMissingSubmissions] = useState(true);
+  const [awardTerm, setAwardTerm] = useState("");
+  const [awardSummary, setAwardSummary] = useState<{ term: string; count: number } | null>(null);
+
+  const runAwardsMutation = useMutation({
+    mutationFn: async (term: string) => {
+      const response = await apiRequest("POST", "/api/teacher/dream-world/awards", { term });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      if (data?.success) {
+        setAwardSummary({ term: data.term, count: data.count });
+        toast({ title: "Town Awards sent!", description: `${data.count} town${data.count === 1 ? "" : "s"} received an award for ${data.term}.` });
+      } else {
+        toast({ title: "Error", description: data?.message || "Could not run awards.", variant: "destructive" });
+      }
+    },
+    onError: () => toast({ title: "Error", description: "Could not run awards. Please try again.", variant: "destructive" }),
+  });
 
   const deleteAssignmentMutation = useMutation({
     mutationFn: async (id: number) => {
@@ -345,6 +363,40 @@ export default function TeacherDashboard() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Dream World — Term Awards (primary classes) */}
+        <Card className="mb-6" data-testid="card-term-awards">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">🏆 Dream World — Term Awards</CardTitle>
+            <CardDescription>
+              Give every primary town (Stages 3–6) an award for the term. Each class gets its own winners, and every child wins something.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+              <input
+                value={awardTerm}
+                onChange={(e) => setAwardTerm(e.target.value)}
+                placeholder="Term name (e.g. Term 1 2026)"
+                className="flex-1 rounded-md border bg-background px-3 py-2 text-sm"
+                data-testid="input-award-term"
+              />
+              <Button
+                onClick={() => runAwardsMutation.mutate(awardTerm)}
+                disabled={runAwardsMutation.isPending}
+                data-testid="button-run-awards"
+              >
+                {runAwardsMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                Run Term Awards
+              </Button>
+            </div>
+            {awardSummary && (
+              <p className="text-sm text-muted-foreground mt-3" data-testid="text-award-summary">
+                ✅ {awardSummary.count} town{awardSummary.count === 1 ? "" : "s"} awarded for <span className="font-semibold">{awardSummary.term}</span>. Each child can now view and print their certificate.
+              </p>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Missing Submissions Today */}
         {(() => {

@@ -12,6 +12,9 @@ export function DreamBuilding({ id }: { id: BuildingId }) {
     case "house":
       return (
         <g>
+          <rect x="25" y="9" width="4" height="8" fill="#8F3F2A" />
+          <g className="dw-smoke"><circle cx="27" cy="8" r="1.7" fill="#D2D6DA" /></g>
+          <g className="dw-smoke dw-smoke-2"><circle cx="27" cy="8" r="1.3" fill="#DEE2E6" /></g>
           <rect x="9" y="17" width="22" height="17" rx="1" fill="#EAD1A6" stroke="#9C7A45" strokeWidth="1" />
           <polygon points="6,18 20,6 34,18" fill="#C55A3B" stroke="#8F3F2A" strokeWidth="1" strokeLinejoin="round" />
           <rect x="17" y="24" width="6" height="10" rx="0.5" fill="#8A5A2B" />
@@ -22,9 +25,11 @@ export function DreamBuilding({ id }: { id: BuildingId }) {
       return (
         <g>
           <rect x="18" y="24" width="4" height="10" rx="1" fill="#7C4A24" />
-          <circle cx="15" cy="18" r="7" fill="#4FAE5E" />
-          <circle cx="20" cy="14" r="8" fill="#47A457" />
-          <circle cx="25" cy="19" r="7" fill="#3F9B50" />
+          <g className="dw-sway">
+            <circle cx="15" cy="18" r="7" fill="#4FAE5E" />
+            <circle cx="20" cy="14" r="8" fill="#47A457" />
+            <circle cx="25" cy="19" r="7" fill="#3F9B50" />
+          </g>
         </g>
       );
     case "road":
@@ -115,6 +120,7 @@ export function DreamBuilding({ id }: { id: BuildingId }) {
           <path d="M 14.5 27 h 11 l 1.5 4 a 2 2 0 0 1 -2 3 h -10 a 2 2 0 0 1 -2 -3 z" fill="#3FBE86" />
           <circle cx="19" cy="30" r="1" fill="#DFF3EA" />
           <circle cx="23" cy="31" r="0.8" fill="#DFF3EA" />
+          <circle className="dw-blink" cx="26" cy="12" r="1.5" fill="#F2C94C" />
         </g>
       );
     case "hospital":
@@ -172,6 +178,8 @@ export function DreamBuilding({ id }: { id: BuildingId }) {
           <rect x="34" y="56" width="12" height="16" fill="#8A5A32" />
           <rect x="16" y="44" width="10" height="9" fill="#BFE0EC" stroke="#B8925E" strokeWidth="0.8" />
           <rect x="54" y="44" width="10" height="9" fill="#BFE0EC" stroke="#B8925E" strokeWidth="0.8" />
+          <line x1="58" y1="28" x2="58" y2="19" stroke="#5A4A38" strokeWidth="1" />
+          <path className="dw-wave" d="M 58 19 q 3 1.5 6 0 q 2 -1 4 0 l 0 4 q -2 1 -4 0 q -3 -1.5 -6 0 z" fill="#BF3B3B" />
         </g>
       );
 

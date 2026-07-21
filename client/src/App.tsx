@@ -28,6 +28,9 @@ import StudentResources from "@/pages/student/resources";
 import StudentLessons from "@/pages/student/lessons";
 import TreasureIsland from "@/pages/student/treasure-island";
 import DreamWorld from "@/pages/student/dream-world";
+import VisitTowns from "@/pages/student/visit";
+import TownViewPage from "@/pages/student/town-view";
+import Certificate from "@/pages/student/certificate";
 
 function Router() {
   return (
@@ -57,6 +60,9 @@ function Router() {
       <Route path="/student/lessons" component={StudentLessons} />
       <Route path="/student/treasure" component={TreasureIsland} />
       <Route path="/student/dream-world" component={DreamWorld} />
+      <Route path="/student/visit" component={VisitTowns} />
+      <Route path="/student/town/:id" component={TownViewPage} />
+      <Route path="/student/certificate" component={Certificate} />
       <Route component={NotFound} />
     </Switch>
   );
