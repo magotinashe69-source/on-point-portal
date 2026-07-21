@@ -52,7 +52,10 @@ export function payoutForPercent(percent: number): Payout {
 // ---------------------------------------------------------------------------
 // Subject categories and the unlock system.
 // ---------------------------------------------------------------------------
-export type Category = "starter" | "maths" | "english" | "science" | "computing" | "universal";
+export type Category = "starter" | "maths" | "english" | "science" | "computing" | "universal" | "decor";
+
+// Categories that need no completions to unlock.
+export const FREE_CATEGORIES: Category[] = ["starter", "decor"];
 
 // Completions the student has, per subject, plus the grand total (all subjects).
 export interface Progress {
@@ -78,14 +81,15 @@ export const CATEGORY_META: Record<Category, { label: string; emoji: string }> =
   science:   { label: "Science",       emoji: "🔬" },
   computing: { label: "Computing",     emoji: "🤖" },
   universal: { label: "School",        emoji: "🏫" },
+  decor:     { label: "Decorations",   emoji: "🌷" },
 };
 
 // The display order of the shop's groups.
-export const CATEGORY_ORDER: Category[] = ["starter", "maths", "english", "science", "computing", "universal"];
+export const CATEGORY_ORDER: Category[] = ["starter", "maths", "english", "science", "computing", "universal", "decor"];
 
 // Map an assignment's subject text to a category (or null for "other" subjects,
 // which still count toward the total but unlock no specific building).
-export function subjectToCategory(subject: string): Exclude<Category, "starter" | "universal"> | null {
+export function subjectToCategory(subject: string): "maths" | "english" | "science" | "computing" | null {
   const s = (subject || "").toLowerCase();
   if (s.includes("math")) return "maths";
   if (s.includes("english")) return "english";
@@ -103,7 +107,9 @@ export type BuildingId =
   | "library" | "theatre"
   | "laboratory" | "hospital"
   | "robot_kiosk" | "robot_factory"
-  | "school";
+  | "school"
+  // Session 4 decorations.
+  | "fence" | "pond" | "lamppost" | "statue" | "bench";
 
 export interface BuildingDef {
   id: BuildingId;
@@ -112,34 +118,42 @@ export interface BuildingDef {
   cost: Partial<Wallet>;       // coins/bricks/wood and (Tier 2) gems
   category: Category;
   tier?: 1 | 2;                // subject/universal buildings only
+  maxLevel?: number;           // structures can be upgraded up to this level (default 1 = no upgrades)
 }
 
 export const BUILDINGS: BuildingDef[] = [
   // Starter kit — always available.
-  { id: "house",  name: "Small House",    size: 1, cost: { coins: 40, bricks: 30 }, category: "starter" },
+  { id: "house",  name: "Small House",    size: 1, cost: { coins: 40, bricks: 30 }, category: "starter", maxLevel: 3 },
   { id: "tree",   name: "Tree",           size: 1, cost: { wood: 10 }, category: "starter" },
   { id: "road",   name: "Road",           size: 1, cost: { bricks: 5 }, category: "starter" },
   { id: "flower", name: "Flower Patch",   size: 1, cost: { coins: 5 }, category: "starter" },
-  { id: "field",  name: "Football Field", size: 2, cost: { coins: 60, wood: 40 }, category: "starter" },
+  { id: "field",  name: "Football Field", size: 2, cost: { coins: 60, wood: 40 }, category: "starter", maxLevel: 3 },
 
   // Maths.
-  { id: "bank",        name: "Bank",              size: 1, cost: { coins: 80, bricks: 50 }, category: "maths", tier: 1 },
-  { id: "engineering", name: "Engineering Works", size: 2, cost: { coins: 150, bricks: 80, gems: 2 }, category: "maths", tier: 2 },
+  { id: "bank",        name: "Bank",              size: 1, cost: { coins: 80, bricks: 50 }, category: "maths", tier: 1, maxLevel: 3 },
+  { id: "engineering", name: "Engineering Works", size: 2, cost: { coins: 150, bricks: 80, gems: 2 }, category: "maths", tier: 2, maxLevel: 3 },
 
   // English.
-  { id: "library", name: "Library", size: 1, cost: { coins: 70, wood: 40 }, category: "english", tier: 1 },
-  { id: "theatre", name: "Theatre", size: 2, cost: { coins: 140, bricks: 60, wood: 60, gems: 2 }, category: "english", tier: 2 },
+  { id: "library", name: "Library", size: 1, cost: { coins: 70, wood: 40 }, category: "english", tier: 1, maxLevel: 3 },
+  { id: "theatre", name: "Theatre", size: 2, cost: { coins: 140, bricks: 60, wood: 60, gems: 2 }, category: "english", tier: 2, maxLevel: 3 },
 
   // Science.
-  { id: "laboratory", name: "Laboratory", size: 1, cost: { coins: 80, wood: 50 }, category: "science", tier: 1 },
-  { id: "hospital",   name: "Hospital",   size: 2, cost: { coins: 160, bricks: 80, gems: 2 }, category: "science", tier: 2 },
+  { id: "laboratory", name: "Laboratory", size: 1, cost: { coins: 80, wood: 50 }, category: "science", tier: 1, maxLevel: 3 },
+  { id: "hospital",   name: "Hospital",   size: 2, cost: { coins: 160, bricks: 80, gems: 2 }, category: "science", tier: 2, maxLevel: 3 },
 
   // Computing / ICT.
-  { id: "robot_kiosk",   name: "Robot Kiosk",   size: 1, cost: { coins: 60, bricks: 30 }, category: "computing", tier: 1 },
-  { id: "robot_factory", name: "Robot Factory", size: 2, cost: { coins: 150, bricks: 70, wood: 70, gems: 2 }, category: "computing", tier: 2 },
+  { id: "robot_kiosk",   name: "Robot Kiosk",   size: 1, cost: { coins: 60, bricks: 30 }, category: "computing", tier: 1, maxLevel: 3 },
+  { id: "robot_factory", name: "Robot Factory", size: 2, cost: { coins: 150, bricks: 70, wood: 70, gems: 2 }, category: "computing", tier: 2, maxLevel: 3 },
 
   // Universal reward.
-  { id: "school", name: "School", size: 2, cost: { coins: 200, bricks: 100, wood: 100, gems: 3 }, category: "universal", tier: 2 },
+  { id: "school", name: "School", size: 2, cost: { coins: 200, bricks: 100, wood: 100, gems: 3 }, category: "universal", tier: 2, maxLevel: 3 },
+
+  // Decorations — always available, cheap, cosmetic. Not upgradable.
+  { id: "fence",    name: "Fence",    size: 1, cost: { wood: 3 }, category: "decor" },
+  { id: "pond",     name: "Pond",     size: 1, cost: { coins: 8 }, category: "decor" },
+  { id: "lamppost", name: "Lamppost", size: 1, cost: { bricks: 6 }, category: "decor" },
+  { id: "bench",    name: "Bench",    size: 1, cost: { wood: 5 }, category: "decor" },
+  { id: "statue",   name: "Statue",   size: 1, cost: { coins: 12, bricks: 6 }, category: "decor" },
 ];
 
 export function buildingById(id: string): BuildingDef | undefined {
@@ -150,9 +164,9 @@ export function buildingsInCategory(cat: Category): BuildingDef[] {
   return BUILDINGS.filter((b) => b.category === cat);
 }
 
-// How many completions a building needs (0 for starters).
+// How many completions a building needs (0 for starters and decorations).
 export function requirementFor(def: BuildingDef): number {
-  if (def.category === "starter") return 0;
+  if (FREE_CATEGORIES.includes(def.category)) return 0;
   if (def.category === "universal") return SCHOOL_REQUIRED;
   return def.tier === 2 ? TIER2_REQUIRED : TIER1_REQUIRED;
 }
@@ -160,9 +174,11 @@ export function requirementFor(def: BuildingDef): number {
 // The count that matters for a building: its subject's count, or the grand
 // total for the universal School.
 export function countFor(def: BuildingDef, p: Progress): number {
-  if (def.category === "starter") return 0;
-  if (def.category === "universal") return p.total;
-  return p[def.category];
+  switch (def.category) {
+    case "maths": case "english": case "science": case "computing": return p[def.category];
+    case "universal": return p.total;
+    default: return 0; // starter, decor
+  }
 }
 
 export function isUnlocked(def: BuildingDef, p: Progress): boolean {
@@ -189,7 +205,7 @@ export function unlockHint(def: BuildingDef, p: Progress): string {
 // The ids of every currently-unlocked building that requires an unlock (used to
 // detect newly-unlocked buildings for the celebration).
 export function unlockedIds(p: Progress): BuildingId[] {
-  return BUILDINGS.filter((b) => b.category !== "starter" && isUnlocked(b, p)).map((b) => b.id);
+  return BUILDINGS.filter((b) => !FREE_CATEGORIES.includes(b.category) && isUnlocked(b, p)).map((b) => b.id);
 }
 
 // ---------------------------------------------------------------------------
@@ -200,6 +216,7 @@ export interface Placed {
   x: number;
   y: number;
   placedAt?: number; // ms timestamp when placed (used for the "Rising Town" award)
+  level?: number;    // upgrade level (1 = as placed); absent means 1
 }
 
 export function footprint(x: number, y: number, size: 1 | 2): { x: number; y: number }[] {
@@ -210,9 +227,9 @@ export function footprint(x: number, y: number, size: 1 | 2): { x: number; y: nu
   ];
 }
 
-export function inBounds(x: number, y: number, size: 1 | 2): boolean {
+export function inBounds(x: number, y: number, size: 1 | 2, gridSize: number = GRID_SIZE): boolean {
   return footprint(x, y, size).every(
-    (c) => c.x >= 0 && c.y >= 0 && c.x < GRID_SIZE && c.y < GRID_SIZE,
+    (c) => c.x >= 0 && c.y >= 0 && c.x < gridSize && c.y < gridSize,
   );
 }
 
@@ -253,6 +270,80 @@ export function refundOf(cost: Partial<Wallet>): Wallet {
 // drives the friendly "go earn more" nudge.
 export function canBuildAnything(wallet: Wallet, p: Progress): boolean {
   return BUILDINGS.some((b) => isUnlocked(b, p) && canAfford(wallet, b.cost));
+}
+
+// ---------------------------------------------------------------------------
+// Session 4 — building upgrades, town value, and plot expansion.
+// ---------------------------------------------------------------------------
+export function levelOf(b: Placed): number {
+  return b.level && b.level > 1 ? b.level : 1;
+}
+
+export function maxLevelOf(def: BuildingDef): number {
+  return def.maxLevel ?? 1;
+}
+
+export function isUpgradable(def: BuildingDef): boolean {
+  return maxLevelOf(def) > 1;
+}
+
+// Cost to upgrade FROM the given current level to the next one. It scales with
+// the level, so each upgrade costs more: Lv1→2 = one base cost, Lv2→3 = two.
+export function upgradeCost(def: BuildingDef, currentLevel: number): Partial<Wallet> {
+  const mult = currentLevel; // 1 for the first upgrade, 2 for the second
+  return {
+    coins: (def.cost.coins ?? 0) * mult,
+    bricks: (def.cost.bricks ?? 0) * mult,
+    wood: (def.cost.wood ?? 0) * mult,
+    gems: (def.cost.gems ?? 0) * mult,
+  };
+}
+
+// Total resources sunk into a building at a given level (base + all upgrades).
+// Lv1 = base, Lv2 = base×2, Lv3 = base×4 (1 + 1 + 2).
+const INVESTED_MULT = [1, 2, 4];
+export function totalInvested(def: BuildingDef, level: number): Wallet {
+  const m = INVESTED_MULT[Math.min(level, INVESTED_MULT.length) - 1] ?? 1;
+  return {
+    coins: (def.cost.coins ?? 0) * m,
+    bricks: (def.cost.bricks ?? 0) * m,
+    wood: (def.cost.wood ?? 0) * m,
+    gems: (def.cost.gems ?? 0) * m,
+  };
+}
+
+// Removing refunds half of everything invested (base + upgrades), rounded down.
+export function refundForLevel(def: BuildingDef, level: number): Wallet {
+  const t = totalInvested(def, level);
+  return {
+    coins: Math.floor(t.coins / 2),
+    bricks: Math.floor(t.bricks / 2),
+    wood: Math.floor(t.wood / 2),
+    gems: Math.floor(t.gems / 2),
+  };
+}
+
+// A single "value" number for a building's base cost (gems are worth more), used
+// to score a town's prestige.
+export function buildingValue(def: BuildingDef): number {
+  return (def.cost.coins ?? 0) + (def.cost.bricks ?? 0) + (def.cost.wood ?? 0) + (def.cost.gems ?? 0) * 15;
+}
+
+// A town's total value = each building's base value times its level.
+export function townValue(layout: Placed[]): number {
+  let total = 0;
+  for (const b of layout) {
+    const def = buildingById(b.id);
+    if (def) total += buildingValue(def) * levelOf(b);
+  }
+  return total;
+}
+
+// Plot expansion — one purchasable upgrade from 8x8 to 10x10.
+export const MAX_GRID_SIZE = 10;
+export const EXPAND_COST: Wallet = { coins: 150, bricks: 100, wood: 100, gems: 2 };
+export function canExpand(gridSize: number): boolean {
+  return gridSize < MAX_GRID_SIZE;
 }
 
 // ---------------------------------------------------------------------------

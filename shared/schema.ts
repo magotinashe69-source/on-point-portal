@@ -359,6 +359,7 @@ export const dreamWorld = pgTable("dream_world", {
   foundedAt: text("founded_at").notNull().default(""),    // ISO time the town was founded
   award: text("award").notNull().default(""),             // current Town Award id (set by the teacher run)
   awardTerm: text("award_term").notNull().default(""),    // the term the award is for
+  gridSize: integer("grid_size").notNull().default(8),    // plot size (8, or 10 once expanded)
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 

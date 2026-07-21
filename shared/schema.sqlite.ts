@@ -220,6 +220,7 @@ export const dreamWorld = sqliteTable("dream_world", {
   foundedAt: text("founded_at").notNull().default(""),
   award: text("award").notNull().default(""),
   awardTerm: text("award_term").notNull().default(""),
+  gridSize: integer("grid_size").notNull().default(8),
   updatedAt: timestamp("updated_at").notNull().$defaultFn(() => new Date()),
 });
 
@@ -378,6 +379,7 @@ CREATE TABLE IF NOT EXISTS dream_world (
   founded_at TEXT NOT NULL DEFAULT '',
   award TEXT NOT NULL DEFAULT '',
   award_term TEXT NOT NULL DEFAULT '',
+  grid_size INTEGER NOT NULL DEFAULT 8,
   updated_at INTEGER NOT NULL
 );
 `;

@@ -70,6 +70,7 @@ CREATE TABLE IF NOT EXISTS dream_world (
   founded_at TEXT NOT NULL DEFAULT '',
   award TEXT NOT NULL DEFAULT '',
   award_term TEXT NOT NULL DEFAULT '',
+  grid_size INTEGER NOT NULL DEFAULT 8,
   updated_at TIMESTAMP NOT NULL DEFAULT now()
 );
 `;
@@ -83,6 +84,7 @@ const DREAM_WORLD_ADDED_COLUMNS: { name: string; type: string }[] = [
   { name: "founded_at",     type: "TEXT NOT NULL DEFAULT ''" },
   { name: "award",          type: "TEXT NOT NULL DEFAULT ''" },
   { name: "award_term",     type: "TEXT NOT NULL DEFAULT ''" },
+  { name: "grid_size",      type: "INTEGER NOT NULL DEFAULT 8" },
 ];
 
 // Filled in below depending on which database we use.

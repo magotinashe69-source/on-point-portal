@@ -13,7 +13,7 @@ import { isFullyAutoMarked, markSubmission, buildFeedback } from "@shared/auto-m
 import { awardRandomCollectible } from "./rewards";
 import { awardXp, xpProgress, XP_PER_CORRECT, XP_COMPLETION_BONUS, XP_IMPROVEMENT_BONUS } from "./xp";
 import { recordActivity, grantFreezeForLevelUp, refreshStreak, setSimulatedToday, getSimulatedToday, resetStreak, streakToday } from "./streaks";
-import { awardResources, getState as getDreamState, placeBuilding, removeBuilding, setTownName, getNeighbours, getTownView, runTermAwards } from "./dreamworld";
+import { awardResources, getState as getDreamState, placeBuilding, removeBuilding, upgradeBuilding, expandPlot, setTownName, getNeighbours, getTownView, runTermAwards } from "./dreamworld";
 import { z } from "zod";
 
 // Mark an auto-markable submission in code and save the result as a Mark.
@@ -1119,6 +1119,35 @@ export async function registerRoutes(
       res.json({ success: true, wallet: result.wallet, layout: result.layout });
     } catch (error) {
       console.error("Remove building error:", error);
+      res.status(500).json({ success: false, message: "Server error" });
+    }
+  });
+
+  // Upgrade the building on a tile to the next level.
+  app.post("/api/students/:id/dreamworld/upgrade", async (req, res) => {
+    try {
+      const student = await requirePrimaryStudent(parseInt(req.params.id), res);
+      if (!student) return;
+      const { x, y } = req.body ?? {};
+      const result = await upgradeBuilding(student.id, x, y);
+      if (!result.ok) return res.status(400).json({ success: false, message: result.message });
+      res.json({ success: true, wallet: result.wallet, layout: result.layout });
+    } catch (error) {
+      console.error("Upgrade building error:", error);
+      res.status(500).json({ success: false, message: "Server error" });
+    }
+  });
+
+  // Expand the plot (8x8 -> 10x10), once.
+  app.post("/api/students/:id/dreamworld/expand", async (req, res) => {
+    try {
+      const student = await requirePrimaryStudent(parseInt(req.params.id), res);
+      if (!student) return;
+      const result = await expandPlot(student.id);
+      if (!result.ok) return res.status(400).json({ success: false, message: result.message });
+      res.json({ success: true, wallet: result.wallet, gridSize: result.gridSize });
+    } catch (error) {
+      console.error("Expand plot error:", error);
       res.status(500).json({ success: false, message: "Server error" });
     }
   });

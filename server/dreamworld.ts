@@ -13,6 +13,8 @@ import {
   buildingById, canAfford, footprint, inBounds, occupiedCells,
   payoutForPercent, refundOf, subjectToCategory, unlockedIds, isUnlocked,
   cleanTownName, firstName, townMetrics, assignAwards, RENAME_COOLDOWN_MS,
+  upgradeCost, refundForLevel, townValue, isUpgradable, maxLevelOf, levelOf,
+  canExpand, EXPAND_COST, MAX_GRID_SIZE,
   EMPTY_PROGRESS, type AwardId, type Payout, type Placed, type Progress, type Wallet,
 } from "@shared/dreamworld";
 
@@ -96,6 +98,8 @@ export interface DreamState {
   award: string;          // current award id (or "")
   awardTerm: string;
   buildingCount: number;
+  gridSize: number;       // 8, or 10 once the plot is expanded
+  townValue: number;      // prestige score (building values × levels)
 }
 
 // The full Dream World state for the plot screen. Also detects buildings that
@@ -124,6 +128,7 @@ export async function getState(student: Student): Promise<DreamState> {
     wallet: walletOf(row), layout, progress, overdue, justUnlocked,
     townName: row.townName, mayorFirstName: firstName(student.fullName), foundedAt, canRename,
     award: row.award, awardTerm: row.awardTerm, buildingCount: layout.length,
+    gridSize: row.gridSize, townValue: townValue(layout),
   };
 }
 
@@ -171,6 +176,8 @@ export interface TownView {
   layout: Placed[];
   award: string;
   buildingCount: number;
+  gridSize: number;
+  townValue: number;
 }
 
 export async function getTownView(
@@ -188,6 +195,7 @@ export async function getTownView(
     town: {
       studentId: targetId, townName: row?.townName || "", mayorFirstName: firstName(target.fullName),
       foundedAt: row?.foundedAt || "", layout, award: row?.award || "", buildingCount: layout.length,
+      gridSize: row?.gridSize || 8, townValue: townValue(layout),
     },
   };
 }
@@ -257,7 +265,7 @@ export async function placeBuilding(
   const progress = await computeProgress(studentId);
   if (!isUnlocked(def, progress)) return { ok: false, message: "That building isn't unlocked yet." };
 
-  if (!inBounds(x, y, def.size)) return { ok: false, message: "That doesn't fit on the map." };
+  if (!inBounds(x, y, def.size, row.gridSize)) return { ok: false, message: "That doesn't fit on the map." };
 
   const occupied = occupiedCells(layout);
   const overlaps = footprint(x, y, def.size).some((c) => occupied.has(`${c.x},${c.y}`));
@@ -266,7 +274,7 @@ export async function placeBuilding(
   const wallet = walletOf(row);
   if (!canAfford(wallet, def.cost)) return { ok: false, message: "Not enough resources yet." };
 
-  const newLayout: Placed[] = [...layout, { id: def.id, x, y, placedAt: Date.now() }];
+  const newLayout: Placed[] = [...layout, { id: def.id, x, y, placedAt: Date.now(), level: 1 }];
   const updated = await storage.updateDreamWorld(studentId, {
     coins: row.coins - (def.cost.coins ?? 0),
     bricks: row.bricks - (def.cost.bricks ?? 0),
@@ -289,7 +297,8 @@ export async function removeBuilding(
   if (!target) return { ok: false, message: "Nothing to remove there." };
 
   const def = buildingById(target.id);
-  const refund = def ? refundOf(def.cost) : { coins: 0, bricks: 0, wood: 0, gems: 0 };
+  // Refund half of everything invested — the base cost plus any upgrades.
+  const refund = def ? refundForLevel(def, levelOf(target)) : { coins: 0, bricks: 0, wood: 0, gems: 0 };
   const newLayout = layout.filter((b) => !(b.x === target.x && b.y === target.y && b.id === target.id));
 
   const updated = await storage.updateDreamWorld(studentId, {
@@ -300,4 +309,58 @@ export async function removeBuilding(
     layout: JSON.stringify(newLayout),
   });
   return { ok: true, wallet: walletOf(updated), layout: newLayout };
+}
+
+// Upgrade the building on a tile to the next level, after checking it can be
+// upgraded, isn't already max level, and the student can afford the (scaling)
+// upgrade cost. Server-authoritative.
+export async function upgradeBuilding(
+  studentId: number, x: number, y: number,
+): Promise<MutationResult> {
+  const row = await loadOrCreate(studentId);
+  const layout = parseLayout(row.layout);
+  const occupied = occupiedCells(layout);
+  const target = occupied.get(`${x},${y}`);
+  if (!target) return { ok: false, message: "Nothing to upgrade there." };
+
+  const def = buildingById(target.id);
+  if (!def || !isUpgradable(def)) return { ok: false, message: "This one can't be upgraded." };
+
+  const level = levelOf(target);
+  if (level >= maxLevelOf(def)) return { ok: false, message: "Already at the highest level!" };
+
+  const cost = upgradeCost(def, level);
+  const wallet = walletOf(row);
+  if (!canAfford(wallet, cost)) return { ok: false, message: "Not enough resources to upgrade yet." };
+
+  const newLayout = layout.map((b) =>
+    b.x === target.x && b.y === target.y && b.id === target.id ? { ...b, level: level + 1 } : b,
+  );
+  const updated = await storage.updateDreamWorld(studentId, {
+    coins: row.coins - (cost.coins ?? 0),
+    bricks: row.bricks - (cost.bricks ?? 0),
+    wood: row.wood - (cost.wood ?? 0),
+    gems: row.gems - (cost.gems ?? 0),
+    layout: JSON.stringify(newLayout),
+  });
+  return { ok: true, wallet: walletOf(updated), layout: newLayout };
+}
+
+// Expand the plot once, from 8x8 to 10x10, for a fixed cost.
+export async function expandPlot(
+  studentId: number,
+): Promise<{ ok: true; wallet: Wallet; gridSize: number } | { ok: false; message: string }> {
+  const row = await loadOrCreate(studentId);
+  if (!canExpand(row.gridSize)) return { ok: false, message: "Your plot is already as big as it gets!" };
+  const wallet = walletOf(row);
+  if (!canAfford(wallet, EXPAND_COST)) return { ok: false, message: "Not enough resources to expand the plot yet." };
+
+  const updated = await storage.updateDreamWorld(studentId, {
+    coins: row.coins - EXPAND_COST.coins,
+    bricks: row.bricks - EXPAND_COST.bricks,
+    wood: row.wood - EXPAND_COST.wood,
+    gems: row.gems - EXPAND_COST.gems,
+    gridSize: MAX_GRID_SIZE,
+  });
+  return { ok: true, wallet: walletOf(updated), gridSize: updated.gridSize };
 }
