@@ -56,6 +56,16 @@ CREATE TABLE IF NOT EXISTS student_streaks (
   pending_notice TEXT NOT NULL DEFAULT '',
   updated_at TIMESTAMP NOT NULL DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS dream_world (
+  id SERIAL PRIMARY KEY,
+  student_id INTEGER NOT NULL,
+  coins INTEGER NOT NULL DEFAULT 0,
+  bricks INTEGER NOT NULL DEFAULT 0,
+  wood INTEGER NOT NULL DEFAULT 0,
+  gems INTEGER NOT NULL DEFAULT 0,
+  layout TEXT NOT NULL DEFAULT '[]',
+  updated_at TIMESTAMP NOT NULL DEFAULT now()
+);
 `;
 
 // Filled in below depending on which database we use.
@@ -124,4 +134,5 @@ export const {
   studentRewards,
   studentXp,
   studentStreaks,
+  dreamWorld,
 } = (usePostgres ? pgSchema : sqliteSchema) as typeof pgSchema;

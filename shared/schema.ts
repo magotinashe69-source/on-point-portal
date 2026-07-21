@@ -340,6 +340,26 @@ export const insertStudentStreakSchema = createInsertSchema(studentStreaks).omit
 export type StudentStreak = typeof studentStreaks.$inferSelect;
 export type InsertStudentStreak = z.infer<typeof insertStudentStreakSchema>;
 
+// Dream World (gamification: a town-building reward game for primary students).
+// Like the other gamification tables it stands on its own — one row per student,
+// referencing a student id only. It holds the student's resource wallet (coins,
+// bricks, wood, gems) and their saved town layout (a JSON array of placed
+// buildings). Secondary students (Forms) never get a row.
+export const dreamWorld = pgTable("dream_world", {
+  id: serial("id").primaryKey(),
+  studentId: integer("student_id").notNull().references(() => students.id), // who this belongs to
+  coins: integer("coins").notNull().default(0),
+  bricks: integer("bricks").notNull().default(0),
+  wood: integer("wood").notNull().default(0),
+  gems: integer("gems").notNull().default(0),
+  layout: text("layout").notNull().default("[]"), // JSON: [{ id, x, y }, ...]
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertDreamWorldSchema = createInsertSchema(dreamWorld).omit({ id: true, updatedAt: true });
+export type DreamWorld = typeof dreamWorld.$inferSelect;
+export type InsertDreamWorld = z.infer<typeof insertDreamWorldSchema>;
+
 // Login schemas
 export const teacherLoginSchema = z.object({
   email: z.string().email("Valid email is required"),

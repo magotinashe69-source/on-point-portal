@@ -204,6 +204,19 @@ export const studentStreaks = sqliteTable("student_streaks", {
   updatedAt: timestamp("updated_at").notNull().$defaultFn(() => new Date()),
 });
 
+// --- Dream World (gamification: town-building reward game, primary only) ---
+// One row per student: their resource wallet plus a JSON town layout.
+export const dreamWorld = sqliteTable("dream_world", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  studentId: integer("student_id").notNull().references(() => students.id),
+  coins: integer("coins").notNull().default(0),
+  bricks: integer("bricks").notNull().default(0),
+  wood: integer("wood").notNull().default(0),
+  gems: integer("gems").notNull().default(0),
+  layout: text("layout").notNull().default("[]"),
+  updatedAt: timestamp("updated_at").notNull().$defaultFn(() => new Date()),
+});
+
 // Plain SQL that creates every table above if it does not exist yet.
 // We run this once on startup so a fresh SQLite database is ready to use
 // with no manual migration step.
@@ -342,6 +355,17 @@ CREATE TABLE IF NOT EXISTS student_streaks (
   freezes INTEGER NOT NULL DEFAULT 0,
   reached_milestones TEXT NOT NULL DEFAULT '',
   pending_notice TEXT NOT NULL DEFAULT '',
+  updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS dream_world (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  student_id INTEGER NOT NULL,
+  coins INTEGER NOT NULL DEFAULT 0,
+  bricks INTEGER NOT NULL DEFAULT 0,
+  wood INTEGER NOT NULL DEFAULT 0,
+  gems INTEGER NOT NULL DEFAULT 0,
+  layout TEXT NOT NULL DEFAULT '[]',
   updated_at INTEGER NOT NULL
 );
 `;

@@ -3,7 +3,7 @@ import { eq, and, inArray, or, isNull, desc } from "drizzle-orm";
 // the right database (SQLite or PostgreSQL) at runtime.
 import {
   db,
-  teachers, students, assignments, submissions, marks, resources, announcements, lessons, exportLogs, studentRewards, studentXp, studentStreaks,
+  teachers, students, assignments, submissions, marks, resources, announcements, lessons, exportLogs, studentRewards, studentXp, studentStreaks, dreamWorld,
 } from "./db";
 // The TypeScript types are the same for both databases, so they come from the shared schema.
 import {
@@ -19,6 +19,7 @@ import {
   type StudentReward, type InsertStudentReward,
   type StudentXp, type InsertStudentXp,
   type StudentStreak, type InsertStudentStreak,
+  type DreamWorld, type InsertDreamWorld,
   MASTER_PASSWORD
 } from "@shared/schema";
 
@@ -94,6 +95,10 @@ export interface IStorage {
   getStudentStreak(studentId: number): Promise<StudentStreak | undefined>;
   createStudentStreak(row: InsertStudentStreak): Promise<StudentStreak>;
   updateStudentStreak(studentId: number, data: Partial<InsertStudentStreak>): Promise<StudentStreak>;
+
+  getDreamWorld(studentId: number): Promise<DreamWorld | undefined>;
+  createDreamWorld(row: InsertDreamWorld): Promise<DreamWorld>;
+  updateDreamWorld(studentId: number, data: Partial<InsertDreamWorld>): Promise<DreamWorld>;
 
   // Seed data
   seedInitialData(): Promise<void>;
@@ -489,6 +494,25 @@ export class DatabaseStorage implements IStorage {
     const [updated] = await db.update(studentStreaks)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(studentStreaks.studentId, studentId))
+      .returning();
+    return updated;
+  }
+
+  // Dream World (wallet + town layout)
+  async getDreamWorld(studentId: number): Promise<DreamWorld | undefined> {
+    const [row] = await db.select().from(dreamWorld).where(eq(dreamWorld.studentId, studentId));
+    return row || undefined;
+  }
+
+  async createDreamWorld(row: InsertDreamWorld): Promise<DreamWorld> {
+    const [created] = await db.insert(dreamWorld).values(row).returning();
+    return created;
+  }
+
+  async updateDreamWorld(studentId: number, data: Partial<InsertDreamWorld>): Promise<DreamWorld> {
+    const [updated] = await db.update(dreamWorld)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(dreamWorld.studentId, studentId))
       .returning();
     return updated;
   }
