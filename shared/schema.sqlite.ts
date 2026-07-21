@@ -189,6 +189,21 @@ export const studentXp = sqliteTable("student_xp", {
   updatedAt: timestamp("updated_at").notNull().$defaultFn(() => new Date()),
 });
 
+// --- Student daily streaks (gamification) ---
+// One row per student: current/longest streak, freezes held, and small
+// bookkeeping fields. References a student id only; touches no existing table.
+export const studentStreaks = sqliteTable("student_streaks", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  studentId: integer("student_id").notNull().references(() => students.id),
+  currentStreak: integer("current_streak").notNull().default(0),
+  longestStreak: integer("longest_streak").notNull().default(0),
+  lastActiveDate: text("last_active_date").notNull().default(""),
+  freezes: integer("freezes").notNull().default(0),
+  reachedMilestones: text("reached_milestones").notNull().default(""),
+  pendingNotice: text("pending_notice").notNull().default(""),
+  updatedAt: timestamp("updated_at").notNull().$defaultFn(() => new Date()),
+});
+
 // Plain SQL that creates every table above if it does not exist yet.
 // We run this once on startup so a fresh SQLite database is ready to use
 // with no manual migration step.
@@ -315,6 +330,18 @@ CREATE TABLE IF NOT EXISTS student_xp (
   level INTEGER NOT NULL DEFAULT 0,
   daily_xp INTEGER NOT NULL DEFAULT 0,
   daily_date TEXT NOT NULL DEFAULT '',
+  updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS student_streaks (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  student_id INTEGER NOT NULL,
+  current_streak INTEGER NOT NULL DEFAULT 0,
+  longest_streak INTEGER NOT NULL DEFAULT 0,
+  last_active_date TEXT NOT NULL DEFAULT '',
+  freezes INTEGER NOT NULL DEFAULT 0,
+  reached_milestones TEXT NOT NULL DEFAULT '',
+  pending_notice TEXT NOT NULL DEFAULT '',
   updated_at INTEGER NOT NULL
 );
 `;

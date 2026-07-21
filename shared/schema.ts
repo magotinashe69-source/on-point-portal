@@ -319,6 +319,27 @@ export const insertStudentXpSchema = createInsertSchema(studentXp).omit({ id: tr
 export type StudentXp = typeof studentXp.$inferSelect;
 export type InsertStudentXp = z.infer<typeof insertStudentXpSchema>;
 
+// Student daily streaks (gamification). Like studentXp and studentRewards this
+// table stands on its own — one row per student, referencing a student id only.
+// A streak counts consecutive days (in Mozambique time, CAT / UTC+2) on which
+// the student completed at least one submission. Freezes auto-save a streak
+// when a day is missed. All day fields are plain YYYY-MM-DD strings in CAT.
+export const studentStreaks = pgTable("student_streaks", {
+  id: serial("id").primaryKey(),
+  studentId: integer("student_id").notNull().references(() => students.id), // who this belongs to
+  currentStreak: integer("current_streak").notNull().default(0),  // consecutive active days right now
+  longestStreak: integer("longest_streak").notNull().default(0),  // best streak ever reached
+  lastActiveDate: text("last_active_date").notNull().default(""), // last day that counted (CAT, YYYY-MM-DD)
+  freezes: integer("freezes").notNull().default(0),               // freezes held (0..2)
+  reachedMilestones: text("reached_milestones").notNull().default(""), // CSV of milestone days already celebrated
+  pendingNotice: text("pending_notice").notNull().default(""),    // JSON of a one-time note to show on the dashboard
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertStudentStreakSchema = createInsertSchema(studentStreaks).omit({ id: true, updatedAt: true });
+export type StudentStreak = typeof studentStreaks.$inferSelect;
+export type InsertStudentStreak = z.infer<typeof insertStudentStreakSchema>;
+
 // Login schemas
 export const teacherLoginSchema = z.object({
   email: z.string().email("Valid email is required"),

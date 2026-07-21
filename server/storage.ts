@@ -3,7 +3,7 @@ import { eq, and, inArray, or, isNull, desc } from "drizzle-orm";
 // the right database (SQLite or PostgreSQL) at runtime.
 import {
   db,
-  teachers, students, assignments, submissions, marks, resources, announcements, lessons, exportLogs, studentRewards, studentXp,
+  teachers, students, assignments, submissions, marks, resources, announcements, lessons, exportLogs, studentRewards, studentXp, studentStreaks,
 } from "./db";
 // The TypeScript types are the same for both databases, so they come from the shared schema.
 import {
@@ -18,6 +18,7 @@ import {
   type ExportLog, type InsertExportLog,
   type StudentReward, type InsertStudentReward,
   type StudentXp, type InsertStudentXp,
+  type StudentStreak, type InsertStudentStreak,
   MASTER_PASSWORD
 } from "@shared/schema";
 
@@ -89,6 +90,10 @@ export interface IStorage {
   getStudentXp(studentId: number): Promise<StudentXp | undefined>;
   createStudentXp(row: InsertStudentXp): Promise<StudentXp>;
   updateStudentXp(studentId: number, data: Partial<InsertStudentXp>): Promise<StudentXp>;
+
+  getStudentStreak(studentId: number): Promise<StudentStreak | undefined>;
+  createStudentStreak(row: InsertStudentStreak): Promise<StudentStreak>;
+  updateStudentStreak(studentId: number, data: Partial<InsertStudentStreak>): Promise<StudentStreak>;
 
   // Seed data
   seedInitialData(): Promise<void>;
@@ -465,6 +470,25 @@ export class DatabaseStorage implements IStorage {
     const [updated] = await db.update(studentXp)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(studentXp.studentId, studentId))
+      .returning();
+    return updated;
+  }
+
+  // Student daily streaks
+  async getStudentStreak(studentId: number): Promise<StudentStreak | undefined> {
+    const [row] = await db.select().from(studentStreaks).where(eq(studentStreaks.studentId, studentId));
+    return row || undefined;
+  }
+
+  async createStudentStreak(row: InsertStudentStreak): Promise<StudentStreak> {
+    const [created] = await db.insert(studentStreaks).values(row).returning();
+    return created;
+  }
+
+  async updateStudentStreak(studentId: number, data: Partial<InsertStudentStreak>): Promise<StudentStreak> {
+    const [updated] = await db.update(studentStreaks)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(studentStreaks.studentId, studentId))
       .returning();
     return updated;
   }

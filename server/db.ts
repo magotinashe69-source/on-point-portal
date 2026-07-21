@@ -83,4 +83,5 @@ export const {
   exportLogs,
   studentRewards,
   studentXp,
+  studentStreaks,
 } = (usePostgres ? pgSchema : sqliteSchema) as typeof pgSchema;
