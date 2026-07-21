@@ -9,14 +9,19 @@ import { storage } from "./storage";
 import { COLLECTIBLES } from "@shared/collectibles";
 import type { StudentReward } from "@shared/schema";
 
-// Award one random collectible to a student for a completed assignment.
-// Returns the saved reward row so a caller could show it to the student later.
+// Award one collectible to a student for a completed assignment. Prefers a
+// collectible they don't have yet, so that finishing assignments actually
+// works towards "collect all 12" (no duplicates until the set is complete).
+// Once every collectible is earned, it falls back to a random one so the
+// chest-opening reward moment still plays.
 export async function awardRandomCollectible(
   studentId: number,
   assignmentId: number,
 ): Promise<StudentReward> {
-  // Pick a random item from the 12-collectible set.
-  const pick = COLLECTIBLES[Math.floor(Math.random() * COLLECTIBLES.length)];
+  const earned = new Set((await storage.getStudentRewards(studentId)).map((r) => r.rewardName));
+  const unearned = COLLECTIBLES.filter((c) => !earned.has(c.name));
+  const pool = unearned.length > 0 ? unearned : COLLECTIBLES;
+  const pick = pool[Math.floor(Math.random() * pool.length)];
 
   return storage.createStudentReward({
     studentId,

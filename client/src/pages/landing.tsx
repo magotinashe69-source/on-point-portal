@@ -47,11 +47,14 @@ const STATS = [
   { value: "📸", label: "Photo Answers" },
 ];
 
+// Nav links. "#" links scroll to a section on this page; Games and Rewards go
+// to the student login (the real games/rewards live behind login for primary
+// classes) rather than to a "coming soon" placeholder.
 const NAV_LINKS = [
   { label: "Home", href: "/" },
-  { label: "Subjects", href: "/#subjects" },
-  { label: "Games", href: "/games" },
-  { label: "Rewards", href: "/rewards" },
+  { label: "Subjects", href: "#subjects" },
+  { label: "Games", href: "/student/login" },
+  { label: "Rewards", href: "/student/login" },
   { label: "Parents", href: "/parents" },
 ];
 
@@ -118,9 +121,15 @@ export default function Landing() {
           {/* Desktop links */}
           <nav className="hidden md:flex items-center gap-6 font-semibold" style={{ color: NAVY }}>
             {NAV_LINKS.map((l) => (
-              <Link key={l.label} href={l.href} className="hover:opacity-70 transition-opacity" data-testid={`nav-${l.label.toLowerCase()}`}>
-                {l.label}
-              </Link>
+              l.href.startsWith("#") ? (
+                <a key={l.label} href={l.href} className="hover:opacity-70 transition-opacity" data-testid={`nav-${l.label.toLowerCase()}`}>
+                  {l.label}
+                </a>
+              ) : (
+                <Link key={l.label} href={l.href} className="hover:opacity-70 transition-opacity" data-testid={`nav-${l.label.toLowerCase()}`}>
+                  {l.label}
+                </Link>
+              )
             ))}
           </nav>
 
@@ -156,9 +165,15 @@ export default function Landing() {
         {menuOpen && (
           <nav className="md:hidden border-t border-black/5 bg-white px-4 py-3 flex flex-col gap-1 font-semibold" style={{ color: NAVY }}>
             {NAV_LINKS.map((l) => (
-              <Link key={l.label} href={l.href} className="py-2 px-2 rounded-lg hover:bg-black/5" onClick={() => setMenuOpen(false)}>
-                {l.label}
-              </Link>
+              l.href.startsWith("#") ? (
+                <a key={l.label} href={l.href} className="py-2 px-2 rounded-lg hover:bg-black/5" onClick={() => setMenuOpen(false)}>
+                  {l.label}
+                </a>
+              ) : (
+                <Link key={l.label} href={l.href} className="py-2 px-2 rounded-lg hover:bg-black/5" onClick={() => setMenuOpen(false)}>
+                  {l.label}
+                </Link>
+              )
             ))}
             <Link href="/student/login" className="py-2 px-2 rounded-lg hover:bg-black/5" onClick={() => setMenuOpen(false)}>Log In</Link>
           </nav>

@@ -25,10 +25,11 @@ export function levelForXp(totalXp: number): number {
   return Math.floor(totalXp / XP_PER_LEVEL);
 }
 
-// A plain YYYY-MM-DD day key (UTC) for the daily-cap window. UTC keeps it
-// simple and predictable; for a UTC+2 school the day rolls over at 02:00 local.
+// A plain YYYY-MM-DD day key for the daily-cap window, in Mozambique time
+// (CAT, UTC+2) so the XP day resets at local midnight — matching the streak
+// day (see server/streaks.ts) rather than rolling over at 02:00 local.
 function todayKey(): string {
-  return new Date().toISOString().slice(0, 10);
+  return new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
 // A transparent breakdown of where an award's XP came from, so the UI can

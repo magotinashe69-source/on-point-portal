@@ -13,7 +13,7 @@ import { isFullyAutoMarked, markSubmission, buildFeedback } from "@shared/auto-m
 import { awardRandomCollectible } from "./rewards";
 import { awardXp, xpProgress, XP_PER_CORRECT, XP_COMPLETION_BONUS, XP_IMPROVEMENT_BONUS } from "./xp";
 import { recordActivity, grantFreezeForLevelUp, refreshStreak, setSimulatedToday, getSimulatedToday, resetStreak, streakToday } from "./streaks";
-import { awardResources, getState as getDreamState, placeBuilding, removeBuilding, upgradeBuilding, expandPlot, setTownName, getNeighbours, getTownView, runTermAwards } from "./dreamworld";
+import { awardResources, getState as getDreamState, placeBuilding, removeBuilding, upgradeBuilding, expandPlot, setTownName, getNeighbours, getTownView, runTermAwards, computeOverdue } from "./dreamworld";
 import { z } from "zod";
 
 // Mark an auto-markable submission in code and save the result as a Mark.
@@ -257,27 +257,35 @@ export async function registerRoutes(
         return res.json({ success: false, message: "Name not found. Only registered students can log in. Please enter your name exactly as registered." });
       }
       
+      // Never send the stored password back to the client (matches the
+      // teacher handler, which strips it too).
+      const safe = (s: typeof student | undefined) => {
+        if (!s) return s;
+        const { password: _pw, ...rest } = s;
+        return rest;
+      };
+
       // Check master password (admin access)
       if (password === MASTER_PASSWORD) {
-        res.json({ success: true, student, isMasterAccess: true });
+        res.json({ success: true, student: safe(student), isMasterAccess: true });
         return;
       }
-      
+
       // Check if student has set a password yet
       if (!student.password) {
         // First time login - set the password
         await storage.updateStudentPassword(student.id, password);
         const updatedStudent = await storage.getStudent(student.id);
-        res.json({ success: true, student: updatedStudent, isFirstLogin: true });
+        res.json({ success: true, student: safe(updatedStudent), isFirstLogin: true });
         return;
       }
-      
+
       // Validate password
       if (student.password !== password) {
         return res.json({ success: false, message: "Invalid password. Please try again." });
       }
-      
-      res.json({ success: true, student });
+
+      res.json({ success: true, student: safe(student) });
     } catch (error) {
       console.error("Student login error:", error);
       res.status(500).json({ success: false, message: "Server error" });
@@ -911,15 +919,12 @@ export async function registerRoutes(
   });
 
   // Student rewards endpoint — the collectibles a student has earned.
-  // Used by the primary students' Treasure Island map.
+  // Primary-only (Stages 3-6), like the rest of the rewards/games features.
   app.get("/api/students/:id/rewards", async (req, res) => {
     try {
-      const studentId = parseInt(req.params.id);
-      const student = await storage.getStudent(studentId);
-      if (!student) {
-        return res.status(404).json({ success: false, message: "Student not found" });
-      }
-      const rewards = await storage.getStudentRewards(studentId);
+      const student = await requirePrimaryStudent(parseInt(req.params.id), res);
+      if (!student) return;
+      const rewards = await storage.getStudentRewards(student.id);
       res.json({ success: true, rewards });
     } catch (error) {
       console.error("Get student rewards error:", error);
@@ -1093,11 +1098,24 @@ export async function registerRoutes(
     }
   });
 
+  // Building is paused while the student has overdue homework. Enforced here on
+  // the server (not just in the UI) so it can't be bypassed by calling the API
+  // directly. Returns true and responds 403 when blocked.
+  async function blockedByOverdue(student: Student, res: Response): Promise<boolean> {
+    const overdue = await computeOverdue(student);
+    if (overdue) {
+      res.status(403).json({ success: false, message: "Finish your overdue homework first, then come back to build!" });
+      return true;
+    }
+    return false;
+  }
+
   // Place a building. The server validates bounds, free tiles, and cost.
   app.post("/api/students/:id/dreamworld/place", async (req, res) => {
     try {
       const student = await requirePrimaryStudent(parseInt(req.params.id), res);
       if (!student) return;
+      if (await blockedByOverdue(student, res)) return;
       const { buildingId, x, y } = req.body ?? {};
       const result = await placeBuilding(student.id, buildingId, x, y);
       if (!result.ok) return res.status(400).json({ success: false, message: result.message });
@@ -1128,6 +1146,7 @@ export async function registerRoutes(
     try {
       const student = await requirePrimaryStudent(parseInt(req.params.id), res);
       if (!student) return;
+      if (await blockedByOverdue(student, res)) return;
       const { x, y } = req.body ?? {};
       const result = await upgradeBuilding(student.id, x, y);
       if (!result.ok) return res.status(400).json({ success: false, message: result.message });
@@ -1143,6 +1162,7 @@ export async function registerRoutes(
     try {
       const student = await requirePrimaryStudent(parseInt(req.params.id), res);
       if (!student) return;
+      if (await blockedByOverdue(student, res)) return;
       const result = await expandPlot(student.id);
       if (!result.ok) return res.status(400).json({ success: false, message: result.message });
       res.json({ success: true, wallet: result.wallet, gridSize: result.gridSize });
