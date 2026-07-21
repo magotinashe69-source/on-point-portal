@@ -25,6 +25,7 @@ import {
 import type { Assignment, Announcement } from "@shared/schema";
 import { isPrimaryForm } from "@shared/schema";
 import { XpLevelBar } from "@/components/XpLevelBar";
+import { StreakFlame } from "@/components/StreakFlame";
 import logoPath from "@assets/logo.webp";
 
 interface EnrichedSubmission {
@@ -69,6 +70,13 @@ export default function StudentDashboard() {
       xpIntoLevel: number;
       xpForNextLevel: number;
       progressPercent: number;
+    };
+    streak?: {
+      current: number;
+      longest: number;
+      freezes: number;
+      maxFreezes: number;
+      notice: { type: string; message: string } | null;
     };
   }
 
@@ -137,14 +145,35 @@ export default function StudentDashboard() {
           <p className="text-muted-foreground">{student.form} - ID: {student.studentId}</p>
         </div>
 
-        {/* Level + XP progress. Uses the stats already loaded above, so it adds
-            no extra request. Shows a zeroed bar until stats arrive. */}
-        <XpLevelBar
-          level={statsData?.stats.xp?.level ?? 0}
-          xpIntoLevel={statsData?.stats.xp?.xpIntoLevel ?? 0}
-          xpForNextLevel={statsData?.stats.xp?.xpForNextLevel ?? 500}
-          progressPercent={statsData?.stats.xp?.progressPercent ?? 0}
-        />
+        {/* Level + XP progress with the daily streak flame beside it. Both come
+            from the stats already loaded above, so this adds no extra request.
+            Shows zeroed values until stats arrive. */}
+        <div className="flex flex-col sm:flex-row sm:items-start gap-3">
+          <div className="flex-1 min-w-0">
+            <XpLevelBar
+              level={statsData?.stats.xp?.level ?? 0}
+              xpIntoLevel={statsData?.stats.xp?.xpIntoLevel ?? 0}
+              xpForNextLevel={statsData?.stats.xp?.xpForNextLevel ?? 500}
+              progressPercent={statsData?.stats.xp?.progressPercent ?? 0}
+            />
+          </div>
+          <StreakFlame
+            current={statsData?.stats.streak?.current ?? 0}
+            freezes={statsData?.stats.streak?.freezes ?? 0}
+            maxFreezes={statsData?.stats.streak?.maxFreezes ?? 2}
+          />
+        </div>
+
+        {/* A gentle one-time note when a freeze saved the streak, a milestone was
+            reached, or a lost streak needs an encouraging nudge. */}
+        {statsData?.stats.streak?.notice && (
+          <div
+            className="mb-6 -mt-2 rounded-xl border px-4 py-3 text-sm font-medium bg-muted/40"
+            data-testid="streak-notice"
+          >
+            {statsData.stats.streak.notice.message}
+          </div>
+        )}
 
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
           <Card>
