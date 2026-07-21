@@ -7,12 +7,13 @@ import {
   studentLoginSchema,
   MASTER_PASSWORD
 } from "@shared/schema";
-import type { Assignment, Submission } from "@shared/schema";
+import type { Assignment, Submission, Student } from "@shared/schema";
 import { isPrimaryForm } from "@shared/schema";
 import { isFullyAutoMarked, markSubmission, buildFeedback } from "@shared/auto-marking";
 import { awardRandomCollectible } from "./rewards";
 import { awardXp, xpProgress, XP_PER_CORRECT, XP_COMPLETION_BONUS, XP_IMPROVEMENT_BONUS } from "./xp";
 import { recordActivity, grantFreezeForLevelUp, refreshStreak, setSimulatedToday, getSimulatedToday, resetStreak, streakToday } from "./streaks";
+import { awardResources, getState as getDreamState, placeBuilding, removeBuilding } from "./dreamworld";
 import { z } from "zod";
 
 // Mark an auto-markable submission in code and save the result as a Mark.
@@ -724,6 +725,21 @@ export async function registerRoutes(
         }
       }
 
+      // Dream World payout: primary students earn coins/bricks/wood — plus gems
+      // for a high score — for completing an auto-marked assignment. Same
+      // best-effort path as XP, and only for primary classes (Forms have no
+      // Dream World). Awarded once per assignment (a duplicate submission is
+      // blocked above), so it can't be farmed.
+      let resources;
+      if (mark && isPrimaryForm(student.form)) {
+        try {
+          const percent = assignment.totalMarks > 0 ? (mark.totalScore / assignment.totalMarks) * 100 : 0;
+          resources = await awardResources(studentId, percent);
+        } catch (resourceError) {
+          console.error("Dream World payout failed (submission still saved):", resourceError);
+        }
+      }
+
       // Daily streak: completing a submission counts as activity for today, for
       // every student (primary and Forms). A level-up (reported by the XP award
       // above) also earns a streak freeze. Best-effort so it can never break or
@@ -735,7 +751,7 @@ export async function registerRoutes(
         console.error("Streak update failed (submission still saved):", streakError);
       }
 
-      res.json({ success: true, submission, mark: mark ?? undefined, reward, xp });
+      res.json({ success: true, submission, mark: mark ?? undefined, reward, xp, resources });
     } catch (error) {
       console.error("Create submission error:", error);
       res.status(500).json({ success: false, message: "Server error" });
@@ -1045,6 +1061,67 @@ export async function registerRoutes(
       res.json({ success: true });
     });
   }
+
+  // -------------------------------------------------------------------------
+  // Dream World — the town-building reward game. Every endpoint is restricted
+  // to primary students (Stages 3-6); secondary Forms get a 403 and never see
+  // the game. Placement and resource spending are validated server-side.
+  // -------------------------------------------------------------------------
+  async function requirePrimaryStudent(studentId: number, res: Response): Promise<Student | null> {
+    const student = await storage.getStudent(studentId);
+    if (!student) {
+      res.status(404).json({ success: false, message: "Student not found" });
+      return null;
+    }
+    if (!isPrimaryForm(student.form)) {
+      res.status(403).json({ success: false, message: "Dream World is for primary classes only" });
+      return null;
+    }
+    return student;
+  }
+
+  // The student's wallet and saved town layout.
+  app.get("/api/students/:id/dreamworld", async (req, res) => {
+    try {
+      const student = await requirePrimaryStudent(parseInt(req.params.id), res);
+      if (!student) return;
+      const state = await getDreamState(student.id);
+      res.json({ success: true, wallet: state.wallet, layout: state.layout });
+    } catch (error) {
+      console.error("Get Dream World error:", error);
+      res.status(500).json({ success: false, message: "Server error" });
+    }
+  });
+
+  // Place a building. The server validates bounds, free tiles, and cost.
+  app.post("/api/students/:id/dreamworld/place", async (req, res) => {
+    try {
+      const student = await requirePrimaryStudent(parseInt(req.params.id), res);
+      if (!student) return;
+      const { buildingId, x, y } = req.body ?? {};
+      const result = await placeBuilding(student.id, buildingId, x, y);
+      if (!result.ok) return res.status(400).json({ success: false, message: result.message });
+      res.json({ success: true, wallet: result.wallet, layout: result.layout });
+    } catch (error) {
+      console.error("Place building error:", error);
+      res.status(500).json({ success: false, message: "Server error" });
+    }
+  });
+
+  // Remove the building on a tile (refunds half its cost).
+  app.post("/api/students/:id/dreamworld/remove", async (req, res) => {
+    try {
+      const student = await requirePrimaryStudent(parseInt(req.params.id), res);
+      if (!student) return;
+      const { x, y } = req.body ?? {};
+      const result = await removeBuilding(student.id, x, y);
+      if (!result.ok) return res.status(400).json({ success: false, message: result.message });
+      res.json({ success: true, wallet: result.wallet, layout: result.layout });
+    } catch (error) {
+      console.error("Remove building error:", error);
+      res.status(500).json({ success: false, message: "Server error" });
+    }
+  });
 
   // Resources (textbooks, YouTube links, lesson plans)
   app.get("/api/resources", async (req, res) => {
