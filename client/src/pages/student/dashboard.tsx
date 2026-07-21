@@ -281,6 +281,25 @@ export default function StudentDashboard() {
           </Link>
         )}
 
+        {/* Dream World — a town-building reward game for primary classes
+            (Stages 3-6) only. Secondary students (Form 1/2) never see this. */}
+        {isPrimaryForm(student.form) && (
+          <Link href="/student/dream-world">
+            <Card className="hover-elevate cursor-pointer mb-6 border-primary/30 bg-gradient-to-br from-primary/10 to-transparent">
+              <CardContent className="flex items-center gap-4 py-6">
+                <div className="p-3 rounded-md bg-primary/15 text-2xl leading-none">🏙️</div>
+                <div className="flex-1">
+                  <h3 className="font-semibold">My Dream World</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Spend the coins, bricks and wood you earn to build your own town!
+                  </p>
+                </div>
+                <ArrowRight className="h-5 w-5 text-primary" />
+              </CardContent>
+            </Card>
+          </Link>
+        )}
+
         <div className="grid gap-4 md:grid-cols-2 mb-6">
           <Link href="/student/resources">
             <Card className="hover-elevate cursor-pointer h-full">

@@ -13,6 +13,8 @@ import { isFullyAutoMarked } from "@shared/auto-marking";
 import type { Submission, Assignment, Mark } from "@shared/schema";
 import { XpRewardBadge } from "@/components/XpRewardBadge";
 import { takePendingXp } from "@/lib/xp-handoff";
+import { ResourcePayout } from "@/components/ResourcePayout";
+import { takePendingResources } from "@/lib/dream-handoff";
 import logoPath from "@assets/logo.webp";
 
 export default function ViewResults() {
@@ -25,6 +27,8 @@ export default function ViewResults() {
   // Read once on mount (and cleared) so the animation shows only right after
   // submitting, not every time old results are reopened.
   const [xpAward] = useState(() => (id ? takePendingXp(Number(id)) : undefined));
+  // The Dream World resources just earned, handed off from the submit page.
+  const [resourcePayout] = useState(() => (id ? takePendingResources(Number(id)) : undefined));
 
   useEffect(() => {
     if (!student) {
@@ -120,6 +124,13 @@ export default function ViewResults() {
                 {xpAward && (
                   <div className="mt-5 flex justify-center">
                     <XpRewardBadge award={xpAward} />
+                  </div>
+                )}
+
+                {/* Dream World resources earned for this assignment. */}
+                {resourcePayout && (
+                  <div className="mt-3 flex justify-center">
+                    <ResourcePayout payout={resourcePayout} />
                   </div>
                 )}
 

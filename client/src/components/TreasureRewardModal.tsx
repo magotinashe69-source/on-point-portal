@@ -7,16 +7,19 @@ import { Button } from "@/components/ui/button";
 import { COLLECTIBLES } from "@shared/collectibles";
 import { collectibleEmoji } from "@/lib/collectible-emoji";
 import { XpRewardBadge } from "@/components/XpRewardBadge";
+import { ResourcePayout } from "@/components/ResourcePayout";
 import type { XpAward } from "@/lib/xp-handoff";
+import type { Wallet } from "@shared/dreamworld";
 
 interface TreasureRewardModalProps {
   rewardName: string;        // e.g. "Golden Compass"
   xp?: XpAward | null;       // XP earned alongside the treasure, if any
+  resources?: Wallet | null; // Dream World resources earned, if any
   onClose: () => void;       // "Continue" — usually back to the dashboard
   onViewMap: () => void;     // "See it on the map" — go to Treasure Island
 }
 
-export function TreasureRewardModal({ rewardName, xp, onClose, onViewMap }: TreasureRewardModalProps) {
+export function TreasureRewardModal({ rewardName, xp, resources, onClose, onViewMap }: TreasureRewardModalProps) {
   const emoji = collectibleEmoji(rewardName);
   const description = COLLECTIBLES.find((c) => c.name === rewardName)?.description ?? "";
 
@@ -125,6 +128,13 @@ export function TreasureRewardModal({ rewardName, xp, onClose, onViewMap }: Trea
         {xp && (
           <div className="mt-3 flex justify-center">
             <XpRewardBadge award={xp} />
+          </div>
+        )}
+
+        {/* Dream World resources earned for completing the assignment. */}
+        {resources && (
+          <div className="mt-3 flex justify-center">
+            <ResourcePayout payout={resources} />
           </div>
         )}
 

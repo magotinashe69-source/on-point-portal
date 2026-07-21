@@ -24,6 +24,8 @@ import { isFullyAutoMarked } from "@shared/auto-marking";
 import type { Assignment, Submission, StudentReward } from "@shared/schema";
 import { TreasureRewardModal } from "@/components/TreasureRewardModal";
 import { setPendingXp, type XpAward } from "@/lib/xp-handoff";
+import { setPendingResources } from "@/lib/dream-handoff";
+import type { Wallet } from "@shared/dreamworld";
 import logoPath from "@assets/logo.webp";
 
 const MIN_ANSWER_LENGTH = 30;
@@ -64,6 +66,8 @@ export default function SubmitAssignment() {
   const [earnedReward, setEarnedReward] = useState<StudentReward | null>(null);
   // The XP earned on this submission, shown inside the chest pop-up.
   const [earnedXp, setEarnedXp] = useState<XpAward | null>(null);
+  // The Dream World resources earned, shown inside the chest pop-up.
+  const [earnedResources, setEarnedResources] = useState<Wallet | null>(null);
 
   useEffect(() => {
     if (!student) {
@@ -152,15 +156,20 @@ export default function SubmitAssignment() {
         // handle navigation.
         if (data.reward) {
           queryClient.invalidateQueries({ queryKey: ["/api/students/" + student.id + "/rewards"] });
+          // Dream World resources may have changed — refresh the plot.
+          queryClient.invalidateQueries({ queryKey: ["/api/students/" + student.id + "/dreamworld"] });
           setEarnedXp(data.xp ?? null);
+          setEarnedResources(data.resources ?? null);
           setEarnedReward(data.reward);
           return;
         }
 
         // Auto-marked submissions earned XP and have an instant score: hand the
-        // XP to the results screen and show the "+X XP" moment there.
+        // XP (and any Dream World payout) to the results screen and show the
+        // reward moment there.
         if (data.xp && submissionId) {
           setPendingXp(submissionId, data.xp);
+          if (data.resources) setPendingResources(submissionId, data.resources);
           setLocation(`/student/results/${submissionId}`);
           return;
         }
@@ -247,6 +256,7 @@ export default function SubmitAssignment() {
         <TreasureRewardModal
           rewardName={earnedReward.rewardName}
           xp={earnedXp}
+          resources={earnedResources}
           onClose={() => setLocation("/student/dashboard")}
           onViewMap={() => setLocation("/student/treasure")}
         />

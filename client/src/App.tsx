@@ -27,6 +27,7 @@ import ViewResults from "@/pages/student/view-results";
 import StudentResources from "@/pages/student/resources";
 import StudentLessons from "@/pages/student/lessons";
 import TreasureIsland from "@/pages/student/treasure-island";
+import DreamWorld from "@/pages/student/dream-world";
 
 function Router() {
   return (
@@ -55,6 +56,7 @@ function Router() {
       <Route path="/student/resources" component={StudentResources} />
       <Route path="/student/lessons" component={StudentLessons} />
       <Route path="/student/treasure" component={TreasureIsland} />
+      <Route path="/student/dream-world" component={DreamWorld} />
       <Route component={NotFound} />
     </Switch>
   );
