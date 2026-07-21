@@ -11,12 +11,13 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { ArrowLeft, Loader2, Lock, Pencil, Users } from "lucide-react";
+import { ArrowLeft, Loader2, Lock, Pencil, Users, ArrowUpCircle, Trash2, Maximize2 } from "lucide-react";
 import { isPrimaryForm } from "@shared/schema";
 import {
   RESOURCE_ICON, CATEGORY_ORDER, CATEGORY_META, EMPTY_PROGRESS, AWARDS, TOWN_NAME_MAX,
   buildingById, buildingsInCategory, canAfford, canBuildAnything, cleanTownName, footprint,
   inBounds, isUnlocked, occupiedCells, remainingToUnlock, unlockHint,
+  townValue, levelOf, maxLevelOf, isUpgradable, upgradeCost, canExpand, EXPAND_COST,
   type AwardId, type BuildingDef, type BuildingId, type Placed, type Progress, type Wallet,
 } from "@shared/dreamworld";
 import { DreamBuilding, TILE } from "@/components/DreamBuilding";
@@ -38,6 +39,8 @@ interface DreamData {
   canRename: boolean;
   award: string;
   awardTerm: string;
+  gridSize: number;
+  townValue: number;
 }
 
 export default function DreamWorld() {
@@ -67,6 +70,8 @@ export default function DreamWorld() {
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState("");
   const [nameError, setNameError] = useState<string | null>(null);
+  const [gridSize, setGridSize] = useState(8);
+  const [actioning, setActioning] = useState<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     if (data?.success) {
@@ -75,6 +80,7 @@ export default function DreamWorld() {
       setProgress(data.progress ?? EMPTY_PROGRESS);
       setOverdue(data.overdue ?? null);
       setTown({ name: data.townName, mayor: data.mayorFirstName, founded: data.foundedAt, canRename: data.canRename, award: data.award, term: data.awardTerm });
+      setGridSize(data.gridSize ?? 8);
       if (data.justUnlocked && data.justUnlocked.length > 0) setCelebrate(data.justUnlocked);
     }
   }, [data]);
@@ -83,12 +89,13 @@ export default function DreamWorld() {
 
   const occupied = occupiedCells(layout);
   const locked = !!overdue;
+  const value = townValue(layout);
 
   async function placeAt(x: number, y: number) {
     if (busy || locked || !selected) return;
     const def = buildingById(selected)!;
     if (!isUnlocked(def, progress)) { setMessage(unlockHint(def, progress)); return; }
-    if (!inBounds(x, y, def.size)) { setMessage("That doesn't fit here."); return; }
+    if (!inBounds(x, y, def.size, gridSize)) { setMessage("That doesn't fit here."); return; }
     if (footprint(x, y, def.size).some((c) => occupied.has(`${c.x},${c.y}`))) { setMessage("That space is taken."); return; }
     if (!canAfford(wallet, def.cost)) { setMessage("Not enough resources yet."); return; }
 
@@ -136,7 +143,7 @@ export default function DreamWorld() {
     try {
       const res = await apiRequest("POST", `/api/students/${student!.id}/dreamworld/remove`, { x, y });
       const body = await res.json();
-      if (body.success) { setWallet(body.wallet); setLayout(body.layout); }
+      if (body.success) { setWallet(body.wallet); setLayout(body.layout); setActioning(null); }
       else { setWallet(prevWallet); setLayout(prevLayout); setMessage(body.message || "Couldn't remove that."); }
     } catch { setWallet(prevWallet); setLayout(prevLayout); }
     finally { setBusy(false); }
@@ -144,9 +151,34 @@ export default function DreamWorld() {
 
   function handleTileTap(x: number, y: number) {
     if (locked) { setMessage("Finish your homework first, then come back to build!"); return; }
-    if (occupied.has(`${x},${y}`)) removeAt(x, y);
-    else if (selected) placeAt(x, y);
+    const here = occupied.get(`${x},${y}`);
+    if (here) { setActioning({ x: here.x, y: here.y }); return; } // open upgrade/remove
+    if (selected) placeAt(x, y);
     else setMessage("Pick something to build first!");
+  }
+
+  async function upgradeAt(x: number, y: number) {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const res = await apiRequest("POST", `/api/students/${student!.id}/dreamworld/upgrade`, { x, y });
+      const body = await res.json();
+      if (body.success) { setWallet(body.wallet); setLayout(body.layout); setActioning(null); }
+      else setMessage(body.message || "Couldn't upgrade that.");
+    } catch { setMessage("Couldn't upgrade — try again."); }
+    finally { setBusy(false); }
+  }
+
+  async function expandPlot() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const res = await apiRequest("POST", `/api/students/${student!.id}/dreamworld/expand`, {});
+      const body = await res.json();
+      if (body.success) { setWallet(body.wallet); setGridSize(body.gridSize); setMessage("Your plot is bigger now! 🎉"); }
+      else setMessage(body.message || "Couldn't expand the plot.");
+    } catch { setMessage("Couldn't expand — try again."); }
+    finally { setBusy(false); }
   }
 
   async function saveName() {
@@ -216,6 +248,9 @@ export default function DreamWorld() {
                 {town.mayor && <span className="text-muted-foreground font-normal"> • Mayor {town.mayor}</span>}
                 {foundedDate && <span className="text-muted-foreground font-normal"> • Founded {foundedDate}</span>}
               </span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-[#BF9000]/15 px-2 py-0.5 text-xs font-bold text-[#8a6a00] dark:text-[#E0B93A] tabular-nums" data-testid="town-value">
+                ⭐ {value}
+              </span>
               {town.canRename && (
                 <button
                   className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs hover-elevate"
@@ -270,7 +305,21 @@ export default function DreamWorld() {
         {isLoading ? (
           <div className="flex items-center justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
         ) : (
-          <TownPlot layout={layout} popping={popping} onTileTap={handleTileTap} interactive />
+          <TownPlot layout={layout} popping={popping} onTileTap={handleTileTap} interactive gridSize={gridSize} />
+        )}
+
+        {/* Plot expansion. */}
+        {!locked && canExpand(gridSize) && (
+          <button
+            type="button"
+            onClick={expandPlot}
+            disabled={busy || !canAfford(wallet, EXPAND_COST)}
+            className="mt-3 w-full rounded-xl border border-dashed border-primary/40 bg-primary/5 px-4 py-2.5 text-sm font-medium text-primary disabled:opacity-45 hover-elevate"
+            data-testid="button-expand-plot"
+          >
+            <Maximize2 className="inline h-4 w-4 mr-1.5" />
+            Expand your plot to 10×10 — {(["coins", "bricks", "wood", "gems"] as const).filter((k) => EXPAND_COST[k] > 0).map((k) => `${RESOURCE_ICON[k]}${EXPAND_COST[k]}`).join(" ")}
+          </button>
         )}
 
         {overdue && (
@@ -288,7 +337,7 @@ export default function DreamWorld() {
           {CATEGORY_ORDER.map((cat) => {
             const meta = CATEGORY_META[cat];
             const items = buildingsInCategory(cat);
-            const showCount = cat !== "starter";
+            const showCount = cat !== "starter" && cat !== "decor";
             const count = cat === "universal" ? progress.total : (progress as any)[cat] ?? 0;
             return (
               <div key={cat} className="mb-4">
@@ -322,6 +371,63 @@ export default function DreamWorld() {
           {locked ? "Building is paused until your homework is done." : selected ? "Now tap an empty tile to build. Tap a building to remove it." : "Tap an unlocked building, then tap a tile."}
         </p>
       </main>
+
+      {/* Building action sheet — upgrade or remove the tapped building. */}
+      {actioning && (() => {
+        const b = occupied.get(`${actioning.x},${actioning.y}`);
+        const def = b ? buildingById(b.id) : undefined;
+        if (!b || !def) return null;
+        const level = levelOf(b);
+        const max = maxLevelOf(def);
+        const canUp = isUpgradable(def) && level < max;
+        const up = canUp ? upgradeCost(def, level) : null;
+        const affordUp = up ? canAfford(wallet, up) : false;
+        const px = def.size === 2 ? 80 : TILE;
+        return (
+          <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" role="dialog" aria-modal="true" onClick={() => setActioning(null)} data-testid="building-actions">
+            <div className="dw-modal w-full max-w-xs rounded-2xl border bg-card p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center gap-3">
+                <svg viewBox={`0 0 ${px} ${px}`} className="h-12 w-12 shrink-0" aria-hidden="true">
+                  <rect x="0" y="0" width={px} height={px} fill="#8FD673" rx="4" />
+                  <DreamBuilding id={def.id} />
+                </svg>
+                <div>
+                  <div className="font-bold">{def.name}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {isUpgradable(def) ? `Level ${level} of ${max}` : "Decoration"}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 flex flex-col gap-2">
+                {canUp ? (
+                  <button
+                    className="flex items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-45"
+                    onClick={() => upgradeAt(actioning.x, actioning.y)}
+                    disabled={busy || !affordUp}
+                    data-testid="button-upgrade"
+                  >
+                    <ArrowUpCircle className="h-4 w-4" />
+                    Upgrade to Level {level + 1} — {(["coins", "bricks", "wood", "gems"] as const).filter((k) => (up![k] ?? 0) > 0).map((k) => `${RESOURCE_ICON[k]}${up![k]}`).join(" ")}
+                  </button>
+                ) : isUpgradable(def) ? (
+                  <div className="rounded-lg bg-muted px-4 py-2 text-center text-sm font-medium">⭐ Max level reached!</div>
+                ) : null}
+
+                <button
+                  className="flex items-center justify-center gap-1.5 rounded-lg border px-4 py-2 text-sm font-medium text-destructive disabled:opacity-45"
+                  onClick={() => removeAt(actioning.x, actioning.y)}
+                  disabled={busy}
+                  data-testid="button-remove"
+                >
+                  <Trash2 className="h-4 w-4" /> Remove (half refund)
+                </button>
+                <button className="rounded-lg px-4 py-2 text-sm text-muted-foreground" onClick={() => setActioning(null)}>Cancel</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {celebrate && celebrate.length > 0 && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" role="dialog" aria-modal="true" onClick={() => setCelebrate(null)} data-testid="unlock-celebration">

@@ -183,9 +183,68 @@ export function DreamBuilding({ id }: { id: BuildingId }) {
         </g>
       );
 
+    // ---- Decorations ----
+    case "fence":
+      return (
+        <g>
+          <rect x="6" y="22" width="28" height="2.4" rx="1" fill="#B07E45" />
+          <rect x="6" y="27" width="28" height="2.4" rx="1" fill="#B07E45" />
+          {[8, 15.5, 23, 30.5].map((x) => (
+            <rect key={x} x={x} y="19" width="3" height="14" rx="1" fill="#8A5A2B" />
+          ))}
+        </g>
+      );
+    case "pond":
+      return (
+        <g>
+          <ellipse cx="20" cy="26" rx="14" ry="8" fill="#4FA3D1" stroke="#3B7FA6" strokeWidth="1" />
+          <ellipse cx="16" cy="23" rx="4" ry="1.8" fill="#9FD6EE" opacity="0.8" />
+        </g>
+      );
+    case "lamppost":
+      return (
+        <g>
+          <rect x="13" y="32" width="14" height="2.6" rx="1" fill="#3F3F3F" />
+          <rect x="18.7" y="14" width="2.6" height="19" fill="#4A4A4A" />
+          <path d="M 15 14 q 5 -5 10 0 z" fill="#3A3A3A" />
+          <circle cx="20" cy="13" r="3" fill="#FCE38A" />
+        </g>
+      );
+    case "bench":
+      return (
+        <g>
+          <rect x="9" y="18" width="22" height="3" rx="1" fill="#B07E45" />
+          <rect x="9" y="24" width="22" height="3" rx="1" fill="#8A5A2B" />
+          <rect x="11" y="27" width="2.6" height="6" fill="#6B4A22" />
+          <rect x="26.4" y="27" width="2.6" height="6" fill="#6B4A22" />
+          <rect x="11" y="18" width="2.6" height="9" fill="#6B4A22" />
+          <rect x="26.4" y="18" width="2.6" height="9" fill="#6B4A22" />
+        </g>
+      );
+    case "statue":
+      return (
+        <g>
+          <rect x="13" y="30" width="14" height="4" rx="0.5" fill="#B7B0A2" />
+          <rect x="16" y="25" width="8" height="6" fill="#C9C3B6" />
+          <path d="M 16 26 q 4 -9 8 0 z" fill="#D8D3C8" />
+          <circle cx="20" cy="15" r="3.4" fill="#DCD7CC" />
+        </g>
+      );
+
     default:
       return null;
   }
+}
+
+// A small 5-point gold star, used to badge an upgraded building's level.
+export function LevelStar({ cx, cy, r = 3.2 }: { cx: number; cy: number; r?: number }) {
+  const pts: string[] = [];
+  for (let i = 0; i < 10; i++) {
+    const ang = -Math.PI / 2 + (i * Math.PI) / 5;
+    const rr = i % 2 === 0 ? r : r * 0.45;
+    pts.push(`${(cx + Math.cos(ang) * rr).toFixed(1)},${(cy + Math.sin(ang) * rr).toFixed(1)}`);
+  }
+  return <polygon points={pts.join(" ")} fill="#F2C94C" stroke="#B8891F" strokeWidth="0.4" />;
 }
 
 // A simple cog/gear: a hub circle with eight teeth around a body circle.

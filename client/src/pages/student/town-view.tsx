@@ -22,6 +22,8 @@ interface TownView {
   layout: Placed[];
   award: string;
   buildingCount: number;
+  gridSize: number;
+  townValue: number;
 }
 
 export default function TownViewPage() {
@@ -76,12 +78,12 @@ export default function TownViewPage() {
                 {foundedDate && <span className="text-muted-foreground font-normal"> • Founded {foundedDate}</span>}
               </div>
               <div className="text-xs text-muted-foreground mt-0.5">
-                {town.buildingCount} building{town.buildingCount === 1 ? "" : "s"}
+                {town.buildingCount} building{town.buildingCount === 1 ? "" : "s"} • ⭐ {town.townValue}
                 {award && <span> • {award.emoji} {award.name}</span>}
               </div>
             </div>
 
-            <TownPlot layout={town.layout} interactive={false} />
+            <TownPlot layout={town.layout} interactive={false} gridSize={town.gridSize} />
 
             <p className="text-center text-xs text-muted-foreground mt-3">You're just visiting — this town is view-only. 👀</p>
           </>
