@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Stage D — Daily Streaks</title>
+<style>
+  html { color-scheme: light dark; }
+  body { margin: 0; }
+  :root {
+    --ground: #FAF8F2;
+    --surface: #FFFFFF;
+    --surface-2: #F4EFE3;
+    --ink: #19212E;
+    --ink-soft: #56617A;
+    --line: #E7E0CF;
+    --line-strong: #D8CFB8;
+    --navy: #1F3864;
+    --navy-ink: #1F3864;
+    --gold: #A9770B;
+    --ember: #D9711A;
+    --good: #2E7D52;
+    --good-bg: #E5F1E9;
+    --good-line: #BFE0CC;
+
+    --maxw: 60rem;
+    --radius: 14px;
+    --shadow: 0 1px 2px rgba(25,33,46,.05), 0 6px 20px -12px rgba(25,33,46,.18);
+    --font: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #12151D;
+      --surface: #1A2030;
+      --surface-2: #222941;
+      --ink: #ECEFF6;
+      --ink-soft: #A3ADC4;
+      --line: #2A3145;
+      --line-strong: #333B54;
+      --navy: #7CA0DD;
+      --navy-ink: #A9C4F1;
+      --gold: #E3BC44;
+      --ember: #F49A4E;
+      --good: #6FD79E;
+      --good-bg: #1B2E27;
+      --good-line: #2E4A3B;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 26px -14px rgba(0,0,0,.6);
+    }
+  }
+  :root[data-theme="light"] {
+    --ground: #FAF8F2; --surface: #FFFFFF; --surface-2: #F4EFE3;
+    --ink: #19212E; --ink-soft: #56617A; --line: #E7E0CF; --line-strong: #D8CFB8;
+    --navy: #1F3864; --navy-ink: #1F3864; --gold: #A9770B; --ember: #D9711A;
+    --good: #2E7D52; --good-bg: #E5F1E9; --good-line: #BFE0CC;
+    --shadow: 0 1px 2px rgba(25,33,46,.05), 0 6px 20px -12px rgba(25,33,46,.18);
+  }
+  :root[data-theme="dark"] {
+    --ground: #12151D; --surface: #1A2030; --surface-2: #222941;
+    --ink: #ECEFF6; --ink-soft: #A3ADC4; --line: #2A3145; --line-strong: #333B54;
+    --navy: #7CA0DD; --navy-ink: #A9C4F1; --gold: #E3BC44; --ember: #F49A4E;
+    --good: #6FD79E; --good-bg: #1B2E27; --good-line: #2E4A3B;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 26px -14px rgba(0,0,0,.6);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--font);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: var(--maxw);
+    margin: 0 auto;
+    padding: clamp(1.25rem, 4vw, 3rem) clamp(1.1rem, 4vw, 2rem) 4rem;
+  }
+
+  /* ---- Header ---- */
+  header { border-bottom: 1px solid var(--line); padding-bottom: 1.75rem; }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: .5rem;
+    font-size: .72rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--navy-ink);
+  }
+  .eyebrow .dot { width: .5rem; height: .5rem; border-radius: 50%; background: var(--ember); }
+  h1 {
+    font-size: clamp(2rem, 6vw, 3rem);
+    line-height: 1.05; letter-spacing: -.02em; text-wrap: balance;
+    margin: .7rem 0 .1rem; font-weight: 800;
+  }
+  h1 .flame { color: var(--ember); }
+  .lede {
+    font-size: clamp(1.02rem, 2.4vw, 1.18rem); color: var(--ink-soft);
+    max-width: 46ch; margin: .6rem 0 1.4rem;
+  }
+  .status {
+    display: inline-flex; align-items: center; gap: .55rem;
+    background: var(--good-bg); color: var(--good);
+    border: 1px solid var(--good-line);
+    padding: .4rem .8rem; border-radius: 999px;
+    font-weight: 700; font-size: .86rem;
+  }
+  .status .pulse { width: .55rem; height: .55rem; border-radius: 50%; background: var(--good); box-shadow: 0 0 0 0 var(--good); animation: pulse 2.6s infinite; }
+  @keyframes pulse { 0%{ box-shadow: 0 0 0 0 color-mix(in srgb, var(--good) 55%, transparent); } 70%{ box-shadow: 0 0 0 .5rem transparent; } 100%{ box-shadow: 0 0 0 0 transparent; } }
+  @media (prefers-reduced-motion: reduce) { .status .pulse { animation: none; } }
+
+  /* ---- Sections ---- */
+  section { margin-top: 2.75rem; }
+  .kicker {
+    display: flex; align-items: baseline; gap: .75rem; margin-bottom: 1.1rem;
+  }
+  h2 {
+    font-size: 1.25rem; font-weight: 800; letter-spacing: -.01em; margin: 0;
+  }
+  .kicker .rule { flex: 1; height: 1px; background: var(--line); }
+
+  /* ---- Feature grid ---- */
+  .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: .9rem; }
+  @media (max-width: 640px) { .grid { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 1.15rem 1.2rem; box-shadow: var(--shadow);
+    display: flex; flex-direction: column; gap: .3rem;
+  }
+  .card .ico { font-size: 1.4rem; line-height: 1; margin-bottom: .35rem; }
+  .card h3 { margin: 0; font-size: 1rem; font-weight: 700; }
+  .card p { margin: 0; color: var(--ink-soft); font-size: .92rem; }
+
+  /* ---- Milestone table ---- */
+  .tablecard { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: .7rem 1rem; font-size: .92rem; }
+  thead th {
+    background: var(--surface-2); color: var(--navy-ink);
+    font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; font-weight: 700;
+    border-bottom: 1px solid var(--line);
+  }
+  tbody tr + tr td { border-top: 1px solid var(--line); }
+  td.num { font-variant-numeric: tabular-nums; font-weight: 700; }
+  .xp { color: var(--gold); font-weight: 800; font-variant-numeric: tabular-nums; }
+  .cap { color: var(--ink-soft); font-size: .84rem; margin-top: .6rem; }
+
+  /* ---- Checklist ---- */
+  ul.checks { list-style: none; margin: 0; padding: 0; display: grid; gap: .55rem; }
+  ul.checks li { display: flex; gap: .7rem; align-items: flex-start; }
+  ul.checks .mk { color: var(--good); font-weight: 800; flex: none; }
+  ul.checks li span.txt { color: var(--ink); }
+  ul.checks li span.txt b { font-weight: 700; }
+
+  /* ---- Notes / callout ---- */
+  .note {
+    background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--navy);
+    border-radius: 10px; padding: 1rem 1.15rem; box-shadow: var(--shadow);
+  }
+  .note.warn { border-left-color: var(--ember); }
+  .note p { margin: 0 0 .5rem; }
+  .note p:last-child { margin-bottom: 0; }
+  .note .lead { font-weight: 700; }
+  .note code, code.inline {
+    font-family: ui-monospace, "Cascadia Code", "Consolas", monospace;
+    font-size: .84em; background: var(--surface-2); padding: .1rem .38rem; border-radius: 5px;
+    border: 1px solid var(--line);
+  }
+
+  .prose p { color: var(--ink-soft); max-width: 62ch; }
+  .prose p b { color: var(--ink); }
+
+  /* ---- Footer ---- */
+  footer {
+    margin-top: 3.25rem; padding-top: 1.4rem; border-top: 1px solid var(--line);
+    display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; align-items: center; justify-content: space-between;
+    color: var(--ink-soft); font-size: .84rem;
+  }
+  footer .brand { font-weight: 700; color: var(--ink); }
+  footer .tag { font-style: italic; color: var(--gold); }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <span class="eyebrow"><span class="dot"></span> On Point Portal · Feature Report</span>
+    <h1>Stage D — Daily <span class="flame">Streaks</span> 🔥</h1>
+    <p class="lede">A gentle, everyday reason to come back: students build a streak for each day they finish work, and the whole school can see their flame grow.</p>
+    <span class="status"><span class="pulse"></span> Shipped · Live on <b>main</b> &amp; production</span>
+  </header>
+
+  <section>
+    <div class="kicker"><h2>What students get</h2><span class="rule"></span></div>
+    <div class="grid">
+      <div class="card">
+        <div class="ico">🔥</div>
+        <h3>A daily streak</h3>
+        <p>Every day a student completes at least one assignment, their streak grows by one. We track their current streak and their best-ever record.</p>
+      </div>
+      <div class="card">
+        <div class="ico">⭐</div>
+        <h3>The flame, front and centre</h3>
+        <p>A small flame and day-count sit right next to the XP bar on every student’s dashboard — primary <em>and</em> Forms — loading instantly with the page.</p>
+      </div>
+      <div class="card">
+        <div class="ico">❄️</div>
+        <h3>Streak freezes</h3>
+        <p>Miss a day and a freeze is used automatically to save the streak — “Your streak freeze saved you!” Students earn one each time they level up, holding up to two.</p>
+      </div>
+      <div class="card">
+        <div class="ico">🏅</div>
+        <h3>Milestone rewards</h3>
+        <p>Reaching 3, 7, 14 and 30 days triggers a one-time celebration and a bonus of XP — always within the daily XP cap, so nothing can be farmed.</p>
+      </div>
+      <div class="card">
+        <div class="ico">🌍</div>
+        <h3>Their real day</h3>
+        <p>Days are counted in Mozambique time (CAT, UTC+2), so “today” lines up with the children’s actual day — no confusing midnight cut-offs.</p>
+      </div>
+      <div class="card">
+        <div class="ico">💛</div>
+        <h3>Kind, never shaming</h3>
+        <p>If a streak is lost with no freeze left, the message encourages: “Start a new streak today — your record is 12 days!” We keep the record to cheer them on.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="kicker"><h2>Milestone rewards</h2><span class="rule"></span></div>
+    <div class="tablecard">
+      <table>
+        <thead>
+          <tr><th>Streak reached</th><th>Bonus XP</th><th>What the student sees</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="num">3 days</td><td class="xp">+15</td><td>“🔥 3-day streak! +15 XP”</td></tr>
+          <tr><td class="num">7 days</td><td class="xp">+40</td><td>A one-week celebration</td></tr>
+          <tr><td class="num">14 days</td><td class="xp">+100</td><td>Two weeks strong</td></tr>
+          <tr><td class="num">30 days</td><td class="xp">+250</td><td>A full month — the big one</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="cap">Each milestone celebrates once. Bonus XP flows through the normal XP system, so the 300-XP daily cap always applies.</p>
+  </section>
+
+  <section>
+    <div class="kicker"><h2>Status at a glance</h2><span class="rule"></span></div>
+    <ul class="checks">
+      <li><span class="mk">✓</span><span class="txt"><b>All six requirements delivered</b> — tracking, flame, freezes, milestones, timezone, and gentle messaging.</span></li>
+      <li><span class="mk">✓</span><span class="txt"><b>Live on production</b> — verified the deploy on Render; the dashboard loads the streak cleanly.</span></li>
+      <li><span class="mk">✓</span><span class="txt"><b>Fully tested</b> — the streak logic is proven end-to-end (building, milestones, loss, and freezes) against the running app.</span></li>
+      <li><span class="mk">✓</span><span class="txt"><b>Works for everyone</b> — the flame shows for both primary stages and secondary Forms.</span></li>
+    </ul>
+  </section>
+
+  <section>
+    <div class="kicker"><h2>Under the hood</h2><span class="rule"></span></div>
+    <ul class="checks">
+      <li><span class="mk">•</span><span class="txt"><b>Self-contained.</b> Streaks are a brand-new module — auto-marking, XP, and the Treasure Island were left untouched.</span></li>
+      <li><span class="mk">•</span><span class="txt"><b>No extra loading.</b> The flame rides along with the dashboard’s existing data request — zero additional network calls.</span></li>
+      <li><span class="mk">•</span><span class="txt"><b>Never in the way.</b> Streak updates are best-effort, so a hiccup can never block a submission or break the dashboard.</span></li>
+      <li><span class="mk">•</span><span class="txt"><b>No background jobs.</b> A missed day is worked out the moment a student is next active or opens their dashboard.</span></li>
+    </ul>
+  </section>
+
+  <section>
+    <div class="kicker"><h2>Also fixed on the way</h2><span class="rule"></span></div>
+    <div class="note warn">
+      <p class="lead">A production issue was caught and fixed during this work.</p>
+      <p>Verifying the deploy surfaced a live error on the student dashboard: a database table the new feature needed hadn’t been created during deployment, which made the dashboard’s stats fail to load.</p>
+      <p>It’s now fixed two ways — the dashboard shrugs off any gamification hiccup instead of failing, and the app now guarantees these tables exist on start-up. This also quietly repaired XP and rewards tables that an earlier deploy had likely missed, so this class of problem can’t recur.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="kicker"><h2>For the developers — how to test</h2><span class="rule"></span></div>
+    <div class="prose">
+      <p>Run <code class="inline">npm run dev</code>, then <code class="inline">bash script/test-streaks.sh</code>. It uses <b>dev-only</b> endpoints to simulate day changes, so you can watch a streak build, hit a milestone, lose a day, and be saved by a freeze — all <b>without waiting real days</b>. These test endpoints are automatically disabled in production.</p>
+    </div>
+  </section>
+
+  <footer>
+    <span><span class="brand">On Point Education Centre</span> · Homework &amp; Learning Portal</span>
+    <span class="tag">Quality Beyond Measure</span>
+    <span>Stage D · July 2026</span>
+  </footer>
+</div>
+
+</body>
+</html>
