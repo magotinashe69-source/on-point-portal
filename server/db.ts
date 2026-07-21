@@ -24,6 +24,40 @@ import * as sqliteSchema from "@shared/schema.sqlite";
 // True when a PostgreSQL connection string is provided.
 export const usePostgres = !!process.env.DATABASE_URL;
 
+// PostgreSQL "create if missing" for the stand-alone gamification tables. This
+// mirrors the matching SQLite DDL and is only a safety net around `db:push`.
+// It must stay in sync with the pgTable definitions in shared/schema.ts.
+const PG_GAMIFICATION_DDL = `
+CREATE TABLE IF NOT EXISTS student_rewards (
+  id SERIAL PRIMARY KEY,
+  student_id INTEGER NOT NULL,
+  reward_type TEXT NOT NULL,
+  reward_name TEXT NOT NULL,
+  assignment_id INTEGER,
+  earned_at TIMESTAMP NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS student_xp (
+  id SERIAL PRIMARY KEY,
+  student_id INTEGER NOT NULL,
+  total_xp INTEGER NOT NULL DEFAULT 0,
+  level INTEGER NOT NULL DEFAULT 0,
+  daily_xp INTEGER NOT NULL DEFAULT 0,
+  daily_date TEXT NOT NULL DEFAULT '',
+  updated_at TIMESTAMP NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS student_streaks (
+  id SERIAL PRIMARY KEY,
+  student_id INTEGER NOT NULL,
+  current_streak INTEGER NOT NULL DEFAULT 0,
+  longest_streak INTEGER NOT NULL DEFAULT 0,
+  last_active_date TEXT NOT NULL DEFAULT '',
+  freezes INTEGER NOT NULL DEFAULT 0,
+  reached_milestones TEXT NOT NULL DEFAULT '',
+  pending_notice TEXT NOT NULL DEFAULT '',
+  updated_at TIMESTAMP NOT NULL DEFAULT now()
+);
+`;
+
 // Filled in below depending on which database we use.
 let activeDb: unknown;
 let pgPoolInstance: pg.Pool | undefined;
@@ -35,9 +69,15 @@ if (usePostgres) {
   pgPoolInstance = new Pool({ connectionString: process.env.DATABASE_URL });
   activeDb = drizzlePg(pgPoolInstance, { schema: pgSchema });
 
-  // PostgreSQL tables are created separately with `npm run db:push`,
-  // so there is nothing to create here.
-  ensureSchemaFn = async () => {};
+  // The core tables are created by `npm run db:push` on deploy. As a safety net
+  // we also create the stand-alone gamification tables here if they are missing,
+  // so a deploy where `db:push` does not pick up a brand-new table can never
+  // leave the dashboard reading a table that does not exist. All three are
+  // additive and reference a student id only, so `CREATE TABLE IF NOT EXISTS`
+  // is completely safe and does nothing when they already exist.
+  ensureSchemaFn = async () => {
+    await pgPoolInstance!.query(PG_GAMIFICATION_DDL);
+  };
 
   console.log("[db] Using PostgreSQL (DATABASE_URL is set)");
 } else {

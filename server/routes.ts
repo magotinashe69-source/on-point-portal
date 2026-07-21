@@ -948,14 +948,28 @@ export async function registerRoutes(
 
       // XP + level for the dashboard bar. Included here (rather than a separate
       // endpoint) so it loads in the same request the dashboard already makes.
-      const xpRow = await storage.getStudentXp(studentId);
-      const xp = xpProgress(xpRow?.totalXp ?? 0, xpRow?.level ?? 0);
+      // Gamification (XP + streak) is best-effort on read: a failure here — for
+      // example a table that a deploy has not created yet — must never break the
+      // core dashboard stats. Each part is guarded on its own so a problem with
+      // one never hides the other.
+      let xp = null;
+      try {
+        const xpRow = await storage.getStudentXp(studentId);
+        xp = xpProgress(xpRow?.totalXp ?? 0, xpRow?.level ?? 0);
+      } catch (xpError) {
+        console.error("XP read failed (stats still returned):", xpError);
+      }
 
       // Daily streak for the flame next to the XP bar. Loaded here (rather than
       // a separate endpoint) so it costs no extra round trip. Reading also
       // settles the streak, so a missed day is noticed even if the student only
       // opens the dashboard.
-      const streak = await refreshStreak(studentId);
+      let streak = null;
+      try {
+        streak = await refreshStreak(studentId);
+      } catch (streakError) {
+        console.error("Streak read failed (stats still returned):", streakError);
+      }
 
       res.json({
         success: true,
