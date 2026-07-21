@@ -12,6 +12,7 @@ import { isPrimaryForm } from "@shared/schema";
 import { isFullyAutoMarked, markSubmission, buildFeedback } from "@shared/auto-marking";
 import { awardRandomCollectible } from "./rewards";
 import { awardXp, xpProgress, XP_PER_CORRECT, XP_COMPLETION_BONUS, XP_IMPROVEMENT_BONUS } from "./xp";
+import { recordActivity, grantFreezeForLevelUp, refreshStreak, setSimulatedToday, getSimulatedToday, resetStreak, streakToday } from "./streaks";
 import { z } from "zod";
 
 // Mark an auto-markable submission in code and save the result as a Mark.
@@ -723,6 +724,17 @@ export async function registerRoutes(
         }
       }
 
+      // Daily streak: completing a submission counts as activity for today, for
+      // every student (primary and Forms). A level-up (reported by the XP award
+      // above) also earns a streak freeze. Best-effort so it can never break or
+      // slow the submission response.
+      try {
+        if (xp?.leveledUp) await grantFreezeForLevelUp(studentId);
+        await recordActivity(studentId);
+      } catch (streakError) {
+        console.error("Streak update failed (submission still saved):", streakError);
+      }
+
       res.json({ success: true, submission, mark: mark ?? undefined, reward, xp });
     } catch (error) {
       console.error("Create submission error:", error);
@@ -798,6 +810,15 @@ export async function registerRoutes(
         } catch (xpError) {
           console.error("XP award failed (submission still saved):", xpError);
         }
+      }
+
+      // Daily streak: a retry counts as activity today too (idempotent per day).
+      // A level-up from the retry bonus also earns a freeze. Best-effort.
+      try {
+        if (xp?.leveledUp) await grantFreezeForLevelUp(submission.studentId);
+        await recordActivity(submission.studentId);
+      } catch (streakError) {
+        console.error("Streak update failed (submission still saved):", streakError);
       }
 
       res.json({ success: true, submission: updatedSubmission, mark: mark ?? undefined, xp });
@@ -930,6 +951,12 @@ export async function registerRoutes(
       const xpRow = await storage.getStudentXp(studentId);
       const xp = xpProgress(xpRow?.totalXp ?? 0, xpRow?.level ?? 0);
 
+      // Daily streak for the flame next to the XP bar. Loaded here (rather than
+      // a separate endpoint) so it costs no extra round trip. Reading also
+      // settles the streak, so a missed day is noticed even if the student only
+      // opens the dashboard.
+      const streak = await refreshStreak(studentId);
+
       res.json({
         success: true,
         stats: {
@@ -938,6 +965,7 @@ export async function registerRoutes(
           averageScore,
           totalSubmissions: submissions.length,
           xp,
+          streak,
         }
       });
     } catch (error) {
@@ -945,6 +973,64 @@ export async function registerRoutes(
       res.status(500).json({ success: false, message: "Server error" });
     }
   });
+
+  // -------------------------------------------------------------------------
+  // Dev-only streak testing helpers.
+  //
+  // These let you simulate day changes and activity so streaks (freezes, resets,
+  // milestones) can be tested without waiting real days. They are registered
+  // ONLY when NOT running in production, so they can never affect real users.
+  // -------------------------------------------------------------------------
+  if (process.env.NODE_ENV !== "production") {
+    // Set (or clear) the simulated "today". Pass { "date": "YYYY-MM-DD" } to
+    // pretend it is that day, or { "date": null } to go back to the real clock.
+    app.post("/api/dev/streak/sim-date", (req, res) => {
+      const { date } = req.body ?? {};
+      if (date !== null && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        return res.status(400).json({ success: false, message: "date must be YYYY-MM-DD or null" });
+      }
+      setSimulatedToday(date ?? null);
+      res.json({ success: true, simulatedDate: getSimulatedToday(), today: streakToday() });
+    });
+
+    // See what "today" the streak system is currently using.
+    app.get("/api/dev/streak/sim-date", (_req, res) => {
+      res.json({ success: true, simulatedDate: getSimulatedToday(), today: streakToday() });
+    });
+
+    // Record activity for a student (same as completing a submission), then
+    // return their fresh streak summary.
+    app.post("/api/dev/streak/activity", async (req, res) => {
+      const studentId = parseInt(req.body?.studentId);
+      if (Number.isNaN(studentId)) {
+        return res.status(400).json({ success: false, message: "studentId is required" });
+      }
+      await recordActivity(studentId);
+      const streak = await refreshStreak(studentId);
+      res.json({ success: true, today: streakToday(), streak });
+    });
+
+    // Give a student a freeze (simulates the level-up reward), capped at 2.
+    app.post("/api/dev/streak/freeze", async (req, res) => {
+      const studentId = parseInt(req.body?.studentId);
+      if (Number.isNaN(studentId)) {
+        return res.status(400).json({ success: false, message: "studentId is required" });
+      }
+      await grantFreezeForLevelUp(studentId);
+      const streak = await refreshStreak(studentId);
+      res.json({ success: true, streak });
+    });
+
+    // Wipe a student's streak back to nothing.
+    app.post("/api/dev/streak/reset", async (req, res) => {
+      const studentId = parseInt(req.body?.studentId);
+      if (Number.isNaN(studentId)) {
+        return res.status(400).json({ success: false, message: "studentId is required" });
+      }
+      await resetStreak(studentId);
+      res.json({ success: true });
+    });
+  }
 
   // Resources (textbooks, YouTube links, lesson plans)
   app.get("/api/resources", async (req, res) => {
