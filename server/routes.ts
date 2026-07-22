@@ -967,29 +967,26 @@ export async function registerRoutes(
 
       const averageScore = totalMaxScore > 0 ? Math.round((totalScore / totalMaxScore) * 100) : 0;
 
-      // XP + level for the dashboard bar. Included here (rather than a separate
-      // endpoint) so it loads in the same request the dashboard already makes.
-      // Gamification (XP + streak) is best-effort on read: a failure here — for
-      // example a table that a deploy has not created yet — must never break the
-      // core dashboard stats. Each part is guarded on its own so a problem with
-      // one never hides the other.
-      let xp = null;
+      // XP + streak for the dashboard bar. Included here (rather than separate
+      // endpoints) so they load in the same request the dashboard already makes.
+      // Both are best-effort AND always return a COMPLETE object — a brand-new
+      // student with no XP/streak row, or a read that fails, still gets a fully
+      // shaped default (never null/undefined), so the widgets can't crash.
+      let xp = xpProgress(0, 0); // { totalXp:0, level:0, xpIntoLevel:0, xpForNextLevel:500, progressPercent:0 }
       try {
         const xpRow = await storage.getStudentXp(studentId);
         xp = xpProgress(xpRow?.totalXp ?? 0, xpRow?.level ?? 0);
       } catch (xpError) {
-        console.error("XP read failed (stats still returned):", xpError);
+        console.error("XP read failed (returned defaults):", xpError);
       }
 
-      // Daily streak for the flame next to the XP bar. Loaded here (rather than
-      // a separate endpoint) so it costs no extra round trip. Reading also
-      // settles the streak, so a missed day is noticed even if the student only
-      // opens the dashboard.
-      let streak = null;
+      // Reading the streak also settles it (a missed day is noticed even if the
+      // student only opens the dashboard).
+      let streak: Awaited<ReturnType<typeof refreshStreak>> = { current: 0, longest: 0, freezes: 0, maxFreezes: 2, notice: null };
       try {
         streak = await refreshStreak(studentId);
       } catch (streakError) {
-        console.error("Streak read failed (stats still returned):", streakError);
+        console.error("Streak read failed (returned defaults):", streakError);
       }
 
       res.json({

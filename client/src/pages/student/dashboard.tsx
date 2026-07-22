@@ -26,6 +26,7 @@ import type { Assignment, Announcement } from "@shared/schema";
 import { isPrimaryForm } from "@shared/schema";
 import { XpLevelBar } from "@/components/XpLevelBar";
 import { StreakFlame } from "@/components/StreakFlame";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import logoPath from "@assets/logo.webp";
 
 interface EnrichedSubmission {
@@ -148,32 +149,34 @@ export default function StudentDashboard() {
         {/* Level + XP progress with the daily streak flame beside it. Both come
             from the stats already loaded above, so this adds no extra request.
             Shows zeroed values until stats arrive. */}
-        <div className="flex flex-col sm:flex-row sm:items-start gap-3">
-          <div className="flex-1 min-w-0">
-            <XpLevelBar
-              level={statsData?.stats.xp?.level ?? 0}
-              xpIntoLevel={statsData?.stats.xp?.xpIntoLevel ?? 0}
-              xpForNextLevel={statsData?.stats.xp?.xpForNextLevel ?? 500}
-              progressPercent={statsData?.stats.xp?.progressPercent ?? 0}
+        <ErrorBoundary label="xp-streak">
+          <div className="flex flex-col sm:flex-row sm:items-start gap-3">
+            <div className="flex-1 min-w-0">
+              <XpLevelBar
+                level={statsData?.stats?.xp?.level ?? 0}
+                xpIntoLevel={statsData?.stats?.xp?.xpIntoLevel ?? 0}
+                xpForNextLevel={statsData?.stats?.xp?.xpForNextLevel ?? 500}
+                progressPercent={statsData?.stats?.xp?.progressPercent ?? 0}
+              />
+            </div>
+            <StreakFlame
+              current={statsData?.stats?.streak?.current ?? 0}
+              freezes={statsData?.stats?.streak?.freezes ?? 0}
+              maxFreezes={statsData?.stats?.streak?.maxFreezes ?? 2}
             />
           </div>
-          <StreakFlame
-            current={statsData?.stats.streak?.current ?? 0}
-            freezes={statsData?.stats.streak?.freezes ?? 0}
-            maxFreezes={statsData?.stats.streak?.maxFreezes ?? 2}
-          />
-        </div>
 
-        {/* A gentle one-time note when a freeze saved the streak, a milestone was
-            reached, or a lost streak needs an encouraging nudge. */}
-        {statsData?.stats.streak?.notice && (
-          <div
-            className="mb-6 -mt-2 rounded-xl border px-4 py-3 text-sm font-medium bg-muted/40"
-            data-testid="streak-notice"
-          >
-            {statsData.stats.streak.notice.message}
-          </div>
-        )}
+          {/* A gentle one-time note when a freeze saved the streak, a milestone
+              was reached, or a lost streak needs an encouraging nudge. */}
+          {statsData?.stats?.streak?.notice && (
+            <div
+              className="mb-6 -mt-2 rounded-xl border px-4 py-3 text-sm font-medium bg-muted/40"
+              data-testid="streak-notice"
+            >
+              {statsData.stats.streak.notice.message}
+            </div>
+          )}
+        </ErrorBoundary>
 
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
           <Card>
@@ -262,6 +265,7 @@ export default function StudentDashboard() {
         {/* Treasure Island map — a fun collectibles game for primary classes
             (Stages 3-6) only. Secondary students (Form 1/2) never see this. */}
         {isPrimaryForm(student.form) && (
+          <ErrorBoundary label="treasure-card">
           <Link href="/student/treasure">
             <Card className="hover-elevate cursor-pointer mb-6 border-primary/30 bg-gradient-to-br from-primary/10 to-transparent">
               <CardContent className="flex items-center gap-4 py-6">
@@ -279,11 +283,13 @@ export default function StudentDashboard() {
               </CardContent>
             </Card>
           </Link>
+          </ErrorBoundary>
         )}
 
         {/* Dream World — a town-building reward game for primary classes
             (Stages 3-6) only. Secondary students (Form 1/2) never see this. */}
         {isPrimaryForm(student.form) && (
+          <ErrorBoundary label="dreamworld-card">
           <Link href="/student/dream-world">
             <Card className="hover-elevate cursor-pointer mb-6 border-primary/30 bg-gradient-to-br from-primary/10 to-transparent">
               <CardContent className="flex items-center gap-4 py-6">
@@ -298,6 +304,7 @@ export default function StudentDashboard() {
               </CardContent>
             </Card>
           </Link>
+          </ErrorBoundary>
         )}
 
         <div className="grid gap-4 md:grid-cols-2 mb-6">
