@@ -92,6 +92,24 @@ export async function awardXp(
   };
 }
 
+// Adjust a student's lifetime XP by a delta (can be negative) and recompute
+// their level. Used when a teacher re-marks or deletes a question after an
+// assignment was already marked, so scores and XP stay consistent. This is a
+// correction, so it is NOT subject to the daily cap, and total XP never goes
+// below zero. Best-effort: callers wrap it so it can't break the edit.
+export async function adjustXp(studentId: number, delta: number): Promise<void> {
+  if (!delta) return;
+  const row = await storage.getStudentXp(studentId);
+  if (!row) {
+    // No row yet: only a positive delta makes sense; create one.
+    if (delta <= 0) return;
+    await storage.createStudentXp({ studentId, totalXp: delta, level: levelForXp(delta), dailyXp: 0, dailyDate: todayKey() });
+    return;
+  }
+  const newTotal = Math.max(0, row.totalXp + delta);
+  await storage.updateStudentXp(studentId, { totalXp: newTotal, level: levelForXp(newTotal) });
+}
+
 // The numbers the dashboard bar needs: current level and progress to the next.
 export interface XpProgress {
   totalXp: number;

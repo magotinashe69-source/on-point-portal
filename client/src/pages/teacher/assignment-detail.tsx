@@ -230,43 +230,13 @@ export default function AssignmentDetail() {
                   {assignment.topic && <Badge variant="outline">{assignment.topic}</Badge>}
                 </div>
                 <div className="flex items-center gap-2">
-                  {/* Edit */}
-                  <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button variant="outline" size="sm" onClick={handleOpenEditDialog} data-testid="button-edit-assignment">
-                        <Edit className="h-4 w-4 mr-1" />
-                        Edit
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Edit Assignment</DialogTitle>
-                        <DialogDescription>Update assignment details</DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-4">
-                        <div>
-                          <Label htmlFor="edit-title">Title</Label>
-                          <Input id="edit-title" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} data-testid="input-edit-title" />
-                        </div>
-                        <div>
-                          <Label htmlFor="edit-topic">Topic (optional)</Label>
-                          <Input id="edit-topic" value={editTopic} onChange={(e) => setEditTopic(e.target.value)} placeholder="e.g., Algebra, Grammar" data-testid="input-edit-topic" />
-                        </div>
-                        <div>
-                          <Label htmlFor="edit-due-date">Due Date</Label>
-                          <Input id="edit-due-date" type="date" value={editDueDate} onChange={(e) => setEditDueDate(e.target.value)} data-testid="input-edit-due-date" />
-                        </div>
-                        <div>
-                          <Label htmlFor="edit-instructions">Instructions</Label>
-                          <Textarea id="edit-instructions" value={editInstructions} onChange={(e) => setEditInstructions(e.target.value)} rows={4} data-testid="input-edit-instructions" />
-                        </div>
-                        <Button onClick={handleSaveEdit} disabled={updateAssignmentMutation.isPending} className="w-full" data-testid="button-save-edit">
-                          {updateAssignmentMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                          Save Changes
-                        </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
+                  {/* Edit — opens the full editor (all fields + questions). */}
+                  <Link href={`/teacher/assignments/${id}/edit`}>
+                    <Button variant="outline" size="sm" data-testid="button-edit-assignment">
+                      <Edit className="h-4 w-4 mr-1" />
+                      Edit
+                    </Button>
+                  </Link>
 
                   {/* Archive */}
                   <Button variant="outline" size="sm" onClick={() => archiveAssignmentMutation.mutate(!assignment.archived)} disabled={archiveAssignmentMutation.isPending} data-testid="button-archive-detail">

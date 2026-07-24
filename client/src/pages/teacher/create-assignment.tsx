@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { useLocation, Link } from "wouter";
+import { useState, useEffect, useRef } from "react";
+import { useLocation, Link, useParams } from "wouter";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -15,12 +15,12 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { ArrowLeft, PlusCircle, Trash2, Loader2, Save, X, Image, Users, Circle, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, PlusCircle, Trash2, Loader2, Save, X, Image, Users, Circle, CheckCircle2, ChevronUp, ChevronDown, RefreshCw } from "lucide-react";
 import logoPath from "@assets/logo.webp";
 import { SimpleUploader } from "@/components/SimpleUploader";
 import { FileAttachmentZone } from "@/components/FileAttachmentZone";
 import type { AttachmentFile } from "@/components/FileAttachmentZone";
-import type { Student } from "@shared/schema";
+import type { Student, Assignment, Submission } from "@shared/schema";
 
 // The question types a teacher can choose. "written" is marked by hand (the
 // original behaviour); the other four are marked automatically in code.
@@ -33,6 +33,10 @@ const QUESTION_TYPES = [
 ] as const;
 
 const questionSchema = z.object({
+  // Stable question id, preserved across edits so existing marks stay linked to
+  // the right question. Named `qid` (not `id`) to avoid clashing with
+  // react-hook-form's internal field key. New questions get a fresh one.
+  qid: z.string().optional(),
   questionText: z.string().min(1, "Question text is required"),
   maxScore: z.number().min(1, "Score must be at least 1"),
   imageUrls: z.array(z.string()).optional(),
@@ -48,12 +52,16 @@ const questionSchema = z.object({
   explanation: z.string().optional(),
 });
 
+// A short unique id for a brand-new question.
+const newQid = () => "q_" + Math.random().toString(36).slice(2, 10);
+
 // A fresh question starts as multiple choice with two blank options, so the
-// auto-marking path is the default and easy to discover.
-const BLANK_QUESTION = {
+// auto-marking path is the default and easy to discover. Each call gets its own
+// unique qid.
+const newQuestion = () => ({
+  qid: newQid(),
   questionText: "",
   maxScore: 1, // new questions start at 1 mark; the teacher can type any value
-
   imageUrls: [] as string[],
   type: "multiple_choice" as const,
   options: ["", ""],
@@ -63,7 +71,7 @@ const BLANK_QUESTION = {
   tolerance: undefined as number | undefined,
   acceptedAnswers: [""],
   explanation: "",
-};
+});
 
 const createAssignmentSchema = z.object({
   subject: z.enum(["MATHS", "ENGLISH", "SCIENCE", "PHYSICS", "CHEMISTRY", "BIOLOGY", "ECONOMICS", "BUSINESS_STUDIES", "GEOGRAPHY", "COMPUTER_SCIENCE", "HISTORY", "ACCOUNTING"]),
@@ -85,6 +93,7 @@ export default function CreateAssignment() {
   const [attachments, setAttachments] = useState<AttachmentFile[]>([]);
   const [selectedStudentIds, setSelectedStudentIds] = useState<number[]>([]);
   const [assignToAll, setAssignToAll] = useState(true);
+  const [remarkingQid, setRemarkingQid] = useState<string | null>(null);
 
   const formMethods = useForm<CreateAssignmentForm>({
     resolver: zodResolver(createAssignmentSchema),
@@ -95,9 +104,17 @@ export default function CreateAssignment() {
       title: "",
       instructions: "",
       dueDate: "",
-      questions: [{ ...BLANK_QUESTION }],
+      questions: [newQuestion()],
     },
   });
+
+  // Edit mode: /teacher/assignments/:id/edit reuses this form to edit an
+  // existing assignment. No :id = the normal "create" flow.
+  const params = useParams<{ id?: string }>();
+  const editId = params.id ? parseInt(params.id) : null;
+  const isEdit = editId != null;
+  const prefilledRef = useRef(false);
+  const lastFormRef = useRef<string>("Form 1");
 
   // Fetch students based on selected form
   const selectedForm = formMethods.watch("form");
@@ -106,22 +123,72 @@ export default function CreateAssignment() {
     enabled: !!selectedForm,
   });
 
+  // In edit mode, load the assignment (to pre-fill) and its submissions (for the
+  // "already submitted" notice and the per-question re-mark actions).
+  const { data: editAssignment } = useQuery<Assignment>({
+    queryKey: ["/api/assignments", editId],
+    enabled: isEdit,
+  });
+  const { data: editSubmissions = [] } = useQuery<Submission[]>({
+    queryKey: ["/api/submissions", { assignmentId: editId }],
+    enabled: isEdit,
+  });
+  const submissionCount = editSubmissions.length;
+
   useEffect(() => {
     if (!teacher) {
       setLocation("/teacher/login");
     }
   }, [teacher, setLocation]);
 
-  // Reset selected students when form changes
+  // Clear the selected students only when the teacher actively switches class —
+  // NOT on mount or during the edit pre-fill (which would wipe the assignment's
+  // targeting).
   useEffect(() => {
+    if (lastFormRef.current === selectedForm) return;
+    lastFormRef.current = selectedForm;
     setSelectedStudentIds([]);
     setAssignToAll(true);
   }, [selectedForm]);
 
-  const { fields, append, remove, update } = useFieldArray({
+  const { fields, append, remove, update, move } = useFieldArray({
     control: formMethods.control,
     name: "questions",
   });
+
+  // Pre-fill the form once the assignment being edited has loaded (only once).
+  useEffect(() => {
+    if (!editAssignment || prefilledRef.current) return;
+    const a = editAssignment;
+    lastFormRef.current = a.form; // so the class-change effect doesn't clear targeting
+    formMethods.reset({
+      subject: a.subject as any,
+      topic: a.topic || "",
+      form: a.form,
+      title: a.title,
+      instructions: a.instructions,
+      dueDate: a.dueDate ? new Date(a.dueDate).toISOString().split("T")[0] : "",
+      questions: (a.questions || []).map((q: any) => ({
+        qid: q.id,
+        questionText: q.questionText,
+        maxScore: q.maxScore,
+        imageUrls: q.imageUrls || [],
+        type: q.type || "written",
+        options: q.options && q.options.length ? q.options : ["", ""],
+        correctOption: q.correctOption ?? 0,
+        correctBool: q.correctBool ?? true,
+        correctNumber: q.correctNumber,
+        tolerance: q.tolerance,
+        acceptedAnswers: q.acceptedAnswers && q.acceptedAnswers.length ? q.acceptedAnswers : [""],
+        explanation: q.explanation || "",
+      })),
+    });
+    const targets = ((a.targetStudentIds as number[] | null) || []);
+    if (targets.length > 0) { setAssignToAll(false); setSelectedStudentIds(targets); }
+    else { setAssignToAll(true); setSelectedStudentIds([]); }
+    setAttachments((((a.attachments as any[]) || []).map((att) => ({ ...att }))) as AttachmentFile[]);
+    prefilledRef.current = true;
+  }, [editAssignment]);
 
   const totalMarks = formMethods.watch("questions").reduce((sum, q) => sum + (q.maxScore || 0), 0);
 
@@ -210,9 +277,12 @@ export default function CreateAssignment() {
     patchQuestion(index, { acceptedAnswers });
   };
 
-  async function onSubmit(values: CreateAssignmentForm) {
-    if (!teacher) return;
-    
+  // Validate + save the assignment (create or edit). Returns true on success.
+  // `navigate` controls whether we leave the page afterwards — the re-mark flow
+  // saves without navigating so it can then re-mark on the same screen.
+  async function doSave(values: CreateAssignmentForm, navigate: boolean): Promise<boolean> {
+    if (!teacher) return false;
+
     // Validate student selection
     if (!assignToAll && selectedStudentIds.length === 0) {
       toast({
@@ -220,7 +290,7 @@ export default function CreateAssignment() {
         description: "Please select at least one student or assign to all students.",
         variant: "destructive",
       });
-      return;
+      return false;
     }
 
     // Check every auto-marked question has a complete answer key, and build a
@@ -229,7 +299,7 @@ export default function CreateAssignment() {
     for (let i = 0; i < values.questions.length; i++) {
       const q = values.questions[i];
       const base = {
-        id: `q${i + 1}`,
+        id: q.qid || newQid(), // preserve the existing id so marks stay linked
         questionText: q.questionText,
         maxScore: q.maxScore,
         imageUrls: q.imageUrls || [],
@@ -242,9 +312,9 @@ export default function CreateAssignment() {
 
       if (q.type === "multiple_choice") {
         const options = (q.options || []).map(o => o.trim()).filter(o => o !== "");
-        if (options.length < 2) { fail("Add at least two options."); return; }
+        if (options.length < 2) { fail("Add at least two options."); return false; }
         if (q.correctOption == null || q.correctOption >= (q.options || []).length) {
-          fail("Choose which option is correct."); return;
+          fail("Choose which option is correct."); return false;
         }
         // Re-point "correct" in case blank options were trimmed out.
         const correctText = (q.options || [])[q.correctOption];
@@ -254,12 +324,12 @@ export default function CreateAssignment() {
         cleanedQuestions.push({ ...base, correctBool: q.correctBool ?? true });
       } else if (q.type === "numeric") {
         if (q.correctNumber == null || Number.isNaN(q.correctNumber)) {
-          fail("Enter the correct number."); return;
+          fail("Enter the correct number."); return false;
         }
         cleanedQuestions.push({ ...base, correctNumber: q.correctNumber, tolerance: q.tolerance ?? 0 });
       } else if (q.type === "short_text") {
         const acceptedAnswers = (q.acceptedAnswers || []).map(a => a.trim()).filter(a => a !== "");
-        if (acceptedAnswers.length === 0) { fail("Add at least one accepted answer."); return; }
+        if (acceptedAnswers.length === 0) { fail("Add at least one accepted answer."); return false; }
         cleanedQuestions.push({ ...base, acceptedAnswers });
       } else {
         // written: marked by hand, no answer key
@@ -269,41 +339,103 @@ export default function CreateAssignment() {
 
     setIsLoading(true);
     try {
-      const response = await apiRequest("POST", "/api/assignments", {
+      const payload = {
         ...values,
         questions: cleanedQuestions,
         attachments,
         totalMarks,
         targetStudentIds: assignToAll ? [] : selectedStudentIds,
-        createdById: teacher.id,
-      });
-      
+      };
+      const response = isEdit
+        ? await apiRequest("PUT", `/api/assignments/${editId}`, payload)
+        : await apiRequest("POST", "/api/assignments", { ...payload, createdById: teacher.id });
+
       const data = await response.json();
-      
+
       if (data.success) {
         queryClient.invalidateQueries({ queryKey: ["/api/assignments"] });
-        toast({
-          title: "Assignment created!",
-          description: "Your assignment has been created successfully.",
-        });
-        setLocation("/teacher/dashboard");
-      } else {
-        toast({
-          title: "Error",
-          description: data.message || "Failed to create assignment",
-          variant: "destructive",
-        });
+        if (isEdit) {
+          queryClient.invalidateQueries({ queryKey: ["/api/assignments", editId] });
+          // A plain save can clean marks for deleted questions, so refresh those too.
+          queryClient.invalidateQueries({ queryKey: ["/api/submissions"] });
+        }
+        if (navigate) {
+          toast({
+            title: isEdit ? "Assignment updated!" : "Assignment created!",
+            description: isEdit ? "Your changes have been saved." : "Your assignment has been created successfully.",
+          });
+          setLocation(isEdit ? `/teacher/assignments/${editId}` : "/teacher/dashboard");
+        }
+        return true;
       }
+      toast({
+        title: "Error",
+        description: data.message || (isEdit ? "Failed to update assignment" : "Failed to create assignment"),
+        variant: "destructive",
+      });
+      return false;
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to create assignment. Please try again.",
+        description: `Failed to ${isEdit ? "update" : "create"} assignment. Please try again.`,
         variant: "destructive",
       });
+      return false;
     } finally {
       setIsLoading(false);
     }
   }
+
+  function onSubmit(values: CreateAssignmentForm) {
+    void doSave(values, true);
+  }
+
+  // The ids of questions that existed when this assignment was loaded — i.e.
+  // questions that may already have student answers.
+  const originalQuestionIds = new Set((editAssignment?.questions || []).map((q: any) => q.id));
+
+  // Delete a question. If it already has student answers, warn first — deleting
+  // will remove its marks from those students' totals.
+  const handleRemoveQuestion = (index: number) => {
+    const qid = formMethods.getValues(`questions.${index}.qid`);
+    const hasAnswers = isEdit && submissionCount > 0 && qid && originalQuestionIds.has(qid);
+    if (hasAnswers) {
+      const okToRemove = window.confirm(
+        "This question already has student answers. Deleting it will remove its marks from those students' totals (their other answers keep their scores). Delete it?",
+      );
+      if (!okToRemove) return;
+    }
+    remove(index);
+  };
+
+  // Re-mark one question across existing submissions after its correct answer
+  // changed. First saves the current edits (so the new answer is persisted),
+  // without navigating away, then re-marks just this question.
+  const handleRemark = (qid: string | undefined) => {
+    if (!qid || !isEdit) return;
+    void formMethods.handleSubmit(async (values) => {
+      const saved = await doSave(values, false);
+      if (!saved) return;
+      setRemarkingQid(qid);
+      try {
+        const res = await apiRequest("POST", `/api/assignments/${editId}/questions/${qid}/remark`, {});
+        const data = await res.json();
+        if (data.success) {
+          queryClient.invalidateQueries({ queryKey: ["/api/submissions"] });
+          toast({
+            title: "Re-marked",
+            description: `${data.affected} submission${data.affected === 1 ? "" : "s"} updated with the new correct answer.`,
+          });
+        } else {
+          toast({ title: "Couldn't re-mark", description: data.message || "Please try again.", variant: "destructive" });
+        }
+      } catch {
+        toast({ title: "Couldn't re-mark", description: "Please try again.", variant: "destructive" });
+      } finally {
+        setRemarkingQid(null);
+      }
+    })();
+  };
 
   if (!teacher) return null;
 
@@ -323,11 +455,23 @@ export default function CreateAssignment() {
       </header>
 
       <main className="container mx-auto px-4 py-8 max-w-3xl">
+        {/* When editing an assignment that already has submissions, warn that
+            changing questions won't retroactively alter marks already given. */}
+        {isEdit && submissionCount > 0 && (
+          <div className="mb-4 rounded-xl border border-orange-400/60 bg-orange-500/10 px-4 py-3 text-sm" data-testid="submissions-notice">
+            ⚠️ <span className="font-semibold">{submissionCount} student{submissionCount === 1 ? " has" : "s have"} already submitted.</span>{" "}
+            Changes to questions will <span className="font-semibold">not</span> alter marks already given. To update a fixed answer, use the{" "}
+            <span className="font-semibold">Re-mark</span> button on that question.
+          </div>
+        )}
+
         <Card>
           <CardHeader>
-            <CardTitle className="text-2xl">Create New Assignment</CardTitle>
+            <CardTitle className="text-2xl">{isEdit ? "Edit Assignment" : "Create New Assignment"}</CardTitle>
             <CardDescription>
-              Create an assignment with questions for your students. You can add images to questions.
+              {isEdit
+                ? "Change any field or question. Total Marks updates as you go."
+                : "Create an assignment with questions for your students. You can add images to questions."}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -539,7 +683,7 @@ export default function CreateAssignment() {
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => append({ ...BLANK_QUESTION })}
+                      onClick={() => append(newQuestion())}
                       data-testid="button-add-question"
                     >
                       <PlusCircle className="h-4 w-4 mr-2" />
@@ -552,7 +696,33 @@ export default function CreateAssignment() {
                       <div className="space-y-4">
                         <div className="flex items-center justify-between flex-wrap gap-2">
                           <span className="font-medium">Question {index + 1}</span>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {/* Reorder */}
+                            <Button type="button" variant="ghost" size="icon" disabled={index === 0}
+                              onClick={() => move(index, index - 1)} title="Move up" data-testid={`button-move-up-${index}`}>
+                              <ChevronUp className="h-4 w-4" />
+                            </Button>
+                            <Button type="button" variant="ghost" size="icon" disabled={index === fields.length - 1}
+                              onClick={() => move(index, index + 1)} title="Move down" data-testid={`button-move-down-${index}`}>
+                              <ChevronDown className="h-4 w-4" />
+                            </Button>
+
+                            {/* Re-mark: only for a saved, auto-markable question when submissions exist. */}
+                            {isEdit && submissionCount > 0
+                              && originalQuestionIds.has(formMethods.watch(`questions.${index}.qid`) || "")
+                              && formMethods.watch(`questions.${index}.type`) !== "written" && (
+                              <Button type="button" variant="outline" size="sm"
+                                disabled={remarkingQid === formMethods.watch(`questions.${index}.qid`)}
+                                onClick={() => handleRemark(formMethods.getValues(`questions.${index}.qid`))}
+                                title="Save changes and re-mark this question for students who already submitted"
+                                data-testid={`button-remark-${index}`}>
+                                {remarkingQid === formMethods.watch(`questions.${index}.qid`)
+                                  ? <Loader2 className="h-4 w-4 animate-spin sm:mr-1" />
+                                  : <RefreshCw className="h-4 w-4 sm:mr-1" />}
+                                <span className="hidden sm:inline">Re-mark</span>
+                              </Button>
+                            )}
+
                             <SimpleUploader
                               onUpload={(url) => handleQuestionImageUpload(index, url)}
                               accept="image/*"
@@ -563,7 +733,7 @@ export default function CreateAssignment() {
                                 type="button"
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => remove(index)}
+                                onClick={() => handleRemoveQuestion(index)}
                                 data-testid={`button-remove-question-${index}`}
                               >
                                 <Trash2 className="h-4 w-4 text-destructive" />
@@ -823,7 +993,7 @@ export default function CreateAssignment() {
                   ) : (
                     <Save className="h-4 w-4 mr-2" />
                   )}
-                  Create Assignment
+                  {isEdit ? "Save Changes" : "Create Assignment"}
                 </Button>
               </form>
             </Form>

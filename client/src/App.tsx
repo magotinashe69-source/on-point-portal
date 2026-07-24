@@ -42,6 +42,7 @@ function Router() {
       <Route path="/teacher/login" component={TeacherLogin} />
       <Route path="/teacher/dashboard" component={TeacherDashboard} />
       <Route path="/teacher/assignments/new" component={CreateAssignment} />
+      <Route path="/teacher/assignments/:id/edit" component={CreateAssignment} />
       <Route path="/teacher/assignments/:id" component={AssignmentDetail} />
       <Route path="/teacher/mark/:id" component={MarkSubmission} />
       <Route path="/teacher/resources" component={TeacherResources} />

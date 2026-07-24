@@ -28,7 +28,8 @@ import {
   ChevronDown,
   ChevronUp,
   ClipboardList,
-  XCircle
+  XCircle,
+  Pencil
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -767,8 +768,18 @@ export default function TeacherDashboard() {
                           {getAssignmentTargetLabel(assignment)}
                         </Badge>
                         <Badge variant="outline">{assignment.totalMarks} marks</Badge>
-                        <Button 
-                          variant="ghost" 
+                        <Link href={`/teacher/assignments/${assignment.id}/edit`}>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            data-testid={`button-edit-assignment-${assignment.id}`}
+                            title="Edit assignment"
+                          >
+                            <Pencil className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+                        </Link>
+                        <Button
+                          variant="ghost"
                           size="icon"
                           onClick={(e) => handleArchiveAssignment(e, assignment.id, true)}
                           disabled={archivingId === assignment.id}

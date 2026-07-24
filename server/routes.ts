@@ -9,9 +9,9 @@ import {
 } from "@shared/schema";
 import type { Assignment, Submission, Student } from "@shared/schema";
 import { isPrimaryForm } from "@shared/schema";
-import { isFullyAutoMarked, markSubmission, buildFeedback } from "@shared/auto-marking";
+import { isFullyAutoMarked, markSubmission, markAnswer, buildFeedback, isAutoMarkable } from "@shared/auto-marking";
 import { awardRandomCollectible } from "./rewards";
-import { awardXp, xpProgress, XP_PER_CORRECT, XP_COMPLETION_BONUS, XP_IMPROVEMENT_BONUS } from "./xp";
+import { awardXp, adjustXp, xpProgress, XP_PER_CORRECT, XP_COMPLETION_BONUS, XP_IMPROVEMENT_BONUS } from "./xp";
 import { recordActivity, grantFreezeForLevelUp, refreshStreak, setSimulatedToday, getSimulatedToday, resetStreak, streakToday } from "./streaks";
 import { awardResources, getState as getDreamState, placeBuilding, removeBuilding, upgradeBuilding, expandPlot, setTownName, getNeighbours, getTownView, runTermAwards, computeOverdue } from "./dreamworld";
 import { z } from "zod";
@@ -505,14 +505,22 @@ export async function registerRoutes(
   });
 
   // Update assignment
+  // Edit an assignment. Teacher-only. When the questions change, we recompute
+  // totalMarks and — for any DELETED question — cleanly remove its marks from
+  // existing submissions (and nudge XP), so already-given scores stay correct.
+  // Kept questions' marks are never touched here (re-marking is a separate,
+  // explicit teacher action below).
   app.put("/api/assignments/:id", async (req, res) => {
     try {
+      const validatedEmail = await requireTeacherAuth(req, res);
+      if (!validatedEmail) return;
+
       const id = parseInt(req.params.id);
       const assignment = await storage.getAssignment(id);
       if (!assignment) {
         return res.status(404).json({ success: false, message: "Assignment not found" });
       }
-      
+
       const validForms = ["Stage 3", "Stage 4", "Stage 5", "Stage 6", "Form 1", "Form 2"];
       const updateData: any = {};
       if (req.body.subject) updateData.subject = req.body.subject;
@@ -525,16 +533,120 @@ export async function registerRoutes(
       }
       if (req.body.title) updateData.title = req.body.title;
       if (req.body.instructions) updateData.instructions = req.body.instructions;
-      if (req.body.questions) updateData.questions = req.body.questions;
       if (req.body.attachments) updateData.attachments = req.body.attachments;
       if (req.body.dueDate) updateData.dueDate = req.body.dueDate;
-      if (req.body.totalMarks) updateData.totalMarks = req.body.totalMarks;
       if (req.body.targetStudentIds !== undefined) updateData.targetStudentIds = req.body.targetStudentIds;
-      
+      if (req.body.extendedDeadlines !== undefined) updateData.extendedDeadlines = req.body.extendedDeadlines;
+
+      if (req.body.questions) {
+        const newQuestions = req.body.questions as Array<{ id: string; maxScore: number }>;
+        updateData.questions = newQuestions;
+        // Recompute totalMarks server-side (don't trust the client's number).
+        updateData.totalMarks = newQuestions.reduce((s, q) => s + (Number(q.maxScore) || 0), 0);
+
+        // Clean the marks of any question that was removed.
+        const newIds = new Set(newQuestions.map((q) => q.id));
+        const deletedIds = (assignment.questions || []).map((q) => q.id).filter((qid) => !newIds.has(qid));
+        if (deletedIds.length > 0) {
+          const submissions = await storage.getSubmissions({ assignmentId: id });
+          for (const sub of submissions) {
+            const mark = await storage.getMark(sub.id);
+            if (!mark) continue;
+            let removedCorrect = 0;
+            let changed = false;
+            const keptMarks = mark.questionMarks.filter((qm) => {
+              if (deletedIds.includes(qm.questionId)) {
+                if (qm.maxScore > 0 && qm.score >= qm.maxScore) removedCorrect++;
+                changed = true;
+                return false;
+              }
+              return true;
+            });
+            if (changed) {
+              const newTotal = keptMarks.reduce((s, qm) => s + qm.score, 0);
+              await storage.createMark({
+                submissionId: sub.id, totalScore: newTotal, feedback: mark.feedback,
+                markedById: mark.markedById, questionMarks: keptMarks,
+              });
+              if (removedCorrect > 0) {
+                try { await adjustXp(sub.studentId, -removedCorrect * XP_PER_CORRECT); }
+                catch (e) { console.error("XP adjust on question delete failed:", e); }
+              }
+            }
+          }
+        }
+      } else if (req.body.totalMarks) {
+        updateData.totalMarks = req.body.totalMarks;
+      }
+
       const updated = await storage.updateAssignment(id, updateData);
       res.json({ success: true, assignment: updated });
     } catch (error) {
       console.error("Update assignment error:", error);
+      res.status(500).json({ success: false, message: "Server error" });
+    }
+  });
+
+  // Explicitly re-mark one question across all existing (marked) submissions —
+  // used when a teacher fixes a correct answer. Auto-markable types only. Each
+  // affected student's per-question score, total, and XP are updated together.
+  app.post("/api/assignments/:id/questions/:questionId/remark", async (req, res) => {
+    try {
+      const validatedEmail = await requireTeacherAuth(req, res);
+      if (!validatedEmail) return;
+
+      const id = parseInt(req.params.id);
+      const questionId = req.params.questionId;
+      const assignment = await storage.getAssignment(id);
+      if (!assignment) {
+        return res.status(404).json({ success: false, message: "Assignment not found" });
+      }
+      const question = (assignment.questions || []).find((q) => q.id === questionId);
+      if (!question) {
+        return res.status(404).json({ success: false, message: "Question not found" });
+      }
+      if (!isAutoMarkable(question)) {
+        return res.status(400).json({ success: false, message: "This question is marked by hand, so it can't be auto re-marked." });
+      }
+
+      const submissions = await storage.getSubmissions({ assignmentId: id });
+      let affected = 0;
+      for (const sub of submissions) {
+        const mark = await storage.getMark(sub.id);
+        if (!mark) continue; // not marked yet — nothing to re-mark
+
+        const answer = (sub.answers || []).find((a) => a.questionId === questionId);
+        const result = markAnswer(question, answer?.answerText ?? "");
+        const newQm = { questionId, score: result.score, maxScore: result.maxScore, feedback: buildFeedback(result) };
+
+        const oldQm = mark.questionMarks.find((qm) => qm.questionId === questionId);
+        const oldScore = oldQm?.score ?? 0;
+        const oldCorrect = !!oldQm && oldQm.maxScore > 0 && oldQm.score >= oldQm.maxScore;
+        const newCorrect = result.maxScore > 0 && result.score >= result.maxScore;
+
+        let replaced = false;
+        const newMarks = mark.questionMarks.map((qm) => (qm.questionId === questionId ? ((replaced = true), newQm) : qm));
+        if (!replaced) newMarks.push(newQm);
+
+        const scoreChanged = oldScore !== result.score;
+        const feedbackChanged = oldQm?.feedback !== newQm.feedback;
+        if (scoreChanged || feedbackChanged || !oldQm) {
+          const newTotal = newMarks.reduce((s, qm) => s + qm.score, 0);
+          await storage.createMark({
+            submissionId: sub.id, totalScore: newTotal, feedback: mark.feedback,
+            markedById: mark.markedById, questionMarks: newMarks,
+          });
+          const xpDelta = ((newCorrect ? 1 : 0) - (oldCorrect ? 1 : 0)) * XP_PER_CORRECT;
+          if (xpDelta !== 0) {
+            try { await adjustXp(sub.studentId, xpDelta); }
+            catch (e) { console.error("XP adjust on re-mark failed:", e); }
+          }
+          if (scoreChanged) affected++;
+        }
+      }
+      res.json({ success: true, affected });
+    } catch (error) {
+      console.error("Re-mark error:", error);
       res.status(500).json({ success: false, message: "Server error" });
     }
   });
