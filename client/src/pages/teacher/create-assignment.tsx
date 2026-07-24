@@ -52,7 +52,8 @@ const questionSchema = z.object({
 // auto-marking path is the default and easy to discover.
 const BLANK_QUESTION = {
   questionText: "",
-  maxScore: 10,
+  maxScore: 1, // new questions start at 1 mark; the teacher can type any value
+
   imageUrls: [] as string[],
   type: "multiple_choice" as const,
   options: ["", ""],
