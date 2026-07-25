@@ -94,6 +94,9 @@ export default function CreateAssignment() {
   const [selectedStudentIds, setSelectedStudentIds] = useState<number[]>([]);
   const [assignToAll, setAssignToAll] = useState(true);
   const [remarkingQid, setRemarkingQid] = useState<string | null>(null);
+  // When set, the effect below scrolls to that question's text box and focuses
+  // it — so after "Add Question" the teacher can type immediately.
+  const [focusIndex, setFocusIndex] = useState<number | null>(null);
 
   const formMethods = useForm<CreateAssignmentForm>({
     resolver: zodResolver(createAssignmentSchema),
@@ -189,6 +192,28 @@ export default function CreateAssignment() {
     setAttachments((((a.attachments as any[]) || []).map((att) => ({ ...att }))) as AttachmentFile[]);
     prefilledRef.current = true;
   }, [editAssignment]);
+
+  // Add a new question, then scroll to it and focus its text box so the teacher
+  // can keep typing without scrolling or clicking. Used by both add buttons.
+  const addQuestionAndFocus = () => {
+    const newIndex = fields.length;
+    append(newQuestion());
+    setFocusIndex(newIndex);
+  };
+
+  useEffect(() => {
+    if (focusIndex === null) return;
+    // Wait a tick for the new card to render, then bring it into view + focus.
+    const t = window.setTimeout(() => {
+      const el = document.querySelector<HTMLTextAreaElement>(`[data-testid="textarea-question-${focusIndex}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.focus({ preventScroll: true });
+      }
+      setFocusIndex(null);
+    }, 80);
+    return () => window.clearTimeout(t);
+  }, [focusIndex]);
 
   const totalMarks = formMethods.watch("questions").reduce((sum, q) => sum + (q.maxScore || 0), 0);
 
@@ -683,7 +708,7 @@ export default function CreateAssignment() {
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => append(newQuestion())}
+                      onClick={addQuestionAndFocus}
                       data-testid="button-add-question"
                     >
                       <PlusCircle className="h-4 w-4 mr-2" />
@@ -969,6 +994,22 @@ export default function CreateAssignment() {
                       </div>
                     </Card>
                   ))}
+
+                  {/* Primary "add" button — right below the last question, so after
+                      finishing one the next-question button is right there (no
+                      scrolling up). Adds a card, scrolls to it, and focuses its
+                      text box. Full-width works well on mobile too. */}
+                  <Button
+                    type="button"
+                    size="lg"
+                    onClick={addQuestionAndFocus}
+                    className="w-full font-bold text-white shadow-md hover:opacity-90"
+                    style={{ backgroundColor: "#BF9000" }}
+                    data-testid="button-add-question-bottom"
+                  >
+                    <PlusCircle className="h-5 w-5 mr-2" />
+                    Add Question
+                  </Button>
                 </div>
 
                 <div className="space-y-2">
