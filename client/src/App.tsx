@@ -18,6 +18,7 @@ import TeacherLessons from "@/pages/teacher/lessons";
 import StudentManagement from "@/pages/teacher/students";
 import TeacherReports from "@/pages/teacher/reports";
 import GradeBook from "@/pages/teacher/gradebook";
+import SubmissionReview from "@/pages/teacher/submission-review";
 import TeacherExport from "@/pages/teacher/export";
 import DailyReport from "@/pages/teacher/daily-report";
 import StudentLogin from "@/pages/student/login";
@@ -50,6 +51,7 @@ function Router() {
       <Route path="/teacher/students" component={StudentManagement} />
       <Route path="/teacher/reports" component={TeacherReports} />
       <Route path="/teacher/gradebook" component={GradeBook} />
+      <Route path="/teacher/submissions/:id" component={SubmissionReview} />
       <Route path="/teacher/export" component={TeacherExport} />
       <Route path="/teacher/daily-report" component={DailyReport} />
       <Route path="/student/login" component={StudentLogin} />

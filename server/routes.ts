@@ -651,6 +651,183 @@ export async function registerRoutes(
     }
   });
 
+  // ------------------------------------------------------------------------
+  // Grade Book — submission review, teacher mark override, and class stats.
+  // Teacher-only (requireTeacherAuth). Single-school app, so an authenticated
+  // teacher already sees only their own school's students.
+  // ------------------------------------------------------------------------
+
+  // Show a student's chosen answer in a friendly way (option text, True/False).
+  function displayStudentAnswer(q: any, raw: string): string {
+    if (raw == null || raw === "") return "";
+    if (q.type === "multiple_choice") {
+      const i = Number(raw);
+      return q.options && q.options[i] != null ? q.options[i] : raw;
+    }
+    if (q.type === "true_false") {
+      const l = raw.toLowerCase();
+      return l === "true" ? "True" : l === "false" ? "False" : raw;
+    }
+    return raw;
+  }
+
+  // Full review of one submission: every question with the student's answer, the
+  // correct answer, the marks awarded, and whether it was right/wrong/partial.
+  app.get("/api/teacher/submissions/:id/review", async (req, res) => {
+    try {
+      const validatedEmail = await requireTeacherAuth(req, res);
+      if (!validatedEmail) return;
+      const submissionId = parseInt(req.params.id);
+      const submission = await storage.getSubmission(submissionId);
+      if (!submission) return res.status(404).json({ success: false, message: "Submission not found" });
+      const assignment = await storage.getAssignment(submission.assignmentId);
+      if (!assignment) return res.status(404).json({ success: false, message: "Assignment not found" });
+      const student = await storage.getStudent(submission.studentId);
+      const mark = await storage.getMark(submissionId);
+
+      const questions = (assignment.questions || []) as any[];
+      const review = questions.map((q, index) => {
+        const answer = (submission.answers || []).find((a) => a.questionId === q.id);
+        const qm = mark?.questionMarks.find((m) => m.questionId === q.id);
+        const auto = isAutoMarkable(q);
+        const marked = markAnswer(q, answer?.answerText ?? "");
+        const score = qm?.score ?? 0;
+        const maxScore = q.maxScore;
+        let verdict: "correct" | "wrong" | "partial" | "unmarked";
+        if (!mark) verdict = "unmarked";
+        else if (maxScore > 0 && score >= maxScore) verdict = "correct";
+        else if (score <= 0) verdict = "wrong";
+        else verdict = "partial";
+        return {
+          index,
+          questionId: q.id,
+          questionText: q.questionText,
+          imageUrls: q.imageUrls || [],
+          type: q.type || "written",
+          autoMarkable: auto,
+          studentAnswerText: answer?.answerText ?? "",
+          studentAnswerDisplay: displayStudentAnswer(q, answer?.answerText ?? ""),
+          studentAnswerImages: answer?.imageUrls || [],
+          correctAnswerDisplay: auto ? marked.correctAnswerDisplay : "",
+          acceptedAnswers: q.type === "short_text" ? (q.acceptedAnswers || []) : undefined,
+          tolerance: q.type === "numeric" ? (q.tolerance ?? 0) : undefined,
+          score,
+          maxScore,
+          verdict,
+          teacherAdjusted: !!qm?.teacherAdjusted,
+          feedback: qm?.feedback,
+        };
+      });
+
+      res.json({
+        success: true,
+        review: {
+          submissionId,
+          status: submission.status,
+          submittedAt: submission.submittedAt ? new Date(submission.submittedAt).toISOString() : null,
+          student: student ? { id: student.id, name: student.fullName, form: student.form } : null,
+          assignment: { id: assignment.id, title: assignment.title, subject: assignment.subject, totalMarks: assignment.totalMarks },
+          totalScore: mark ? mark.totalScore : null,
+          questions: review,
+        },
+      });
+    } catch (error) {
+      console.error("Submission review error:", error);
+      res.status(500).json({ success: false, message: "Server error" });
+    }
+  });
+
+  // Teacher override of one question's mark. Recomputes the total and adjusts the
+  // student's XP by the change in fully-correct answers. Flags it as adjusted.
+  app.post("/api/teacher/submissions/:id/questions/:questionId/mark", async (req, res) => {
+    try {
+      const validatedEmail = await requireTeacherAuth(req, res);
+      if (!validatedEmail) return;
+      const submissionId = parseInt(req.params.id);
+      const questionId = req.params.questionId;
+      const submission = await storage.getSubmission(submissionId);
+      if (!submission) return res.status(404).json({ success: false, message: "Submission not found" });
+      const assignment = await storage.getAssignment(submission.assignmentId);
+      if (!assignment) return res.status(404).json({ success: false, message: "Assignment not found" });
+      const question = (assignment.questions || []).find((q) => q.id === questionId);
+      if (!question) return res.status(404).json({ success: false, message: "Question not found" });
+
+      const raw = Number(req.body?.score);
+      if (!Number.isFinite(raw)) return res.status(400).json({ success: false, message: "A numeric score is required." });
+      const newScore = Math.max(0, Math.min(question.maxScore, Math.round(raw)));
+
+      const mark = await storage.getMark(submissionId);
+      if (!mark) return res.status(400).json({ success: false, message: "This submission hasn't been marked yet." });
+
+      const oldQm = mark.questionMarks.find((m) => m.questionId === questionId);
+      const oldScore = oldQm?.score ?? 0;
+      const oldCorrect = !!oldQm && oldQm.maxScore > 0 && oldQm.score >= oldQm.maxScore;
+      const newCorrect = question.maxScore > 0 && newScore >= question.maxScore;
+
+      const newQm = {
+        questionId,
+        score: newScore,
+        maxScore: question.maxScore,
+        feedback: oldQm?.feedback,
+        teacherAdjusted: true,
+      };
+      let replaced = false;
+      const newMarks = mark.questionMarks.map((m) => (m.questionId === questionId ? ((replaced = true), newQm) : m));
+      if (!replaced) newMarks.push(newQm);
+      const newTotal = newMarks.reduce((s, m) => s + m.score, 0);
+
+      await storage.createMark({
+        submissionId, totalScore: newTotal, feedback: mark.feedback,
+        markedById: mark.markedById, questionMarks: newMarks,
+      });
+      const xpDelta = ((newCorrect ? 1 : 0) - (oldCorrect ? 1 : 0)) * XP_PER_CORRECT;
+      if (xpDelta !== 0) {
+        try { await adjustXp(submission.studentId, xpDelta); }
+        catch (e) { console.error("XP adjust on override failed:", e); }
+      }
+      res.json({ success: true, score: newScore, totalScore: newTotal });
+    } catch (error) {
+      console.error("Override mark error:", error);
+      res.status(500).json({ success: false, message: "Server error" });
+    }
+  });
+
+  // Class-wide per-question breakdown: how many students got each question wrong.
+  app.get("/api/teacher/assignments/:id/question-stats", async (req, res) => {
+    try {
+      const validatedEmail = await requireTeacherAuth(req, res);
+      if (!validatedEmail) return;
+      const id = parseInt(req.params.id);
+      const assignment = await storage.getAssignment(id);
+      if (!assignment) return res.status(404).json({ success: false, message: "Assignment not found" });
+
+      const submissions = await storage.getSubmissions({ assignmentId: id });
+      const marks: NonNullable<Awaited<ReturnType<typeof storage.getMark>>>[] = [];
+      for (const sub of submissions) {
+        const mark = await storage.getMark(sub.id);
+        if (mark) marks.push(mark);
+      }
+      const totalMarked = marks.length;
+
+      const stats = (assignment.questions || []).map((q, index) => {
+        let wrong = 0, correct = 0, partial = 0;
+        for (const mark of marks) {
+          const qm = mark.questionMarks.find((m) => m.questionId === q.id);
+          const score = qm?.score ?? 0;
+          if (q.maxScore > 0 && score >= q.maxScore) correct++;
+          else if (score <= 0) wrong++;
+          else { partial++; wrong++; } // partial counts as "not fully correct"
+        }
+        return { index, questionId: q.id, questionText: q.questionText, type: q.type || "written", maxScore: q.maxScore, wrong, correct, partial, total: totalMarked };
+      });
+
+      res.json({ success: true, totalMarked, stats });
+    } catch (error) {
+      console.error("Question stats error:", error);
+      res.status(500).json({ success: false, message: "Server error" });
+    }
+  });
+
   // Extend deadline for specific student
   app.post("/api/assignments/:id/extend-deadline", async (req, res) => {
     try {
@@ -1792,6 +1969,7 @@ export async function registerRoutes(
         assignmentTitle: string;
         subject: string;
         totalMarks: number;
+        submissionId: number | null;
         submittedAt: string | null;
         score: number | null;
         status: string;
@@ -1835,6 +2013,7 @@ export async function registerRoutes(
             assignmentTitle: assignment.title,
             subject: assignment.subject,
             totalMarks: assignment.totalMarks,
+            submissionId: submission ? submission.id : null,
             submittedAt: submission?.submittedAt ? new Date(submission.submittedAt).toISOString() : null,
             score: mark ? mark.totalScore : null,
             status,

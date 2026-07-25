@@ -176,6 +176,7 @@ export const marks = pgTable("marks", {
     score: number;
     maxScore: number;
     feedback?: string;
+    teacherAdjusted?: boolean; // true when a teacher overrode the auto/hand mark
   }>>().notNull(),
 });
 

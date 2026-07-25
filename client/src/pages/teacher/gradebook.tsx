@@ -20,6 +20,7 @@ interface GradebookRow {
   assignmentTitle: string;
   subject: string;
   totalMarks: number;
+  submissionId: number | null;
   submittedAt: string | null;
   score: number | null;
   status: string;
@@ -72,6 +73,13 @@ export default function GradeBook() {
   const uniqueAssignments = Array.from(
     new Map((allData?.rows || []).map(r => [r.assignmentId, { id: r.assignmentId, title: r.assignmentTitle }])).values()
   );
+
+  // Class-wide per-question breakdown for the selected assignment.
+  interface QuestionStat { index: number; questionId: string; questionText: string; type: string; maxScore: number; wrong: number; correct: number; partial: number; total: number; }
+  const { data: statsData } = useQuery<{ success: boolean; totalMarked: number; stats: QuestionStat[] }>({
+    queryKey: ["/api/teacher/assignments", filterAssignmentId, "question-stats"],
+    enabled: !!teacher && filterAssignmentId !== "ALL",
+  });
 
   const submittedCount = rows.filter(r => r.status !== "NOT_SUBMITTED").length;
   const notSubmittedCount = rows.filter(r => r.status === "NOT_SUBMITTED").length;
@@ -278,6 +286,43 @@ export default function GradeBook() {
           </CardContent>
         </Card>
 
+        {/* Class-wide per-question breakdown (when one assignment is selected). */}
+        {filterAssignmentId !== "ALL" && statsData?.success && statsData.stats.length > 0 && (
+          <Card className="mb-4" data-testid="class-breakdown">
+            <CardHeader>
+              <CardTitle className="text-base">Per-question breakdown</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Across {statsData.totalMarked} marked submission{statsData.totalMarked === 1 ? "" : "s"} — spot which questions the class struggled with.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {statsData.stats.map((s) => {
+                const pctWrong = s.total > 0 ? Math.round((s.wrong / s.total) * 100) : 0;
+                const hard = pctWrong >= 50;
+                return (
+                  <div key={s.questionId} className="flex items-center gap-3" data-testid={`stat-q-${s.index}`}>
+                    <span className="w-8 shrink-0 text-sm font-medium">Q{s.index + 1}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm truncate text-muted-foreground">{s.questionText}</span>
+                        <span className={`text-sm font-semibold shrink-0 tabular-nums ${hard ? "text-destructive" : ""}`}>
+                          {s.wrong} of {s.total} got this wrong
+                        </span>
+                      </div>
+                      <div className="mt-1 h-2 w-full rounded-full bg-muted overflow-hidden">
+                        <div className={`h-full rounded-full ${hard ? "bg-destructive" : "bg-primary/60"}`} style={{ width: `${pctWrong}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              {statsData.totalMarked === 0 && (
+                <p className="text-sm text-muted-foreground">No marked submissions yet.</p>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Table */}
         <Card>
           <CardContent className="p-0">
@@ -317,14 +362,20 @@ export default function GradeBook() {
                         <td className="px-4 py-3">{row.assignmentTitle}</td>
                         <td className="px-4 py-3 text-muted-foreground">{row.subject}</td>
                         <td className="px-4 py-3">
-                          {row.status === "NOT_SUBMITTED" ? (
+                          {row.status === "NOT_SUBMITTED" || !row.submissionId ? (
                             <span className="text-muted-foreground">—</span>
                           ) : row.score !== null ? (
-                            <span className="font-medium">
-                              {row.score}/{row.totalMarks}
-                            </span>
+                            <Link href={`/teacher/submissions/${row.submissionId}`}>
+                              <span className="font-medium text-primary underline underline-offset-2 cursor-pointer hover:opacity-80" data-testid={`link-review-${row.submissionId}`} title="Open this submission">
+                                {row.score}/{row.totalMarks}
+                              </span>
+                            </Link>
                           ) : (
-                            <span className="text-muted-foreground text-xs">Awaiting mark</span>
+                            <Link href={`/teacher/submissions/${row.submissionId}`}>
+                              <span className="text-primary underline underline-offset-2 cursor-pointer text-xs" data-testid={`link-review-${row.submissionId}`} title="Open this submission">
+                                Awaiting mark
+                              </span>
+                            </Link>
                           )}
                         </td>
                         <td className="px-4 py-3 text-muted-foreground text-xs">{formatDate(row.submittedAt)}</td>

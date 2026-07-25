@@ -111,6 +111,7 @@ export const marks = sqliteTable("marks", {
     score: number;
     maxScore: number;
     feedback?: string;
+    teacherAdjusted?: boolean;
   }>>().notNull(),
 });
 
