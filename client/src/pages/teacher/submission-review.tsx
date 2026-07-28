@@ -15,7 +15,7 @@ import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { ErrorBoundary } from "@/components/error-boundary";
+import { PageErrorBoundary } from "@/components/ErrorBoundary";
 import { ArrowLeft, CheckCircle2, XCircle, Loader2, Pencil } from "lucide-react";
 import logoPath from "@assets/logo.webp";
 
@@ -308,8 +308,8 @@ function SubmissionReviewContent() {
 // submission can never white-screen them out of the Grade Book.
 export default function SubmissionReview() {
   return (
-    <ErrorBoundary backHref="/teacher/gradebook" backLabel="Back to Grade Book">
+    <PageErrorBoundary backHref="/teacher/gradebook" backLabel="Back to Grade Book" label="submission-review">
       <SubmissionReviewContent />
-    </ErrorBoundary>
+    </PageErrorBoundary>
   );
 }
