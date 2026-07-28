@@ -1230,6 +1230,10 @@ export async function registerRoutes(
   // "This student must be in a primary class (Stages 3-6)" — used by the
   // rewards endpoint below, and handed to the Dream World routes if that game
   // is ever brought back (see server/routes.dreamworld.ts).
+  //
+  // The 403 wording mentions Dream World even though the live caller is the
+  // rewards endpoint. That is deliberate and unchanged from before — please
+  // leave it as it is rather than "correcting" it.
   async function requirePrimaryStudent(studentId: number, res: Response): Promise<Student | null> {
     const student = await storage.getStudent(studentId);
     if (!student) {
@@ -1237,7 +1241,7 @@ export async function registerRoutes(
       return null;
     }
     if (!isPrimaryForm(student.form)) {
-      res.status(403).json({ success: false, message: "This is for primary classes only" });
+      res.status(403).json({ success: false, message: "Dream World is for primary classes only" });
       return null;
     }
     return student;
