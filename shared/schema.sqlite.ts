@@ -233,6 +233,7 @@ export const penaltyBest = sqliteTable("penalty_best", {
   studentId: integer("student_id").notNull().references(() => students.id),
   subject: text("subject").notNull(),
   bestScore: integer("best_score").notNull().default(0),
+  bestOutOf: integer("best_out_of").notNull().default(0), // how long the game was when the best was set
   gamesPlayed: integer("games_played").notNull().default(0),
   updatedAt: timestamp("updated_at").notNull().$defaultFn(() => new Date()),
 });
@@ -401,6 +402,7 @@ CREATE TABLE IF NOT EXISTS penalty_best (
   student_id INTEGER NOT NULL,
   subject TEXT NOT NULL,
   best_score INTEGER NOT NULL DEFAULT 0,
+  best_out_of INTEGER NOT NULL DEFAULT 0,
   games_played INTEGER NOT NULL DEFAULT 0,
   updated_at INTEGER NOT NULL
 );

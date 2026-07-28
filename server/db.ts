@@ -95,6 +95,14 @@ const DREAM_WORLD_ADDED_COLUMNS: { name: string; type: string }[] = [
   { name: "grid_size",      type: "INTEGER NOT NULL DEFAULT 8" },
 ];
 
+// Columns added to penalty_best after it first shipped, handled the same way.
+const PENALTY_BEST_ADDED_COLUMNS: { name: string; type: string }[] = [
+  // Added when games became variable-length: 8/10 and 5/6 must compare fairly,
+  // so we remember how long the game was when a best was set. Existing rows
+  // default to 0, which reads as "no record set yet".
+  { name: "best_out_of", type: "INTEGER NOT NULL DEFAULT 0" },
+];
+
 // Filled in below depending on which database we use.
 let activeDb: unknown;
 let pgPoolInstance: pg.Pool | undefined;
@@ -118,6 +126,9 @@ if (usePostgres) {
     for (const col of DREAM_WORLD_ADDED_COLUMNS) {
       await pgPoolInstance!.query(`ALTER TABLE dream_world ADD COLUMN IF NOT EXISTS ${col.name} ${col.type}`);
     }
+    for (const col of PENALTY_BEST_ADDED_COLUMNS) {
+      await pgPoolInstance!.query(`ALTER TABLE penalty_best ADD COLUMN IF NOT EXISTS ${col.name} ${col.type}`);
+    }
   };
 
   console.log("[db] Using PostgreSQL (DATABASE_URL is set)");
@@ -137,6 +148,10 @@ if (usePostgres) {
     // "ADD COLUMN IF NOT EXISTS", so ignore the error when it already exists.
     for (const col of DREAM_WORLD_ADDED_COLUMNS) {
       try { await client.execute(`ALTER TABLE dream_world ADD COLUMN ${col.name} ${col.type}`); }
+      catch { /* column already present */ }
+    }
+    for (const col of PENALTY_BEST_ADDED_COLUMNS) {
+      try { await client.execute(`ALTER TABLE penalty_best ADD COLUMN ${col.name} ${col.type}`); }
       catch { /* column already present */ }
     }
   };

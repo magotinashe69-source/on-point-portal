@@ -377,7 +377,8 @@ export const penaltyBest = pgTable("penalty_best", {
   id: serial("id").primaryKey(),
   studentId: integer("student_id").notNull().references(() => students.id), // who this belongs to
   subject: text("subject").notNull(),                    // the subject played (as written on the assignment)
-  bestScore: integer("best_score").notNull().default(0), // personal best out of 10
+  bestScore: integer("best_score").notNull().default(0), // personal best score
+  bestOutOf: integer("best_out_of").notNull().default(0),// how many shots that game was, so records compare fairly
   gamesPlayed: integer("games_played").notNull().default(0),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

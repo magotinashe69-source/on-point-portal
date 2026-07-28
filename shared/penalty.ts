@@ -12,10 +12,31 @@
 import type { Question } from "./auto-marking";
 
 // --- Game shape -----------------------------------------------------------
-export const SHOTS_PER_ROUND = 5;   // 5 penalties taken, then 5 saved
-export const TOTAL_SHOTS = SHOTS_PER_ROUND * 2; // a game is 10 questions
+export const SHOTS_PER_ROUND = 5;   // a full game is 5 penalties, then 5 saves
+export const TOTAL_SHOTS = SHOTS_PER_ROUND * 2; // ...so 10 questions
+export const MIN_QUESTIONS = 2;     // the smallest game: one shot, one save
 export const XP_PER_CORRECT_ANSWER = 2; // fed into the existing capped XP system
 export const ANSWER_REVEAL_MS = 3000;   // how long a missed answer stays on screen
+
+// No question is ever asked twice in the same game, so a subject can only fill
+// as many shots as it has questions. With 10 or more it's the full 5-and-5;
+// with fewer, both rounds shrink equally so the game stays fair (you always
+// take as many penalties as you save). An odd spare question is left out.
+export function gameLength(availableQuestions: number): { perRound: number; total: number } {
+  const perRound = Math.min(SHOTS_PER_ROUND, Math.floor(availableQuestions / 2));
+  return { perRound, total: perRound * 2 };
+}
+
+// Is a personal best beaten? Games can be different lengths (a teacher adding
+// questions makes a subject's game longer), so compare the fraction scored
+// rather than the raw number — 7/10 beats 3/6, and 5/6 beats 7/10.
+export function beatsRecord(
+  score: number, outOf: number, bestScore: number, bestOutOf: number,
+): boolean {
+  if (outOf <= 0) return false;
+  if (bestOutOf <= 0) return score > 0; // no real record yet
+  return score / outOf > bestScore / bestOutOf;
+}
 
 export type Round = "striker" | "keeper";
 export const CORNERS = ["left", "middle", "right"] as const;
@@ -142,11 +163,14 @@ export function buildShotOptions(
   }
 }
 
-// How the child's score reads on the results screen.
-export function scoreLine(score: number): string {
-  if (score === TOTAL_SHOTS) return "Perfect! Every single one! 🏆";
-  if (score >= 8) return "Brilliant shooting! ⚽";
-  if (score >= 6) return "Good game — keep practising!";
-  if (score >= 4) return "Nice try — you'll beat that next time!";
+// How the child's score reads on the results screen. Judged as a share of the
+// game, since games can be different lengths.
+export function scoreLine(score: number, outOf: number): string {
+  if (outOf <= 0) return "Have a go!";
+  if (score === outOf) return "Perfect! Every single one! 🏆";
+  const share = score / outOf;
+  if (share >= 0.8) return "Brilliant shooting! ⚽";
+  if (share >= 0.6) return "Good game — keep practising!";
+  if (share >= 0.4) return "Nice try — you'll beat that next time!";
   return "Every champion starts somewhere. Try again!";
 }
