@@ -1375,10 +1375,38 @@ export async function registerRoutes(
   }
 
   // -------------------------------------------------------------------------
-  // Dream World — the town-building reward game. Every endpoint is restricted
-  // to primary students (Stages 3-6); secondary Forms get a 403 and never see
-  // the game. Placement and resource spending are validated server-side.
+  // Dream World — RETIRED.
+  //
+  // The game is no longer offered: its entry points are gone from the app and
+  // assignments no longer pay out resources. This gate closes the back door,
+  // so a saved bookmark or a hand-written request can't still play it. Every
+  // Dream World endpoint answers 410 Gone ("this used to exist, and won't
+  // again") rather than 404, which would wrongly suggest a broken link.
+  //
+  // Nothing is deleted: the dream_world table, every child's saved town, and
+  // all the handlers below are left exactly as they were. Removing this one
+  // middleware would bring the whole API back.
   // -------------------------------------------------------------------------
+  const DREAM_WORLD_PATH = /^\/api\/students\/\d+\/dreamworld(\/|$)/;
+  const TEACHER_AWARDS_PATH = "/api/teacher/dream-world/awards";
+
+  app.use((req, res, next) => {
+    if (DREAM_WORLD_PATH.test(req.path) || req.path === TEACHER_AWARDS_PATH) {
+      return res.status(410).json({
+        success: false,
+        retired: true,
+        message: "Dream World has been retired. Saved towns are kept, but the game is no longer available.",
+      });
+    }
+    next();
+  });
+
+  // The endpoints below are unreachable while the gate above is in place. They
+  // are kept so the game can be restored without rewriting it.
+  // -------------------------------------------------------------------------
+  // Every endpoint was restricted to primary students (Stages 3-6); secondary
+  // Forms got a 403 and never saw the game. Placement and resource spending
+  // were validated server-side.
   async function requirePrimaryStudent(studentId: number, res: Response): Promise<Student | null> {
     const student = await storage.getStudent(studentId);
     if (!student) {
