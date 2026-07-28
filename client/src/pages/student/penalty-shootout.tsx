@@ -30,7 +30,7 @@ import { PageErrorBoundary } from "@/components/ErrorBoundary";
 import { ArrowLeft, Loader2, Trophy } from "lucide-react";
 import { isPrimaryForm } from "@shared/schema";
 import {
-  ANSWER_REVEAL_MS, CORNERS,
+  ANSWER_REVEAL_MS, CORNERS, MIN_QUESTIONS, SHOTS_PER_ROUND, TOTAL_SHOTS,
   scoreLine, type Corner, type Shot,
 } from "@shared/penalty";
 import logoPath from "@assets/logo.webp";
@@ -38,8 +38,6 @@ import logoPath from "@assets/logo.webp";
 interface SubjectChoice {
   subject: string;
   questionCount: number;
-  shots: number;     // how long a game in this subject is
-  perRound: number;
   bestScore: number;
   bestOutOf: number;
   gamesPlayed: number;
@@ -87,14 +85,11 @@ function PenaltyShootoutContent() {
 
   const [subject, setSubject] = useState<string>("");
   const [shots, setShots] = useState<Shot[]>([]);
-  // How many penalties each round holds — the server decides, based on how many
-  // questions the subject actually has.
-  const [perRound, setPerRound] = useState(5);
   const [shotNo, setShotNo] = useState(0);
   const [phase, setPhase] = useState<Phase>("subject");
   const [starting, setStarting] = useState(false);
 
-  const [answers, setAnswers] = useState<{ questionId: string; answerText: string; round: string }[]>([]);
+  const [answers, setAnswers] = useState<{ ref: string; answerText: string; round: string }[]>([]);
   const [lastCorrect, setLastCorrect] = useState(false);
   const [correctAnswerText, setCorrectAnswerText] = useState("");
   const [corner, setCorner] = useState<Corner>("middle");
@@ -134,7 +129,6 @@ function PenaltyShootoutContent() {
       if (!body.success) { setErrorText(body.message || "Couldn't start the game."); return; }
       setSubject(chosen);
       setShots(body.shots);
-      setPerRound(body.perRound ?? Math.max(1, Math.floor(body.shots.length / 2)));
       setShotNo(0);
       setScore(0);
       setAnswers([]);
@@ -155,7 +149,7 @@ function PenaltyShootoutContent() {
     let correctText = "";
     try {
       const res = await apiRequest("POST", `/api/students/${student!.id}/penalty/answer`, {
-        subject, questionId: shot.questionId, answerText: value,
+        subject, ref: shot.ref, answerText: value,
       });
       const body = await res.json();
       correct = !!body.correct;
@@ -166,7 +160,7 @@ function PenaltyShootoutContent() {
       correct = false;
     }
 
-    setAnswers((a) => [...a, { questionId: shot.questionId, answerText: value, round: shot.round }]);
+    setAnswers((a) => [...a, { ref: shot.ref, answerText: value, round: shot.round }]);
     setLastCorrect(correct);
     setCorrectAnswerText(correctText);
 
@@ -297,7 +291,7 @@ function PenaltyShootoutContent() {
               <div className="text-5xl mb-2">⚽</div>
               <h1 className="text-2xl font-bold">Penalty Shootout</h1>
               <p className="text-sm text-muted-foreground mt-1">
-                Take some penalties, then save the same number. Answer correctly to score!
+                Take {SHOTS_PER_ROUND} penalties, then save {SHOTS_PER_ROUND}. Answer correctly to score!
               </p>
             </div>
 
@@ -307,7 +301,11 @@ function PenaltyShootoutContent() {
               <Card>
                 <CardContent className="py-10 text-center text-sm text-muted-foreground">
                   <p className="font-medium text-foreground mb-1">No games ready yet</p>
-                  <p>Once your teacher sets some quiz questions, they'll show up here to play.</p>
+                  <p>
+                    A shootout needs {MIN_QUESTIONS} quiz questions in a subject — that's a different
+                    question for each of your {SHOTS_PER_ROUND} penalties and {SHOTS_PER_ROUND} saves.
+                  </p>
+                  <p className="mt-2">Ask your teacher to set a few more, then come back!</p>
                 </CardContent>
               </Card>
             ) : (
@@ -325,7 +323,7 @@ function PenaltyShootoutContent() {
                       <div>
                         <div className="font-semibold text-lg">{s.subject}</div>
                         <div className="text-xs text-muted-foreground">
-                          {s.perRound} penalt{s.perRound === 1 ? "y" : "ies"} + {s.perRound} save{s.perRound === 1 ? "" : "s"}
+                          {SHOTS_PER_ROUND} penalties + {SHOTS_PER_ROUND} saves
                           {s.gamesPlayed > 0 && ` · played ${s.gamesPlayed} time${s.gamesPlayed === 1 ? "" : "s"}`}
                         </div>
                       </div>
@@ -356,7 +354,7 @@ function PenaltyShootoutContent() {
                   {isKeeperRound ? "🧤 Keeper Round" : "⚽ Striker Round"}
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {isKeeperRound ? "Save" : "Shot"} {shot.index + 1} of {perRound} · {subject}
+                  {isKeeperRound ? "Save" : "Shot"} {shot.index + 1} of {SHOTS_PER_ROUND} · {subject}
                 </div>
               </div>
               <div className="text-right">
@@ -455,10 +453,10 @@ function PenaltyShootoutContent() {
             )}
 
             <div className="text-6xl font-bold tabular-nums" data-testid="final-score">
-              {result?.score ?? score}<span className="text-2xl text-muted-foreground">/{result?.outOf ?? shots.length}</span>
+              {result?.score ?? score}<span className="text-2xl text-muted-foreground">/{result?.outOf ?? TOTAL_SHOTS}</span>
             </div>
             <p className="text-lg font-medium mt-2">
-              {scoreLine(result?.score ?? score, result?.outOf ?? shots.length)}
+              {scoreLine(result?.score ?? score, result?.outOf ?? TOTAL_SHOTS)}
             </p>
 
             <div className="pk-crowd text-2xl mt-3" aria-hidden="true">
@@ -470,11 +468,11 @@ function PenaltyShootoutContent() {
                 <CardTitle className="text-base">How you did</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
-                <Row label="⚽ Penalties scored" value={`${result?.strikerScore ?? 0} / ${result?.perRound ?? perRound}`} />
-                <Row label="🧤 Saves made" value={`${result?.keeperScore ?? 0} / ${result?.perRound ?? perRound}`} />
+                <Row label="⚽ Penalties scored" value={`${result?.strikerScore ?? 0} / ${SHOTS_PER_ROUND}`} />
+                <Row label="🧤 Saves made" value={`${result?.keeperScore ?? 0} / ${SHOTS_PER_ROUND}`} />
                 <Row
                   label={<span className="flex items-center gap-1"><Trophy className="h-3.5 w-3.5" /> Your best in {subject}</span>}
-                  value={`${result?.bestScore ?? 0} / ${result?.bestOutOf || result?.outOf || shots.length}`}
+                  value={`${result?.bestScore ?? 0} / ${result?.bestOutOf || TOTAL_SHOTS}`}
                 />
                 {result?.xp && result.xp.awarded > 0 && (
                   <Row label="⭐ XP earned" value={`+${result.xp.awarded}${result.xp.dailyCapped ? " (daily cap reached)" : ""}`} />

@@ -17,30 +17,50 @@ import type { Question } from "@shared/auto-marking";
 import { markAnswer } from "@shared/auto-marking";
 import type { ShotOption } from "@shared/penalty";
 import {
-  MIN_QUESTIONS, XP_PER_CORRECT_ANSWER,
-  buildShotOptions, isPlayable, shuffle, gameLength, beatsRecord,
+  MIN_QUESTIONS, SHOTS_PER_ROUND, TOTAL_SHOTS, XP_PER_CORRECT_ANSWER,
+  buildShotOptions, isPlayable, shuffle, canPlay, beatsRecord, makeRef, readRef,
   type Shot, type Round,
 } from "@shared/penalty";
 import { awardXp, type XpAward } from "./xp";
 import { recordActivity } from "./streaks";
 
-// Every question this student is allowed to be asked, with the subject it came
-// from. Built fresh from their assignments each time, so it can never drift and
-// a child can never be served another class's questions.
-async function questionPool(student: Student): Promise<{ subject: string; question: Question }[]> {
+// One question a student may be asked, tied to the assignment it came from.
+interface PoolItem {
+  subject: string;
+  assignmentId: number;
+  ref: string;      // "assignmentId:questionId" — unique across the whole school
+  question: Question;
+}
+
+// Every question this student is allowed to be asked. Built fresh from their
+// assignments each time, so it can never drift and a child can never be served
+// another class's questions.
+async function questionPool(student: Student): Promise<PoolItem[]> {
   const assignments: Assignment[] = await storage.getAssignments(student.form, student.id, false);
-  const out: { subject: string; question: Question }[] = [];
+  const out: PoolItem[] = [];
   for (const a of assignments) {
     for (const q of (a.questions || []) as Question[]) {
-      if (isPlayable(q)) out.push({ subject: a.subject, question: q });
+      if (isPlayable(q)) {
+        out.push({ subject: a.subject, assignmentId: a.id, ref: makeRef(a.id, q.id), question: q });
+      }
     }
   }
   return out;
 }
 
+// Find exactly one question in the pool by its reference. Looking it up by the
+// bare question id would be ambiguous — "q1" exists in nearly every assignment.
+function findByRef(pool: PoolItem[], subject: string, ref: string): PoolItem | undefined {
+  const parsed = readRef(ref);
+  if (!parsed) return undefined;
+  return pool.find(
+    (p) => p.subject === subject && p.assignmentId === parsed.assignmentId && p.question.id === parsed.questionId,
+  );
+}
+
 // Every numeric answer in a subject, used as believable wrong answers to sit
 // beside the right one.
-function numericPoolFor(pool: { subject: string; question: Question }[], subject: string): number[] {
+function numericPoolFor(pool: PoolItem[], subject: string): number[] {
   const seen = new Set<number>();
   for (const { subject: s, question } of pool) {
     if (s !== subject) continue;
@@ -51,20 +71,21 @@ function numericPoolFor(pool: { subject: string; question: Question }[], subject
 
 // The questions in a subject that can actually be played, each already turned
 // into buttons. A question is only usable if it can be made into buttons (a
-// numeric with no believable wrong answers to offer cannot), and each distinct
-// question id appears once — a game never asks the same question twice, so the
-// same id in two assignments must not fill two shots.
-function usableQuestions(pool: { subject: string; question: Question }[], subject: string) {
+// numeric with no believable wrong answers to offer cannot). Questions are kept
+// apart by their full reference, NOT by the bare question id: nearly every
+// assignment has a "q1", so deduping on that would throw away almost the whole
+// subject and leave children with nothing to play.
+function usableQuestions(pool: PoolItem[], subject: string) {
   const numbers = numericPoolFor(pool, subject);
   const seen = new Set<string>();
-  const out: { question: Question; options: ShotOption[] }[] = [];
-  for (const { subject: s, question } of pool) {
-    if (s !== subject) continue;
-    if (seen.has(question.id)) continue;
-    const options = buildShotOptions(question, numbers);
+  const out: { item: PoolItem; options: ShotOption[] }[] = [];
+  for (const item of pool) {
+    if (item.subject !== subject) continue;
+    if (seen.has(item.ref)) continue;
+    const options = buildShotOptions(item.question, numbers);
     if (!options) continue;
-    seen.add(question.id);
-    out.push({ question, options });
+    seen.add(item.ref);
+    out.push({ item, options });
   }
   return out;
 }
@@ -72,17 +93,14 @@ function usableQuestions(pool: { subject: string; question: Question }[], subjec
 export interface SubjectChoice {
   subject: string;
   questionCount: number;  // distinct questions available to play
-  shots: number;          // how long a game in this subject will be
-  perRound: number;       // penalties taken, and saves made
   bestScore: number;
   bestOutOf: number;
   gamesPlayed: number;
 }
 
-// The subjects this child is enrolled in that have enough questions to play,
-// each with their personal best so the child can see what to beat. A subject
-// with fewer than two playable questions can't make a game (you need at least
-// one penalty and one save) and is left out.
+// The subjects this child can play, each with their personal best so they can
+// see what to beat. A game is always 10 different questions, so a subject with
+// fewer than that is hidden until the teacher sets a few more.
 export async function listSubjects(student: Student): Promise<SubjectChoice[]> {
   const pool = await questionPool(student);
   const bests = await storage.getPenaltyBests(student.id);
@@ -90,54 +108,50 @@ export async function listSubjects(student: Student): Promise<SubjectChoice[]> {
 
   return subjects.map((subject) => {
     const count = usableQuestions(pool, subject).length;
-    const { perRound, total } = gameLength(count);
     const best = bests.find((b) => b.subject === subject);
     return {
       subject,
       questionCount: count,
-      shots: total,
-      perRound,
       bestScore: best?.bestScore ?? 0,
       bestOutOf: best?.bestOutOf ?? 0,
       gamesPlayed: best?.gamesPlayed ?? 0,
     };
-  }).filter((s) => s.questionCount >= MIN_QUESTIONS);
+  }).filter((s) => canPlay(s.questionCount));
 }
 
 export interface Game {
   subject: string;
-  perRound: number; // penalties taken, then saves made
-  shots: Shot[];    // every shot a DIFFERENT question, and no answer keys
+  perRound: number; // always 5: penalties taken, then saves made
+  shots: Shot[];    // 10 shots, every one a DIFFERENT question, no answer keys
 }
 
-// Build a game from the chosen subject. Every shot is a different question —
-// nothing is ever asked twice — so a subject with fewer than 10 playable
-// questions simply gets a shorter game rather than repeats.
+// Build a game from the chosen subject: 10 different questions, 5 to shoot and
+// 5 to save. Returns null when the subject doesn't have 10 playable questions,
+// which is also why it wouldn't have been offered in the first place.
 export async function buildGame(student: Student, subject: string): Promise<Game | null> {
   const pool = await questionPool(student);
   const usable = usableQuestions(pool, subject);
-  const { perRound, total } = gameLength(usable.length);
-  if (total < MIN_QUESTIONS) return null;
+  if (!canPlay(usable.length)) return null;
 
-  const picked = shuffle(usable).slice(0, total);
+  const picked = shuffle(usable).slice(0, TOTAL_SHOTS);
   const shots: Shot[] = picked.map((p, i) => ({
-    questionId: p.question.id,
-    round: (i < perRound ? "striker" : "keeper") as Round,
-    index: i % perRound,
-    questionText: p.question.questionText,
+    ref: p.item.ref,
+    round: (i < SHOTS_PER_ROUND ? "striker" : "keeper") as Round,
+    index: i % SHOTS_PER_ROUND,
+    questionText: p.item.question.questionText,
     options: p.options,
   }));
-  return { subject, perRound, shots };
+  return { subject, perRound: SHOTS_PER_ROUND, shots };
 }
 
 // Mark ONE shot, for the instant feedback the game needs (ball in the net, or
 // the keeper saving it). Marking is the existing auto-marker, untouched.
 // Returns null if the question isn't one this child is allowed to be asked.
 export async function markShot(
-  student: Student, subject: string, questionId: string, answerText: string,
+  student: Student, subject: string, ref: string, answerText: string,
 ): Promise<{ correct: boolean; correctAnswerDisplay: string; explanation?: string } | null> {
   const pool = await questionPool(student);
-  const found = pool.find((p) => p.subject === subject && p.question.id === questionId);
+  const found = findByRef(pool, subject, ref);
   if (!found) return null;
 
   const result = markAnswer(found.question, answerText);
@@ -150,8 +164,9 @@ export async function markShot(
 
 export interface GameResult {
   score: number;
-  outOf: number;      // decided by the server from the subject's question count
-  perRound: number;
+  outOf: number;      // always 10 — the server's fixed game length
+  perRound: number;   // always 5
+  playable?: boolean; // false when the subject no longer has enough questions
   strikerScore: number;
   keeperScore: number;
   bestScore: number;
@@ -164,7 +179,7 @@ export interface GameResult {
 }
 
 export interface SubmittedAnswer {
-  questionId: string;
+  ref: string;
   answerText: string;
   round: Round;
 }
@@ -177,10 +192,19 @@ export async function finishGame(
 ): Promise<GameResult> {
   const pool = await questionPool(student);
 
-  // How long a game in this subject is, decided HERE — never taken from the
-  // browser, so a made-up list of answers can't invent a longer game.
+  // A game is always 10 shots, 5 per round — decided HERE, never taken from
+  // the browser. A subject that can't fill a game scores nothing at all, so a
+  // made-up request can't manufacture a record in a subject too thin to play.
   const usable = usableQuestions(pool, subject);
-  const { perRound, total: outOf } = gameLength(usable.length);
+  const perRound = SHOTS_PER_ROUND;
+  const outOf = TOTAL_SHOTS;
+  if (!canPlay(usable.length)) {
+    return {
+      score: 0, outOf, perRound, strikerScore: 0, keeperScore: 0,
+      bestScore: 0, bestOutOf: 0, previousBest: 0, previousOutOf: 0,
+      newRecord: false, gamesPlayed: 0, playable: false,
+    };
+  }
 
   let strikerScore = 0;
   let keeperScore = 0;
@@ -191,10 +215,10 @@ export async function finishGame(
 
   for (const a of answers) {
     if (counted.size >= outOf) break;
-    if (counted.has(a.questionId)) continue;
-    const found = pool.find((p) => p.subject === subject && p.question.id === a.questionId);
+    if (counted.has(a.ref)) continue;
+    const found = findByRef(pool, subject, a.ref);
     if (!found) continue;
-    counted.add(a.questionId);
+    counted.add(a.ref);
 
     if (!markAnswer(found.question, a.answerText).correct) continue;
     // A round can only hold so many shots, so a flood of "keeper" answers

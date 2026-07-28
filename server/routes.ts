@@ -22,6 +22,7 @@ import {
   markShot as markPenaltyShot,
   finishGame as finishPenaltyGame,
 } from "./penalty";
+import { MIN_QUESTIONS as PENALTY_MIN_QUESTIONS } from "@shared/penalty";
 import { z } from "zod";
 
 // Mark an auto-markable submission in code and save the result as a Mark.
@@ -1296,7 +1297,12 @@ export async function registerRoutes(
 
       const game = await buildPenaltyGame(student, subject);
       if (!game) {
-        return res.status(400).json({ success: false, message: "There are no questions to play in this subject yet." });
+        // A game is 10 different questions, so this subject isn't ready yet.
+        // Say why, rather than "no questions" when there are simply too few.
+        return res.status(400).json({
+          success: false,
+          message: `This subject needs ${PENALTY_MIN_QUESTIONS} quiz questions before you can play a shootout. Ask your teacher to set a few more!`,
+        });
       }
       res.json({ success: true, ...game });
     } catch (error) {
@@ -1310,11 +1316,11 @@ export async function registerRoutes(
     try {
       const student = await requirePrimaryStudent(parseInt(req.params.id), res);
       if (!student) return;
-      const { subject, questionId, answerText } = req.body ?? {};
-      if (typeof subject !== "string" || typeof questionId !== "string") {
+      const { subject, ref, answerText } = req.body ?? {};
+      if (typeof subject !== "string" || typeof ref !== "string") {
         return res.status(400).json({ success: false, message: "Missing subject or question." });
       }
-      const result = await markPenaltyShot(student, subject, questionId, String(answerText ?? ""));
+      const result = await markPenaltyShot(student, subject, ref, String(answerText ?? ""));
       if (!result) return res.status(404).json({ success: false, message: "That question isn't part of your game." });
       res.json({ success: true, ...result });
     } catch (error) {

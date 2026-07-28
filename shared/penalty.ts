@@ -12,24 +12,26 @@
 import type { Question } from "./auto-marking";
 
 // --- Game shape -----------------------------------------------------------
-export const SHOTS_PER_ROUND = 5;   // a full game is 5 penalties, then 5 saves
-export const TOTAL_SHOTS = SHOTS_PER_ROUND * 2; // ...so 10 questions
-export const MIN_QUESTIONS = 2;     // the smallest game: one shot, one save
+// Every game is the same: 5 penalties taken, then 5 saved, and no question is
+// ever asked twice. That fixed shape is what makes scores worth comparing.
+export const SHOTS_PER_ROUND = 5;
+export const TOTAL_SHOTS = SHOTS_PER_ROUND * 2; // always 10 questions
 export const XP_PER_CORRECT_ANSWER = 2; // fed into the existing capped XP system
 export const ANSWER_REVEAL_MS = 3000;   // how long a missed answer stays on screen
 
-// No question is ever asked twice in the same game, so a subject can only fill
-// as many shots as it has questions. With 10 or more it's the full 5-and-5;
-// with fewer, both rounds shrink equally so the game stays fair (you always
-// take as many penalties as you save). An odd spare question is left out.
-export function gameLength(availableQuestions: number): { perRound: number; total: number } {
-  const perRound = Math.min(SHOTS_PER_ROUND, Math.floor(availableQuestions / 2));
-  return { perRound, total: perRound * 2 };
+// Because a game needs 10 different questions, a subject with fewer than that
+// simply isn't offered yet — better than a half-length game or the same
+// question twice. Teachers just need to set a few more quiz questions.
+export const MIN_QUESTIONS = TOTAL_SHOTS;
+
+export function canPlay(availableQuestions: number): boolean {
+  return availableQuestions >= MIN_QUESTIONS;
 }
 
-// Is a personal best beaten? Games can be different lengths (a teacher adding
-// questions makes a subject's game longer), so compare the fraction scored
-// rather than the raw number — 7/10 beats 3/6, and 5/6 beats 7/10.
+// Is a personal best beaten? Every game is 10 shots, so this is a plain
+// comparison. bestOutOf is still carried alongside so a score always displays
+// against the length it was scored over, and rows saved before that was
+// recorded (bestOutOf 0) read as "no record yet" and reset on the next game.
 export function beatsRecord(
   score: number, outOf: number, bestScore: number, bestOutOf: number,
 ): boolean {
@@ -54,11 +56,30 @@ export interface ShotOption {
 // questions come from real homework, so the correct answer must never be sent
 // to the browser.
 export interface Shot {
-  questionId: string;
+  // Which question this is. Question ids ("q1", "q2") are only unique WITHIN an
+  // assignment — the same "q1" exists in dozens of them — so a shot has to name
+  // the assignment too, or the wrong question gets marked. The browser just
+  // hands this back untouched.
+  ref: string;
   round: Round;
   index: number;        // 0-4 within its round
   questionText: string;
   options: ShotOption[];
+}
+
+// Build and read that reference. Assignment ids are numbers, so a colon can
+// never appear in the first half.
+export function makeRef(assignmentId: number, questionId: string): string {
+  return `${assignmentId}:${questionId}`;
+}
+
+export function readRef(ref: string): { assignmentId: number; questionId: string } | null {
+  const at = String(ref ?? "").indexOf(":");
+  if (at <= 0) return null;
+  const assignmentId = Number(ref.slice(0, at));
+  const questionId = ref.slice(at + 1);
+  if (!Number.isInteger(assignmentId) || !questionId) return null;
+  return { assignmentId, questionId };
 }
 
 // The question types this game can turn into buttons. "written" is hand-marked
