@@ -16,6 +16,12 @@ import { recordActivity, grantFreezeForLevelUp, refreshStreak, setSimulatedToday
 // Dream World is retired, so this file imports nothing from ./dreamworld. Its
 // endpoints live unwired in ./routes.dreamworld.ts and are answered 410 by the
 // gate further down; assignments no longer pay out resources.
+import {
+  listSubjects as listPenaltySubjects,
+  buildGame as buildPenaltyGame,
+  markShot as markPenaltyShot,
+  finishGame as finishPenaltyGame,
+} from "./penalty";
 import { z } from "zod";
 
 // Mark an auto-markable submission in code and save the result as a Mark.
@@ -1257,6 +1263,80 @@ export async function registerRoutes(
       res.json({ success: true, rewards });
     } catch (error) {
       console.error("Get student rewards error:", error);
+      res.status(500).json({ success: false, message: "Server error" });
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // Penalty Shootout — a football quiz for primary classes (Stages 3-6).
+  // Every endpoint goes through requirePrimaryStudent, so Forms get a 403 and
+  // never see the game. The answer key is never sent to the browser: the
+  // server marks each shot, using the existing auto-marker unchanged.
+  // -------------------------------------------------------------------------
+
+  // Which subjects this child can play, with their personal best in each.
+  app.get("/api/students/:id/penalty/subjects", async (req, res) => {
+    try {
+      const student = await requirePrimaryStudent(parseInt(req.params.id), res);
+      if (!student) return;
+      res.json({ success: true, subjects: await listPenaltySubjects(student) });
+    } catch (error) {
+      console.error("Penalty subjects error:", error);
+      res.status(500).json({ success: false, message: "Server error" });
+    }
+  });
+
+  // Start a game: 10 shots of questions-as-buttons, with no answers attached.
+  app.post("/api/students/:id/penalty/start", async (req, res) => {
+    try {
+      const student = await requirePrimaryStudent(parseInt(req.params.id), res);
+      if (!student) return;
+      const subject = typeof req.body?.subject === "string" ? req.body.subject : "";
+      if (!subject) return res.status(400).json({ success: false, message: "Pick a subject to play." });
+
+      const game = await buildPenaltyGame(student, subject);
+      if (!game) {
+        return res.status(400).json({ success: false, message: "There are no questions to play in this subject yet." });
+      }
+      res.json({ success: true, ...game });
+    } catch (error) {
+      console.error("Penalty start error:", error);
+      res.status(500).json({ success: false, message: "Server error" });
+    }
+  });
+
+  // Mark one shot, so the ball can fly in or the keeper can save it right away.
+  app.post("/api/students/:id/penalty/answer", async (req, res) => {
+    try {
+      const student = await requirePrimaryStudent(parseInt(req.params.id), res);
+      if (!student) return;
+      const { subject, questionId, answerText } = req.body ?? {};
+      if (typeof subject !== "string" || typeof questionId !== "string") {
+        return res.status(400).json({ success: false, message: "Missing subject or question." });
+      }
+      const result = await markPenaltyShot(student, subject, questionId, String(answerText ?? ""));
+      if (!result) return res.status(404).json({ success: false, message: "That question isn't part of your game." });
+      res.json({ success: true, ...result });
+    } catch (error) {
+      console.error("Penalty answer error:", error);
+      res.status(500).json({ success: false, message: "Server error" });
+    }
+  });
+
+  // Finish a game: the server re-marks everything, saves a new best, awards XP
+  // through the existing capped system, and counts the game towards streaks.
+  app.post("/api/students/:id/penalty/finish", async (req, res) => {
+    try {
+      const student = await requirePrimaryStudent(parseInt(req.params.id), res);
+      if (!student) return;
+      const subject = typeof req.body?.subject === "string" ? req.body.subject : "";
+      const answers = Array.isArray(req.body?.answers) ? req.body.answers : [];
+      if (!subject) return res.status(400).json({ success: false, message: "Missing subject." });
+
+      const result = await finishPenaltyGame(student, subject, answers);
+      res.json({ success: true, ...result });
+    } catch (error) {
+      console.error("Penalty finish error:", error);
       res.status(500).json({ success: false, message: "Server error" });
     }
   });
