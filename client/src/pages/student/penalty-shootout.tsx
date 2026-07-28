@@ -17,7 +17,7 @@
 //
 // The browser is never told the answers — every shot is marked by the server.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -61,6 +61,7 @@ interface GameResult {
 type Phase =
   | "subject"    // choosing a subject
   | "question"   // reading the question, tapping an answer
+  | "marking"    // waiting for the server to say if it was right
   | "aiming"     // answered correctly, choosing which corner
   | "shooting"   // the ball (or the keeper) is moving
   | "reveal"     // got it wrong, showing the right answer
@@ -89,7 +90,11 @@ function PenaltyShootoutContent() {
   const [phase, setPhase] = useState<Phase>("subject");
   const [starting, setStarting] = useState(false);
 
-  const [answers, setAnswers] = useState<{ ref: string; answerText: string; round: string }[]>([]);
+  // The answers so far. Kept in a ref, not state: the last shot finishes the
+  // game from inside the same function that records it, and a state value read
+  // there would still be the one from before that answer — so the final shot
+  // never reached the server and every game lost its last mark.
+  const answersRef = useRef<{ ref: string; answerText: string; round: string }[]>([]);
   const [lastCorrect, setLastCorrect] = useState(false);
   const [correctAnswerText, setCorrectAnswerText] = useState("");
   const [corner, setCorner] = useState<Corner>("middle");
@@ -131,7 +136,7 @@ function PenaltyShootoutContent() {
       setShots(body.shots);
       setShotNo(0);
       setScore(0);
-      setAnswers([]);
+      answersRef.current = [];
       setResult(null);
       setPhase("question");
     } catch {
@@ -144,7 +149,12 @@ function PenaltyShootoutContent() {
   // The child tapped an answer. The server marks it, then the pitch reacts.
   const answerShot = async (value: string) => {
     if (!shot || phase !== "question") return;
-    setPhase("shooting");
+    // "marking", not "shooting": until the server answers we don't know what
+    // happened, and the pitch still holds the LAST shot's result. Going
+    // straight to "shooting" made the ball leap towards the previous corner
+    // (or the keeper dive) the instant a button was tapped — invisible on a
+    // fast connection, very visible on a slow phone.
+    setPhase("marking");
     let correct = false;
     let correctText = "";
     try {
@@ -160,7 +170,7 @@ function PenaltyShootoutContent() {
       correct = false;
     }
 
-    setAnswers((a) => [...a, { ref: shot.ref, answerText: value, round: shot.round }]);
+    answersRef.current = [...answersRef.current, { ref: shot.ref, answerText: value, round: shot.round }];
     setLastCorrect(correct);
     setCorrectAnswerText(correctText);
 
@@ -204,7 +214,9 @@ function PenaltyShootoutContent() {
 
   const finishGame = async () => {
     try {
-      const res = await apiRequest("POST", `/api/students/${student!.id}/penalty/finish`, { subject, answers });
+      const res = await apiRequest("POST", `/api/students/${student!.id}/penalty/finish`, {
+        subject, answers: answersRef.current,
+      });
       const body = await res.json();
       if (body.success) {
         setResult(body);
@@ -350,7 +362,7 @@ function PenaltyShootoutContent() {
         )}
 
         {/* ---------- Playing ---------- */}
-        {(phase === "question" || phase === "aiming" || phase === "shooting" || phase === "reveal") && shot && (
+        {(phase === "question" || phase === "marking" || phase === "aiming" || phase === "shooting" || phase === "reveal") && shot && (
           <>
             <div className="flex items-center justify-between mb-3">
               <div>
@@ -429,6 +441,10 @@ function PenaltyShootoutContent() {
                   <p className="text-xl font-bold mt-1">{correctAnswerText || "—"}</p>
                 </CardContent>
               </Card>
+            )}
+
+            {phase === "marking" && (
+              <p className="mt-4 text-center text-sm text-muted-foreground" data-testid="marking">…</p>
             )}
 
             {phase === "shooting" && (
