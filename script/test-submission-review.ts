@@ -60,9 +60,19 @@ async function main() {
   ok("review without login -> 401", (await http("GET", `/api/teacher/submissions/${sub1}/review`)).status === 401);
   ok("override without login -> 401", (await http("POST", `/api/teacher/submissions/${sub1}/questions/q1/mark`, { score: 0 })).status === 401);
   ok("question-stats without login -> 401", (await http("GET", `/api/teacher/assignments/${assignment.id}/question-stats`)).status === 401);
+  // The Grade Book listing must be teacher-only too. It used to be open, so a
+  // dead session still filled the table while opening a row failed — which is
+  // what made this look like "the review feature is broken".
+  ok("gradebook without login -> 401", (await http("GET", "/api/gradebook")).status === 401);
+  ok("grades CSV export without login -> 401", (await http("GET", "/api/export/grades")).status === 401);
+  ok("session check without login -> 401", (await http("GET", "/api/auth/teacher/me")).status === 401);
+
   const login = await http("POST", "/api/auth/teacher/login", { email: TEACHER_EMAIL, password: TEACHER_PASSWORD });
   const cookie = (login.res.headers.get("set-cookie") || "").split(";")[0];
   ok("teacher logged in", !!cookie);
+  const me = await http("GET", "/api/auth/teacher/me", undefined, cookie);
+  ok("session check with login -> the teacher", me.status === 200 && me.json?.teacher?.email === TEACHER_EMAIL);
+  ok("session check never leaks the password", me.json?.teacher?.password === undefined);
 
   // === Review accuracy (Ana: q1 right, q2 right, q3 wrong) ===
   console.log("\n2) Review shows answers, correct answers, verdicts, marks");
@@ -74,6 +84,16 @@ async function main() {
   ok("q3 MCQ wrong: student answer shows option text 'B', correct 'A', score 0",
     q(2).verdict === "wrong" && q(2).studentAnswerDisplay === "B" && q(2).correctAnswerDisplay === "A" && q(2).score === 0,
     `ans=${q(2).studentAnswerDisplay} correct=${q(2).correctAnswerDisplay} verdict=${q(2).verdict}`);
+  ok("per-question answers were saved at submission time", r.hasAnswerData === true);
+  ok("every question carries the student's answer", r.questions.every((x: any) => x.studentAnswerText !== ""));
+
+  // A submission with no stored answers must say so rather than look blank.
+  console.log("\n2b) Submission with no recorded answers");
+  const emptySub = await storage.createSubmission({ assignmentId: assignment.id, studentId: S1.id, answers: [] as any });
+  const rEmpty = (await http("GET", `/api/teacher/submissions/${emptySub.id}/review`, undefined, cookie)).json.review;
+  ok("review still loads (does not error)", !!rEmpty, "review returned");
+  ok("flagged as having no answer data", rEmpty?.hasAnswerData === false);
+  ok("all questions still listed for context", rEmpty?.questions.length === 3, `n=${rEmpty?.questions.length}`);
 
   // === Class per-question breakdown (baseline, before any override) ===
   console.log("\n3) Class per-question breakdown counts");
@@ -102,7 +122,7 @@ async function main() {
 
   // === Gradebook rows carry submissionId ===
   console.log("\n5) Grade Book rows link to submissions");
-  const gb = (await http("GET", `/api/gradebook?assignmentId=${assignment.id}`)).json;
+  const gb = (await http("GET", `/api/gradebook?assignmentId=${assignment.id}`, undefined, cookie)).json;
   const anaRow = (gb.rows || []).find((x: any) => x.studentId === S1.id);
   ok("Ana's gradebook row has her submissionId", anaRow?.submissionId === sub1, `submissionId=${anaRow?.submissionId}`);
 

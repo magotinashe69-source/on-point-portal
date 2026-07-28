@@ -38,6 +38,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [student]);
 
+  // The browser remembers the teacher forever, but the real login is a session
+  // on the server that can end (the server restarting is enough). When that
+  // happens the app used to still look logged in while every teacher-only
+  // request quietly failed — the Grade Book listed students but opening one
+  // showed nothing. So on startup we ask the server whether the session is
+  // still real, and if it isn't we forget the teacher and let the normal
+  // "please log in" redirect happen.
+  useEffect(() => {
+    if (!teacher) return;
+    let cancelled = false;
+    fetch("/api/auth/teacher/me", { credentials: "include" })
+      .then((res) => {
+        if (!cancelled && res.status === 401) setTeacher(null);
+      })
+      .catch(() => {
+        // Offline or the server is down — keep the remembered login rather than
+        // logging the teacher out over a temporary network blip.
+      });
+    return () => { cancelled = true; };
+    // Runs once on startup; later changes come from logging in or out.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const logout = () => {
     // Destroy server-side teacher session (fire-and-forget; best-effort)
     fetch("/api/auth/teacher/logout", { method: "POST" }).catch(() => {});

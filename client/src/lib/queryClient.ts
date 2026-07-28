@@ -1,7 +1,21 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
+// A 401 means the server-side login has ended (most often because the server
+// restarted). The browser may still be remembering the teacher, which used to
+// leave them on a page where everything silently failed to load. Forget the
+// remembered login and send them to the login page once, so the cause is
+// obvious instead of looking like missing data.
+function handleExpiredTeacherLogin() {
+  if (!localStorage.getItem("onpoint-teacher")) return;
+  localStorage.removeItem("onpoint-teacher");
+  if (!window.location.pathname.startsWith("/teacher/login")) {
+    window.location.href = "/teacher/login?expired=1";
+  }
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
+    if (res.status === 401) handleExpiredTeacherLogin();
     const text = (await res.text()) || res.statusText;
     throw new Error(`${res.status}: ${text}`);
   }

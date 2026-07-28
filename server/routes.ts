@@ -233,6 +233,24 @@ export async function registerRoutes(
     }
   });
 
+  // "Am I still logged in?" — the browser remembers the teacher in localStorage,
+  // but the real login lives in a server-side session that can end (server
+  // restart, or the cookie expiring). The app asks this on startup so a
+  // remembered-but-expired login sends the teacher back to the login page
+  // instead of leaving them on a page whose data requests all fail.
+  app.get("/api/auth/teacher/me", async (req, res) => {
+    const teacherId = req.session?.teacherId;
+    if (!teacherId) {
+      return res.status(401).json({ success: false, message: "Not logged in" });
+    }
+    const teacher = await storage.getTeacher(teacherId);
+    if (!teacher) {
+      return res.status(401).json({ success: false, message: "Session invalid" });
+    }
+    const { password: _, ...safeTeacher } = teacher;
+    res.json({ success: true, teacher: safeTeacher });
+  });
+
   // Teacher logout — destroys the server-side session
   app.post("/api/auth/teacher/logout", (req, res) => {
     req.session.destroy(() => {
@@ -686,8 +704,16 @@ export async function registerRoutes(
       const mark = await storage.getMark(submissionId);
 
       const questions = (assignment.questions || []) as any[];
+      // Whether this submission actually stored the student's per-question
+      // answers. Submissions made by current code always do; this guards
+      // against any older or imported row that only kept a total score, so the
+      // page can say "answer data not recorded" instead of showing blanks that
+      // look like the student answered nothing.
+      const storedAnswers = Array.isArray(submission.answers) ? submission.answers : [];
+      const hasAnswerData = storedAnswers.length > 0;
+
       const review = questions.map((q, index) => {
-        const answer = (submission.answers || []).find((a) => a.questionId === q.id);
+        const answer = storedAnswers.find((a) => a.questionId === q.id);
         const qm = mark?.questionMarks.find((m) => m.questionId === q.id);
         const auto = isAutoMarkable(q);
         const marked = markAnswer(q, answer?.answerText ?? "");
@@ -728,6 +754,7 @@ export async function registerRoutes(
           student: student ? { id: student.id, name: student.fullName, form: student.form } : null,
           assignment: { id: assignment.id, title: assignment.title, subject: assignment.subject, totalMarks: assignment.totalMarks },
           totalScore: mark ? mark.totalScore : null,
+          hasAnswerData,
           questions: review,
         },
       });
@@ -1933,9 +1960,15 @@ export async function registerRoutes(
     }
   });
 
-  // Grade Book API - joins assignments, students, submissions, marks
+  // Grade Book API - joins assignments, students, submissions, marks.
+  // Teacher-only: this returns every student's name and score, so it must not be
+  // readable without a login (the submission review beside it is already
+  // teacher-only, and the mismatch made a dead session look like missing data).
   app.get("/api/gradebook", async (req, res) => {
     try {
+      const validatedEmail = await requireTeacherAuth(req, res);
+      if (!validatedEmail) return;
+
       const formFilter = req.query.form as string | undefined;
       const assignmentIdFilter = req.query.assignmentId ? parseInt(req.query.assignmentId as string) : undefined;
       const statusFilter = req.query.status as string | undefined;
@@ -2028,9 +2061,13 @@ export async function registerRoutes(
     }
   });
 
-  // Export grades as CSV
+  // Export grades as CSV. Teacher-only for the same reason as the Grade Book:
+  // it is the whole school's marks in one file.
   app.get("/api/export/grades", async (req, res) => {
     try {
+      const validatedEmail = await requireTeacherAuth(req, res);
+      if (!validatedEmail) return;
+
       const form = req.query.form as string | undefined;
       const subject = req.query.subject as string | undefined;
       

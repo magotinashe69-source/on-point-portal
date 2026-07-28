@@ -15,6 +15,7 @@ import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { ErrorBoundary } from "@/components/error-boundary";
 import { ArrowLeft, CheckCircle2, XCircle, Loader2, Pencil } from "lucide-react";
 import logoPath from "@assets/logo.webp";
 
@@ -45,6 +46,8 @@ interface ReviewData {
   student: { id: number; name: string; form: string } | null;
   assignment: { id: number; title: string; subject: string; totalMarks: number };
   totalScore: number | null;
+  // False for any submission saved without per-question answers (older rows).
+  hasAnswerData: boolean;
   questions: QReview[];
 }
 
@@ -56,7 +59,7 @@ const TYPE_LABEL: Record<string, string> = {
   written: "Written (hand-marked)",
 };
 
-export default function SubmissionReview() {
+function SubmissionReviewContent() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { teacher } = useAuth();
@@ -69,7 +72,7 @@ export default function SubmissionReview() {
   }, [teacher, setLocation]);
 
   const queryKey = ["/api/teacher/submissions", id, "review"];
-  const { data, isLoading } = useQuery<{ success: boolean; review: ReviewData }>({
+  const { data, isLoading, error, refetch } = useQuery<{ success: boolean; review: ReviewData }>({
     queryKey,
     enabled: !!teacher && !!id,
   });
@@ -101,6 +104,33 @@ export default function SubmissionReview() {
     }
   };
 
+  // Say what actually went wrong. Before, every failure looked the same
+  // ("Couldn't load this submission"), which hid the real cause — usually an
+  // expired login being refused, rather than any missing answer data.
+  const renderLoadError = () => {
+    const status = /^(\d{3}):/.exec(String((error as Error)?.message || ""))?.[1];
+    const message =
+      status === "401" ? "Your teacher login has expired. Please sign in again to view this submission."
+      : status === "404" ? "This submission no longer exists. It may have been deleted."
+      : status === "500" ? "The server had a problem loading this submission."
+      : "Couldn't load this submission. Please check your connection and try again.";
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center" data-testid="review-error">
+        <p className="font-medium">{message}</p>
+        <div className="flex gap-2 mt-4">
+          {status === "401" ? (
+            <Button onClick={() => setLocation("/teacher/login")} data-testid="button-review-login">Go to login</Button>
+          ) : (
+            <Button variant="outline" onClick={() => refetch()} data-testid="button-review-retry">Try again</Button>
+          )}
+          <Link href="/teacher/gradebook">
+            <Button variant="ghost" data-testid="button-review-back">Back to Grade Book</Button>
+          </Link>
+        </div>
+      </div>
+    );
+  };
+
   if (!teacher) return null;
 
   const wrongList = (review?.questions || []).filter((q) => q.verdict === "wrong" || q.verdict === "partial");
@@ -126,8 +156,8 @@ export default function SubmissionReview() {
       <main className="container mx-auto px-4 py-6 max-w-3xl">
         {isLoading ? (
           <div className="flex items-center justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
-        ) : !review ? (
-          <p className="text-center text-sm text-muted-foreground py-16">Couldn't load this submission.</p>
+        ) : (error || !review) ? (
+          renderLoadError()
         ) : (
           <>
             {/* Mistakes summary */}
@@ -152,6 +182,15 @@ export default function SubmissionReview() {
                 <div className="rounded-lg bg-muted/50 px-3 py-2 text-sm" data-testid="mistakes-summary">
                   <span className="font-medium">{mistakesLabel}</span>
                 </div>
+                {/* Some older submissions were saved before the app kept each
+                    answer, so there is genuinely nothing to show for them. Say
+                    so plainly instead of leaving the teacher looking at blanks. */}
+                {!review.hasAnswerData && (
+                  <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200" data-testid="notice-no-answer-data">
+                    Answer data not recorded for this submission. It was submitted before the app
+                    started saving each answer, so only the marks below are available.
+                  </div>
+                )}
                 {!isMarked && (
                   <Link href={`/teacher/mark/${review.submissionId}`}>
                     <div className="mt-3 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm text-primary cursor-pointer">
@@ -202,7 +241,9 @@ export default function SubmissionReview() {
                             {q.studentAnswerDisplay}
                           </p>
                         ) : (
-                          <p className="text-sm italic text-muted-foreground">No answer given</p>
+                          <p className="text-sm italic text-muted-foreground">
+                            {review.hasAnswerData ? "No answer given" : "Answer data not recorded"}
+                          </p>
                         )}
                         {q.studentAnswerImages.length > 0 && (
                           <div className="flex flex-wrap gap-2 mt-2">
@@ -259,5 +300,16 @@ export default function SubmissionReview() {
         )}
       </main>
     </div>
+  );
+}
+
+// The safety net. If anything inside the review throws, the teacher sees a
+// message with a way back instead of the whole app going blank — one odd
+// submission can never white-screen them out of the Grade Book.
+export default function SubmissionReview() {
+  return (
+    <ErrorBoundary backHref="/teacher/gradebook" backLabel="Back to Grade Book">
+      <SubmissionReviewContent />
+    </ErrorBoundary>
   );
 }

@@ -39,22 +39,17 @@ export default function GradeBook() {
     if (!teacher) setLocation("/teacher/login");
   }, [teacher, setLocation]);
 
-  const buildQuery = () => {
-    const params = new URLSearchParams();
-    if (filterAssignmentId && filterAssignmentId !== "ALL") params.set("assignmentId", filterAssignmentId);
-    if (filterStatus && filterStatus !== "ALL") params.set("status", filterStatus);
-    if (filterDateFrom) params.set("dateFrom", filterDateFrom);
-    if (filterDateTo) params.set("dateTo", filterDateTo);
-    return params.toString();
-  };
+  // Only send filters that are actually set. Passing them as an object lets the
+  // shared fetcher build the query string — and, importantly, handle an expired
+  // login the same way every other page does.
+  const filters: Record<string, string> = {};
+  if (filterAssignmentId && filterAssignmentId !== "ALL") filters.assignmentId = filterAssignmentId;
+  if (filterStatus && filterStatus !== "ALL") filters.status = filterStatus;
+  if (filterDateFrom) filters.dateFrom = filterDateFrom;
+  if (filterDateTo) filters.dateTo = filterDateTo;
 
   const { data, isLoading } = useQuery<{ success: boolean; rows: GradebookRow[] }>({
-    queryKey: ["/api/gradebook", filterAssignmentId, filterStatus, filterDateFrom, filterDateTo],
-    queryFn: async () => {
-      const qs = buildQuery();
-      const res = await fetch(`/api/gradebook${qs ? "?" + qs : ""}`);
-      return res.json();
-    },
+    queryKey: ["/api/gradebook", filters],
     enabled: !!teacher,
   });
 
@@ -63,10 +58,6 @@ export default function GradeBook() {
   // Unique assignments for filter dropdown (from unfiltered data — always load all for dropdown)
   const { data: allData } = useQuery<{ success: boolean; rows: GradebookRow[] }>({
     queryKey: ["/api/gradebook"],
-    queryFn: async () => {
-      const res = await fetch("/api/gradebook");
-      return res.json();
-    },
     enabled: !!teacher,
   });
 
