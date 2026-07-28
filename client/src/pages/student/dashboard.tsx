@@ -286,6 +286,28 @@ export default function StudentDashboard() {
           </ErrorBoundary>
         )}
 
+        {/* Penalty Shootout — a football quiz for primary classes (Stages 3-6)
+            only. Secondary students (Form 1/2) never see this card, and the
+            page and its endpoints refuse them as well. */}
+        {isPrimaryForm(student.form) && (
+          <ErrorBoundary label="penalty-card">
+          <Link href="/student/penalty">
+            <Card className="hover-elevate cursor-pointer mb-6 border-primary/30 bg-gradient-to-br from-primary/10 to-transparent">
+              <CardContent className="flex items-center gap-4 py-6">
+                <div className="p-3 rounded-md bg-primary/15 text-2xl leading-none">⚽</div>
+                <div className="flex-1">
+                  <h3 className="font-semibold">Penalty Shootout</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Take 5 penalties and save 5 — answer correctly to score!
+                  </p>
+                </div>
+                <ArrowRight className="h-5 w-5 text-primary" />
+              </CardContent>
+            </Card>
+          </Link>
+          </ErrorBoundary>
+        )}
+
         {/* Dream World has been retired — its entry card used to sit here.
             The game's code and every child's saved town are still in the
             database, untouched; there is simply no way in from the app now.
