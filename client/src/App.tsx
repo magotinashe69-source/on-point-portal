@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -28,10 +28,9 @@ import ViewResults from "@/pages/student/view-results";
 import StudentResources from "@/pages/student/resources";
 import StudentLessons from "@/pages/student/lessons";
 import TreasureIsland from "@/pages/student/treasure-island";
-import DreamWorld from "@/pages/student/dream-world";
-import VisitTowns from "@/pages/student/visit";
-import TownViewPage from "@/pages/student/town-view";
-import Certificate from "@/pages/student/certificate";
+// Dream World is retired. Its pages (dream-world, visit, town-view, certificate)
+// are still in the repo but are no longer imported or routed to — see the
+// redirects below.
 
 function Router() {
   return (
@@ -61,10 +60,13 @@ function Router() {
       <Route path="/student/resources" component={StudentResources} />
       <Route path="/student/lessons" component={StudentLessons} />
       <Route path="/student/treasure" component={TreasureIsland} />
-      <Route path="/student/dream-world" component={DreamWorld} />
-      <Route path="/student/visit" component={VisitTowns} />
-      <Route path="/student/town/:id" component={TownViewPage} />
-      <Route path="/student/certificate" component={Certificate} />
+      {/* Dream World is retired. An old bookmark or a typed address lands back
+          on the dashboard instead of opening a game we no longer run. Nothing
+          has been deleted — the towns are all still saved. */}
+      <Route path="/student/dream-world">{() => <Redirect to="/student/dashboard" />}</Route>
+      <Route path="/student/visit">{() => <Redirect to="/student/dashboard" />}</Route>
+      <Route path="/student/town/:id">{() => <Redirect to="/student/dashboard" />}</Route>
+      <Route path="/student/certificate">{() => <Redirect to="/student/dashboard" />}</Route>
       <Route component={NotFound} />
     </Switch>
   );

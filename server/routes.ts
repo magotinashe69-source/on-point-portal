@@ -13,7 +13,10 @@ import { isFullyAutoMarked, markSubmission, markAnswer, buildFeedback, isAutoMar
 import { awardRandomCollectible } from "./rewards";
 import { awardXp, adjustXp, xpProgress, XP_PER_CORRECT, XP_COMPLETION_BONUS, XP_IMPROVEMENT_BONUS } from "./xp";
 import { recordActivity, grantFreezeForLevelUp, refreshStreak, setSimulatedToday, getSimulatedToday, resetStreak, streakToday } from "./streaks";
-import { awardResources, getState as getDreamState, placeBuilding, removeBuilding, upgradeBuilding, expandPlot, setTownName, getNeighbours, getTownView, runTermAwards, computeOverdue } from "./dreamworld";
+// Dream World is retired: awardResources is deliberately no longer imported, so
+// nothing can pay resources out. The rest stays wired up for the existing
+// endpoints, which keep working on the saved data without deleting anything.
+import { getState as getDreamState, placeBuilding, removeBuilding, upgradeBuilding, expandPlot, setTownName, getNeighbours, getTownView, runTermAwards, computeOverdue } from "./dreamworld";
 import { z } from "zod";
 
 // Mark an auto-markable submission in code and save the result as a Mark.
@@ -1049,20 +1052,11 @@ export async function registerRoutes(
         }
       }
 
-      // Dream World payout: primary students earn coins/bricks/wood — plus gems
-      // for a high score — for completing an auto-marked assignment. Same
-      // best-effort path as XP, and only for primary classes (Forms have no
-      // Dream World). Awarded once per assignment (a duplicate submission is
-      // blocked above), so it can't be farmed.
-      let resources;
-      if (mark && isPrimaryForm(student.form)) {
-        try {
-          const percent = assignment.totalMarks > 0 ? (mark.totalScore / assignment.totalMarks) * 100 : 0;
-          resources = await awardResources(studentId, percent);
-        } catch (resourceError) {
-          console.error("Dream World payout failed (submission still saved):", resourceError);
-        }
-      }
+      // Dream World is retired, so completing an assignment no longer pays out
+      // coins/bricks/wood/gems and the response carries no "resources" any
+      // more. The awardResources() helper and every child's saved wallet are
+      // left alone — we simply stop adding to them. XP, streaks and Treasure
+      // Island rewards are unaffected.
 
       // Daily streak: completing a submission counts as activity for today, for
       // every student (primary and Forms). A level-up (reported by the XP award
@@ -1075,7 +1069,7 @@ export async function registerRoutes(
         console.error("Streak update failed (submission still saved):", streakError);
       }
 
-      res.json({ success: true, submission, mark: mark ?? undefined, reward, xp, resources });
+      res.json({ success: true, submission, mark: mark ?? undefined, reward, xp });
     } catch (error) {
       console.error("Create submission error:", error);
       res.status(500).json({ success: false, message: "Server error" });

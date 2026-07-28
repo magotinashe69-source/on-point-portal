@@ -17,6 +17,11 @@
 
 import { storage } from "../server/storage";
 
+// Dream World has been retired — see the note in script/test-dreamworld.ts.
+// Kept for reference; it no longer runs.
+console.log("Dream World is retired — this test is kept for reference and no longer runs.");
+process.exit(0);
+
 const BASE = "http://localhost:5000";
 const TEACHER_EMAIL = "onpointeducationcentremoza@gmail.com";
 const TEACHER_PASSWORD = "onpoint123";
