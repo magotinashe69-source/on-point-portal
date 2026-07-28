@@ -236,6 +236,10 @@ function PenaltyShootoutContent() {
         /* Only transform and opacity are animated — the two things cheap
            phones can move on the GPU without dropping frames. */
         .pk-ball { transition: transform 700ms cubic-bezier(.22,.61,.36,1); will-change: transform; }
+        .pk-shadow { transition: opacity 700ms ease-out; }
+        /* Putting the ball back on the spot for the next shot must not animate,
+           or it slides back out of the net like a kick in reverse. */
+        .pk-instant { transition: none; }
         .pk-keeper { transition: transform 500ms cubic-bezier(.22,.61,.36,1); will-change: transform; }
         .pk-net { transform-origin: center; }
         .pk-net-ripple { animation: pk-ripple 700ms ease-out; }
@@ -259,7 +263,7 @@ function PenaltyShootoutContent() {
         @keyframes pk-pop { 0% { transform: scale(.7); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
 
         @media (prefers-reduced-motion: reduce) {
-          .pk-ball, .pk-keeper { transition-duration: 200ms; }
+          .pk-ball, .pk-keeper, .pk-shadow { transition-duration: 200ms; }
           .pk-net-ripple, .pk-cheer, .pk-crowd span, .pk-pop { animation: none; }
         }
       `}</style>
@@ -524,6 +528,11 @@ function Pitch({
     : conceded ? { x: 74, y: -96 }
     : { x: 0, y: 0 };
 
+  // True while the ball is back on the penalty spot. Between shots we put it
+  // back WITHOUT animating: sliding it back out of the net while the child is
+  // reading the next question looked like a second, backwards kick.
+  const atRest = ballShift.x === 0 && ballShift.y === 0;
+
   // The keeper dives towards the ball when saving, and the wrong way when beaten.
   const keeperShift =
     scored ? (corner === "left" ? 42 : corner === "right" ? -42 : 34)
@@ -581,14 +590,26 @@ function Pitch({
           <rect x="162" y="94" width="6" height="16" rx="3" fill="#2f3640" />
         </g>
 
-        {/* The ball. */}
+        {/* The ball's shadow stays on the grass. It used to sit inside the ball
+            group, so it flew up into the net along with the ball — which is why
+            the kick looked wrong. Now it just fades as the ball leaves. */}
+        <ellipse
+          className={`pk-shadow${atRest ? " pk-instant" : ""}`}
+          cx="160" cy="156" rx="7" ry="2.5" fill="#000000"
+          style={{ opacity: atRest ? 0.25 : 0 }}
+        />
+
+        {/* The ball. It shrinks a little as it travels, which is what makes it
+            read as flying towards the goal rather than sliding along the grass. */}
         <g
-          className="pk-ball"
+          className={`pk-ball${atRest ? " pk-instant" : ""}`}
           style={{
-            transform: `translate(${reduceMotion ? ballShift.x * 0.5 : ballShift.x}px, ${reduceMotion ? ballShift.y * 0.5 : ballShift.y}px)`,
+            transform:
+              `translate(${reduceMotion ? ballShift.x * 0.5 : ballShift.x}px, ${reduceMotion ? ballShift.y * 0.5 : ballShift.y}px)` +
+              ` scale(${atRest ? 1 : 0.72})`,
+            transformOrigin: "160px 150px",
           }}
         >
-          <ellipse cx="160" cy="156" rx="7" ry="2.5" fill="#000000" opacity="0.25" />
           <circle cx="160" cy="150" r="7" fill="#ffffff" stroke="#2f3640" strokeWidth="1" />
           <circle cx="160" cy="150" r="2.4" fill="#2f3640" />
         </g>
