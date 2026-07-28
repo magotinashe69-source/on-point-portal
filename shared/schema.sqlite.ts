@@ -225,6 +225,18 @@ export const dreamWorld = sqliteTable("dream_world", {
   updatedAt: timestamp("updated_at").notNull().$defaultFn(() => new Date()),
 });
 
+// --- Penalty Shootout best scores (gamification, primary only) ---
+// One row per student PER SUBJECT: their best score out of 10 and how many
+// games they have played. Stands on its own, referencing a student id only.
+export const penaltyBest = sqliteTable("penalty_best", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  studentId: integer("student_id").notNull().references(() => students.id),
+  subject: text("subject").notNull(),
+  bestScore: integer("best_score").notNull().default(0),
+  gamesPlayed: integer("games_played").notNull().default(0),
+  updatedAt: timestamp("updated_at").notNull().$defaultFn(() => new Date()),
+});
+
 // Plain SQL that creates every table above if it does not exist yet.
 // We run this once on startup so a fresh SQLite database is ready to use
 // with no manual migration step.
@@ -381,6 +393,15 @@ CREATE TABLE IF NOT EXISTS dream_world (
   award TEXT NOT NULL DEFAULT '',
   award_term TEXT NOT NULL DEFAULT '',
   grid_size INTEGER NOT NULL DEFAULT 8,
+  updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS penalty_best (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  student_id INTEGER NOT NULL,
+  subject TEXT NOT NULL,
+  best_score INTEGER NOT NULL DEFAULT 0,
+  games_played INTEGER NOT NULL DEFAULT 0,
   updated_at INTEGER NOT NULL
 );
 `;

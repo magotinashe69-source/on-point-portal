@@ -368,6 +368,24 @@ export const insertDreamWorldSchema = createInsertSchema(dreamWorld).omit({ id: 
 export type DreamWorld = typeof dreamWorld.$inferSelect;
 export type InsertDreamWorld = z.infer<typeof insertDreamWorldSchema>;
 
+// Penalty Shootout best scores (gamification: a football quiz for primary
+// students). Like the other gamification tables it stands on its own,
+// referencing a student id only. One row PER STUDENT PER SUBJECT holds their
+// personal best out of 10 and how many games they have played, so a child can
+// chase their own record in each subject. Forms never get a row.
+export const penaltyBest = pgTable("penalty_best", {
+  id: serial("id").primaryKey(),
+  studentId: integer("student_id").notNull().references(() => students.id), // who this belongs to
+  subject: text("subject").notNull(),                    // the subject played (as written on the assignment)
+  bestScore: integer("best_score").notNull().default(0), // personal best out of 10
+  gamesPlayed: integer("games_played").notNull().default(0),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertPenaltyBestSchema = createInsertSchema(penaltyBest).omit({ id: true, updatedAt: true });
+export type PenaltyBest = typeof penaltyBest.$inferSelect;
+export type InsertPenaltyBest = z.infer<typeof insertPenaltyBestSchema>;
+
 // Login schemas
 export const teacherLoginSchema = z.object({
   email: z.string().email("Valid email is required"),

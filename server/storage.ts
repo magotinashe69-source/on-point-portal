@@ -3,7 +3,7 @@ import { eq, and, inArray, or, isNull, desc } from "drizzle-orm";
 // the right database (SQLite or PostgreSQL) at runtime.
 import {
   db,
-  teachers, students, assignments, submissions, marks, resources, announcements, lessons, exportLogs, studentRewards, studentXp, studentStreaks, dreamWorld,
+  teachers, students, assignments, submissions, marks, resources, announcements, lessons, exportLogs, studentRewards, studentXp, studentStreaks, dreamWorld, penaltyBest,
 } from "./db";
 // The TypeScript types are the same for both databases, so they come from the shared schema.
 import {
@@ -20,6 +20,7 @@ import {
   type StudentXp, type InsertStudentXp,
   type StudentStreak, type InsertStudentStreak,
   type DreamWorld, type InsertDreamWorld,
+  type PenaltyBest, type InsertPenaltyBest,
   MASTER_PASSWORD
 } from "@shared/schema";
 
@@ -99,6 +100,12 @@ export interface IStorage {
   getDreamWorld(studentId: number): Promise<DreamWorld | undefined>;
   createDreamWorld(row: InsertDreamWorld): Promise<DreamWorld>;
   updateDreamWorld(studentId: number, data: Partial<InsertDreamWorld>): Promise<DreamWorld>;
+
+  // Penalty Shootout personal bests — one row per student per subject.
+  getPenaltyBest(studentId: number, subject: string): Promise<PenaltyBest | undefined>;
+  getPenaltyBests(studentId: number): Promise<PenaltyBest[]>;
+  createPenaltyBest(row: InsertPenaltyBest): Promise<PenaltyBest>;
+  updatePenaltyBest(studentId: number, subject: string, data: Partial<InsertPenaltyBest>): Promise<PenaltyBest>;
 
   // Seed data
   seedInitialData(): Promise<void>;
@@ -513,6 +520,31 @@ export class DatabaseStorage implements IStorage {
     const [updated] = await db.update(dreamWorld)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(dreamWorld.studentId, studentId))
+      .returning();
+    return updated;
+  }
+
+  // Penalty Shootout personal bests. Keyed by student AND subject, so a child
+  // has a separate record to chase in each subject they play.
+  async getPenaltyBest(studentId: number, subject: string): Promise<PenaltyBest | undefined> {
+    const [row] = await db.select().from(penaltyBest)
+      .where(and(eq(penaltyBest.studentId, studentId), eq(penaltyBest.subject, subject)));
+    return row || undefined;
+  }
+
+  async getPenaltyBests(studentId: number): Promise<PenaltyBest[]> {
+    return db.select().from(penaltyBest).where(eq(penaltyBest.studentId, studentId));
+  }
+
+  async createPenaltyBest(row: InsertPenaltyBest): Promise<PenaltyBest> {
+    const [created] = await db.insert(penaltyBest).values(row).returning();
+    return created;
+  }
+
+  async updatePenaltyBest(studentId: number, subject: string, data: Partial<InsertPenaltyBest>): Promise<PenaltyBest> {
+    const [updated] = await db.update(penaltyBest)
+      .set({ ...data, updatedAt: new Date() })
+      .where(and(eq(penaltyBest.studentId, studentId), eq(penaltyBest.subject, subject)))
       .returning();
     return updated;
   }

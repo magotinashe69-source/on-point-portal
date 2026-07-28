@@ -56,6 +56,14 @@ CREATE TABLE IF NOT EXISTS student_streaks (
   pending_notice TEXT NOT NULL DEFAULT '',
   updated_at TIMESTAMP NOT NULL DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS penalty_best (
+  id SERIAL PRIMARY KEY,
+  student_id INTEGER NOT NULL,
+  subject TEXT NOT NULL,
+  best_score INTEGER NOT NULL DEFAULT 0,
+  games_played INTEGER NOT NULL DEFAULT 0,
+  updated_at TIMESTAMP NOT NULL DEFAULT now()
+);
 CREATE TABLE IF NOT EXISTS dream_world (
   id SERIAL PRIMARY KEY,
   student_id INTEGER NOT NULL,
@@ -164,4 +172,5 @@ export const {
   studentXp,
   studentStreaks,
   dreamWorld,
+  penaltyBest,
 } = (usePostgres ? pgSchema : sqliteSchema) as typeof pgSchema;
