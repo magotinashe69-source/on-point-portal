@@ -13,10 +13,9 @@ import { isFullyAutoMarked, markSubmission, markAnswer, buildFeedback, isAutoMar
 import { awardRandomCollectible } from "./rewards";
 import { awardXp, adjustXp, xpProgress, XP_PER_CORRECT, XP_COMPLETION_BONUS, XP_IMPROVEMENT_BONUS } from "./xp";
 import { recordActivity, grantFreezeForLevelUp, refreshStreak, setSimulatedToday, getSimulatedToday, resetStreak, streakToday } from "./streaks";
-// Dream World is retired: awardResources is deliberately no longer imported, so
-// nothing can pay resources out. The rest stays wired up for the existing
-// endpoints, which keep working on the saved data without deleting anything.
-import { getState as getDreamState, placeBuilding, removeBuilding, upgradeBuilding, expandPlot, setTownName, getNeighbours, getTownView, runTermAwards, computeOverdue } from "./dreamworld";
+// Dream World is retired, so this file imports nothing from ./dreamworld. Its
+// endpoints live unwired in ./routes.dreamworld.ts and are answered 410 by the
+// gate further down; assignments no longer pay out resources.
 import { z } from "zod";
 
 // Mark an auto-markable submission in code and save the result as a Mark.
@@ -1228,6 +1227,22 @@ export async function registerRoutes(
     }
   });
 
+  // "This student must be in a primary class (Stages 3-6)" — used by the
+  // rewards endpoint below, and handed to the Dream World routes if that game
+  // is ever brought back (see server/routes.dreamworld.ts).
+  async function requirePrimaryStudent(studentId: number, res: Response): Promise<Student | null> {
+    const student = await storage.getStudent(studentId);
+    if (!student) {
+      res.status(404).json({ success: false, message: "Student not found" });
+      return null;
+    }
+    if (!isPrimaryForm(student.form)) {
+      res.status(403).json({ success: false, message: "This is for primary classes only" });
+      return null;
+    }
+    return student;
+  }
+
   // Student rewards endpoint — the collectibles a student has earned.
   // Primary-only (Stages 3-6), like the rest of the rewards/games features.
   app.get("/api/students/:id/rewards", async (req, res) => {
@@ -1384,8 +1399,9 @@ export async function registerRoutes(
   // again") rather than 404, which would wrongly suggest a broken link.
   //
   // Nothing is deleted: the dream_world table, every child's saved town, and
-  // all the handlers below are left exactly as they were. Removing this one
-  // middleware would bring the whole API back.
+  // the whole route layer are kept. The endpoints themselves now live,
+  // unwired, in server/routes.dreamworld.ts — that file explains how to bring
+  // the game back.
   // -------------------------------------------------------------------------
   const DREAM_WORLD_PATH = /^\/api\/students\/\d+\/dreamworld(\/|$)/;
   const TEACHER_AWARDS_PATH = "/api/teacher/dream-world/awards";
@@ -1399,167 +1415,6 @@ export async function registerRoutes(
       });
     }
     next();
-  });
-
-  // The endpoints below are unreachable while the gate above is in place. They
-  // are kept so the game can be restored without rewriting it.
-  // -------------------------------------------------------------------------
-  // Every endpoint was restricted to primary students (Stages 3-6); secondary
-  // Forms got a 403 and never saw the game. Placement and resource spending
-  // were validated server-side.
-  async function requirePrimaryStudent(studentId: number, res: Response): Promise<Student | null> {
-    const student = await storage.getStudent(studentId);
-    if (!student) {
-      res.status(404).json({ success: false, message: "Student not found" });
-      return null;
-    }
-    if (!isPrimaryForm(student.form)) {
-      res.status(403).json({ success: false, message: "Dream World is for primary classes only" });
-      return null;
-    }
-    return student;
-  }
-
-  // The student's wallet and saved town layout.
-  app.get("/api/students/:id/dreamworld", async (req, res) => {
-    try {
-      const student = await requirePrimaryStudent(parseInt(req.params.id), res);
-      if (!student) return;
-      const state = await getDreamState(student);
-      res.json({ success: true, ...state });
-    } catch (error) {
-      console.error("Get Dream World error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
-    }
-  });
-
-  // Building is paused while the student has overdue homework. Enforced here on
-  // the server (not just in the UI) so it can't be bypassed by calling the API
-  // directly. Returns true and responds 403 when blocked.
-  async function blockedByOverdue(student: Student, res: Response): Promise<boolean> {
-    const overdue = await computeOverdue(student);
-    if (overdue) {
-      res.status(403).json({ success: false, message: "Finish your overdue homework first, then come back to build!" });
-      return true;
-    }
-    return false;
-  }
-
-  // Place a building. The server validates bounds, free tiles, and cost.
-  app.post("/api/students/:id/dreamworld/place", async (req, res) => {
-    try {
-      const student = await requirePrimaryStudent(parseInt(req.params.id), res);
-      if (!student) return;
-      if (await blockedByOverdue(student, res)) return;
-      const { buildingId, x, y } = req.body ?? {};
-      const result = await placeBuilding(student.id, buildingId, x, y);
-      if (!result.ok) return res.status(400).json({ success: false, message: result.message });
-      res.json({ success: true, wallet: result.wallet, layout: result.layout });
-    } catch (error) {
-      console.error("Place building error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
-    }
-  });
-
-  // Remove the building on a tile (refunds half its cost).
-  app.post("/api/students/:id/dreamworld/remove", async (req, res) => {
-    try {
-      const student = await requirePrimaryStudent(parseInt(req.params.id), res);
-      if (!student) return;
-      const { x, y } = req.body ?? {};
-      const result = await removeBuilding(student.id, x, y);
-      if (!result.ok) return res.status(400).json({ success: false, message: result.message });
-      res.json({ success: true, wallet: result.wallet, layout: result.layout });
-    } catch (error) {
-      console.error("Remove building error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
-    }
-  });
-
-  // Upgrade the building on a tile to the next level.
-  app.post("/api/students/:id/dreamworld/upgrade", async (req, res) => {
-    try {
-      const student = await requirePrimaryStudent(parseInt(req.params.id), res);
-      if (!student) return;
-      if (await blockedByOverdue(student, res)) return;
-      const { x, y } = req.body ?? {};
-      const result = await upgradeBuilding(student.id, x, y);
-      if (!result.ok) return res.status(400).json({ success: false, message: result.message });
-      res.json({ success: true, wallet: result.wallet, layout: result.layout });
-    } catch (error) {
-      console.error("Upgrade building error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
-    }
-  });
-
-  // Expand the plot (8x8 -> 10x10), once.
-  app.post("/api/students/:id/dreamworld/expand", async (req, res) => {
-    try {
-      const student = await requirePrimaryStudent(parseInt(req.params.id), res);
-      if (!student) return;
-      if (await blockedByOverdue(student, res)) return;
-      const result = await expandPlot(student.id);
-      if (!result.ok) return res.status(400).json({ success: false, message: result.message });
-      res.json({ success: true, wallet: result.wallet, gridSize: result.gridSize });
-    } catch (error) {
-      console.error("Expand plot error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
-    }
-  });
-
-  // Name (or rename) the town — once a week, server-validated.
-  app.post("/api/students/:id/dreamworld/name", async (req, res) => {
-    try {
-      const student = await requirePrimaryStudent(parseInt(req.params.id), res);
-      if (!student) return;
-      const result = await setTownName(student, req.body?.name ?? "");
-      if (!result.ok) return res.status(400).json({ success: false, message: result.message });
-      res.json({ success: true, townName: result.townName });
-    } catch (error) {
-      console.error("Name town error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
-    }
-  });
-
-  // Classmates (same class only) to visit.
-  app.get("/api/students/:id/dreamworld/neighbours", async (req, res) => {
-    try {
-      const student = await requirePrimaryStudent(parseInt(req.params.id), res);
-      if (!student) return;
-      res.json({ success: true, neighbours: await getNeighbours(student) });
-    } catch (error) {
-      console.error("Neighbours error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
-    }
-  });
-
-  // View a classmate's town (read-only, same class only).
-  app.get("/api/students/:id/dreamworld/town/:otherId", async (req, res) => {
-    try {
-      const student = await requirePrimaryStudent(parseInt(req.params.id), res);
-      if (!student) return;
-      const result = await getTownView(student, parseInt(req.params.otherId));
-      if (!result.ok) return res.status(result.code).json({ success: false, message: result.message });
-      res.json({ success: true, town: result.town });
-    } catch (error) {
-      console.error("View town error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
-    }
-  });
-
-  // Teacher action: run Town Awards for the term (one award per town, per class).
-  app.post("/api/teacher/dream-world/awards", async (req, res) => {
-    try {
-      const validatedEmail = await requireTeacherAuth(req, res);
-      if (!validatedEmail) return;
-      const raw = typeof req.body?.term === "string" ? req.body.term.trim() : "";
-      const term = raw || "This Term";
-      const results = await runTermAwards(term);
-      res.json({ success: true, term, count: results.length, results });
-    } catch (error) {
-      console.error("Run term awards error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
-    }
   });
 
   // Resources (textbooks, YouTube links, lesson plans)
