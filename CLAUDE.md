@@ -112,6 +112,23 @@ shared/
 - The same TypeScript types are used for both databases (from `shared/schema.ts`);
   `shared/schema.sqlite.ts` holds the matching SQLite table definitions.
 
+## Installable app / Android packaging
+
+The app is a **PWA** (installable web app) and is set up to be wrapped as an
+Android app for the Play Store without rewriting anything:
+
+- `client/public/manifest.webmanifest` — app name ("On Point Homework"), colours,
+  icons, portrait orientation.
+- `client/public/icons/` — launcher icons, generated from `logo.png.jpeg` by
+  `script/generate-icons.ts`.
+- `client/public/sw.js` — service worker: opens offline, never caches `/api/` or
+  `/uploads/`. Bump `CACHE_VERSION` inside it when its rules change.
+- `client/src/lib/pwa.ts` — registers the service worker **in production only**.
+- `server/well_known.ts` — serves `/.well-known/assetlinks.json` from the
+  `ANDROID_PACKAGE_NAME` / `ANDROID_CERT_FINGERPRINTS` env vars.
+
+Full walkthrough: **`docs/ANDROID_PACKAGING.md`**.
+
 ## Running the app
 
 - Start dev server: `npm run dev` — runs on **http://localhost:5000**, no setup

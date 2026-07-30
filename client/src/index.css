@@ -175,6 +175,25 @@
   body {
     @apply font-sans antialiased bg-background text-foreground;
   }
+
+  /* --- Installed-app (Android/iOS) behaviour ---------------------------
+     Small touches that make the app feel less like a web page when it is
+     opened from the home screen instead of from a browser.
+
+     Note: we deliberately do NOT draw behind the notch/navigation bar
+     ("edge to edge"). The phone lays the app out inside the safe area for us,
+     which keeps the many `min-h-screen` pages and sticky headers in this app
+     correct without each one needing its own safe-area padding. */
+
+  html {
+    /* Stops the page rubber-banding / pull-to-refresh inside the app. */
+    overscroll-behavior-y: none;
+  }
+
+  body {
+    /* No grey flash box when tapping buttons and links on Android. */
+    -webkit-tap-highlight-color: transparent;
+  }
 }
 
 @layer utilities {

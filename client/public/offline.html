@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#1F3864" />
+    <title>No connection | On Point Homework</title>
+    <!--
+      Shown when the app is opened with no internet. Everything here is
+      self-contained (no web fonts, no separate stylesheet) because nothing
+      external can be downloaded at this point.
+    -->
+    <style>
+      :root {
+        --navy: #1f3864;
+        --red: #c1272d;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1.5rem;
+        padding: 2rem 1.5rem calc(2rem + env(safe-area-inset-bottom));
+        text-align: center;
+        background: #f7f8fa;
+        color: var(--navy);
+        font-family: Calibri, "Segoe UI", system-ui, -apple-system, sans-serif;
+      }
+      img {
+        width: 120px;
+        height: 120px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 1.6rem;
+      }
+      p {
+        margin: 0;
+        max-width: 22rem;
+        font-size: 1.05rem;
+        line-height: 1.55;
+        color: #44506b;
+      }
+      button {
+        margin-top: 0.5rem;
+        padding: 0.9rem 2.2rem;
+        border: 0;
+        border-radius: 999px;
+        background: var(--navy);
+        color: #fff;
+        font: inherit;
+        font-size: 1.05rem;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button:active {
+        background: #16294a;
+      }
+      .tagline {
+        margin-top: 0.5rem;
+        font-size: 0.9rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--red);
+      }
+    </style>
+  </head>
+  <body>
+    <img src="/icons/icon-192.png" alt="On Point Education Centre" />
+    <h1>You&rsquo;re offline</h1>
+    <p>
+      On Point Homework needs an internet connection to load your assignments and
+      marks. Check your Wi-Fi or mobile data, then try again.
+    </p>
+    <button type="button" onclick="location.reload()">Try again</button>
+    <div class="tagline">Quality Beyond Measure</div>
+
+    <script>
+      // As soon as the phone is back online, reload without the student
+      // having to tap anything.
+      window.addEventListener("online", function () {
+        location.reload();
+      });
+    </script>
+  </body>
+</html>

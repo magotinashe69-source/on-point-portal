@@ -5,6 +5,7 @@ import connectPgSimple from "connect-pg-simple";
 import memorystore from "memorystore";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
+import { registerWellKnown } from "./well_known";
 import { createServer } from "http";
 import { pgPool, usePostgres, ensureSchema } from "./db";
 
@@ -103,6 +104,10 @@ app.use((req, res, next) => {
   await ensureSchema();
 
   await registerRoutes(httpServer, app);
+
+  // Android app-verification file. Registered before the client is served so it
+  // is never swallowed by the catch-all that returns the React page.
+  registerWellKnown(app);
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
