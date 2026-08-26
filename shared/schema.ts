@@ -112,6 +112,10 @@ export const assignments = pgTable("assignments", {
     reason?: string;
   }>>().default([]),
   archived: boolean("archived").default(false).notNull(),
+  // Draft & Publish: false means the assignment is still a draft — fully saved,
+  // but hidden from students until the teacher taps Publish. Defaults to true so
+  // assignments created the normal way go live straight away, exactly as before.
+  published: boolean("published").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   createdById: integer("created_by_id").notNull().references(() => teachers.id),
 });

@@ -74,6 +74,10 @@ export const assignments = sqliteTable("assignments", {
     reason?: string;
   }>>().$defaultFn(() => []),
   archived: integer("archived", { mode: "boolean" }).notNull().default(false),
+  // Draft & Publish — mirrors shared/schema.ts. false = still a draft (hidden
+  // from students); true = live. Defaults to true so nothing changes for
+  // assignments created the normal way.
+  published: integer("published", { mode: "boolean" }).notNull().default(true),
   createdAt: timestamp("created_at").notNull().$defaultFn(() => new Date()),
   createdById: integer("created_by_id").notNull().references(() => teachers.id),
 });
@@ -276,6 +280,7 @@ CREATE TABLE IF NOT EXISTS assignments (
   target_student_ids TEXT,
   extended_deadlines TEXT,
   archived INTEGER NOT NULL DEFAULT 0,
+  published INTEGER NOT NULL DEFAULT 1,
   created_at INTEGER NOT NULL,
   created_by_id INTEGER NOT NULL
 );

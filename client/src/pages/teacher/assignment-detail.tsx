@@ -4,6 +4,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { PublishAssignmentButton } from "@/components/PublishAssignmentButton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,7 +14,7 @@ import { useAuth } from "@/lib/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
   ArrowLeft, FileText, Clock, CheckCircle, AlertCircle, Loader2, Calendar,
-  BookOpen, Edit, UserPlus, Archive, ArchiveRestore, XCircle, Bell, Copy, RefreshCw, Paperclip
+  BookOpen, Edit, UserPlus, Archive, ArchiveRestore, XCircle, Bell, Copy, RefreshCw, Paperclip, FileClock
 } from "lucide-react";
 import { AttachmentDisplay } from "@/components/FileAttachmentZone";
 import type { Assignment, Student } from "@shared/schema";
@@ -228,8 +229,20 @@ export default function AssignmentDetail() {
                   <Badge variant="outline">{assignment.subject}</Badge>
                   <Badge variant="secondary">{assignment.form}</Badge>
                   {assignment.topic && <Badge variant="outline">{assignment.topic}</Badge>}
+                  {/* Draft badge — a clear reminder that students can't see this yet. */}
+                  {assignment.published === false && (
+                    <Badge className="bg-amber-500 text-white hover:bg-amber-500" data-testid="badge-draft-detail">
+                      <FileClock className="h-3 w-3 mr-1" />
+                      Draft
+                    </Badge>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
+                  {/* Publish — the one tap that releases a draft to the class. */}
+                  {assignment.published === false && (
+                    <PublishAssignmentButton assignment={assignment} />
+                  )}
+
                   {/* Edit — opens the full editor (all fields + questions). */}
                   <Link href={`/teacher/assignments/${id}/edit`}>
                     <Button variant="outline" size="sm" data-testid="button-edit-assignment">

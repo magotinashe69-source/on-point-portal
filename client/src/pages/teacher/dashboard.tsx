@@ -6,6 +6,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { PublishAssignmentButton } from "@/components/PublishAssignmentButton";
 import { useAuth } from "@/lib/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { 
@@ -25,6 +26,7 @@ import {
   Video,
   Archive,
   ArchiveRestore,
+  FileClock,
   ChevronDown,
   ChevronUp,
   ClipboardList,
@@ -59,8 +61,10 @@ export default function TeacherDashboard() {
     }
   }, [teacher, setLocation]);
 
+  // The teacher's list is the one place that also shows drafts. The server only
+  // honours includeDrafts for a logged-in teacher, so students never get them.
   const { data: assignments, isLoading: assignmentsLoading } = useQuery<Assignment[]>({
-    queryKey: ["/api/assignments"],
+    queryKey: ["/api/assignments", { includeDrafts: true }],
     enabled: !!teacher,
     refetchInterval: 30000,
   });
@@ -251,6 +255,11 @@ export default function TeacherDashboard() {
     activeClassFilter === "all" || a.form === activeClassFilter
   ) || [];
 
+  // Drafts are prepared but not released yet; live ones are visible to students.
+  // Keeping them apart makes it easy to see what is queued and ready to publish.
+  const draftAssignments = filteredAssignments.filter(a => a.published === false);
+  const liveAssignments = filteredAssignments.filter(a => a.published !== false);
+
   const getSubmissionForm = (submission: EnrichedSubmission): string => {
     const assignment = assignments?.find(a => a.id === submission.assignmentId);
     return assignment?.form || "";
@@ -258,6 +267,96 @@ export default function TeacherDashboard() {
 
   const filteredPendingSubmissions = pendingSubmissions.filter(s =>
     activeClassFilter === "all" || getSubmissionForm(s) === activeClassFilter
+  );
+
+  // One row in the teacher's assignment list. A draft is tinted, carries a
+  // "Draft" badge and a Publish button; a live one keeps the archive button.
+  // Both can be opened, edited and deleted in the same way.
+  const renderAssignmentRow = (assignment: Assignment, isDraft: boolean) => (
+    <div
+      key={assignment.id}
+      className={`flex items-center justify-between gap-2 p-3 rounded-md border hover-elevate ${
+        isDraft ? "border-amber-300 bg-amber-50/60 dark:border-amber-800 dark:bg-amber-950/30" : ""
+      }`}
+      data-testid={`row-assignment-${assignment.id}`}
+    >
+      <Link href={`/teacher/assignments/${assignment.id}`} className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer">
+        {isDraft
+          ? <FileClock className="h-5 w-5 text-amber-600 shrink-0" />
+          : <FileText className="h-5 w-5 text-primary shrink-0" />}
+        <div className="min-w-0">
+          <p className="font-medium flex items-center gap-2 flex-wrap">
+            <span className="truncate">{assignment.title}</span>
+            {isDraft && (
+              <Badge
+                className="bg-amber-500 text-white hover:bg-amber-500"
+                data-testid={`badge-draft-${assignment.id}`}
+              >
+                Draft
+              </Badge>
+            )}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {assignment.subject} - {assignment.form}
+          </p>
+        </div>
+      </Link>
+      <div className="flex items-center gap-2 shrink-0">
+        {isDraft ? (
+          <PublishAssignmentButton assignment={assignment} />
+        ) : (
+          <>
+            <Badge variant="secondary" className="hidden sm:flex">
+              <Users className="h-3 w-3 mr-1" />
+              {getAssignmentTargetLabel(assignment)}
+            </Badge>
+            <Badge variant="outline">{assignment.totalMarks} marks</Badge>
+          </>
+        )}
+        <Link href={`/teacher/assignments/${assignment.id}/edit`}>
+          <Button
+            variant="ghost"
+            size="icon"
+            data-testid={`button-edit-assignment-${assignment.id}`}
+            title={isDraft ? "Edit draft" : "Edit assignment"}
+          >
+            <Pencil className="h-4 w-4 text-muted-foreground" />
+          </Button>
+        </Link>
+        {/* Archiving is for assignments students have already seen, so drafts
+            skip it — a draft you no longer want is simply deleted. */}
+        {!isDraft && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={(e) => handleArchiveAssignment(e, assignment.id, true)}
+            disabled={archivingId === assignment.id}
+            data-testid={`button-archive-assignment-${assignment.id}`}
+            title="Archive assignment"
+          >
+            {archivingId === assignment.id ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Archive className="h-4 w-4 text-muted-foreground" />
+            )}
+          </Button>
+        )}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={(e) => handleDeleteAssignment(e, assignment.id)}
+          disabled={deletingId === assignment.id}
+          data-testid={`button-delete-assignment-${assignment.id}`}
+          title={isDraft ? "Delete draft" : "Delete assignment"}
+        >
+          {deletingId === assignment.id ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Trash2 className="h-4 w-4 text-destructive" />
+          )}
+        </Button>
+      </div>
+    </div>
   );
 
   return (
@@ -704,65 +803,37 @@ export default function TeacherDashboard() {
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
               ) : filteredAssignments.length > 0 ? (
-                <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
-                  {filteredAssignments.map((assignment) => (
-                    <div key={assignment.id} className="flex items-center justify-between p-3 rounded-md border hover-elevate">
-                      <Link href={`/teacher/assignments/${assignment.id}`} className="flex items-center gap-3 flex-1 cursor-pointer">
-                        <FileText className="h-5 w-5 text-primary shrink-0" />
-                        <div>
-                          <p className="font-medium">{assignment.title}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {assignment.subject} - {assignment.form}
-                          </p>
-                        </div>
-                      </Link>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="secondary" className="hidden sm:flex">
-                          <Users className="h-3 w-3 mr-1" />
-                          {getAssignmentTargetLabel(assignment)}
-                        </Badge>
-                        <Badge variant="outline">{assignment.totalMarks} marks</Badge>
-                        <Link href={`/teacher/assignments/${assignment.id}/edit`}>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            data-testid={`button-edit-assignment-${assignment.id}`}
-                            title="Edit assignment"
-                          >
-                            <Pencil className="h-4 w-4 text-muted-foreground" />
-                          </Button>
-                        </Link>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) => handleArchiveAssignment(e, assignment.id, true)}
-                          disabled={archivingId === assignment.id}
-                          data-testid={`button-archive-assignment-${assignment.id}`}
-                          title="Archive assignment"
-                        >
-                          {archivingId === assignment.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Archive className="h-4 w-4 text-muted-foreground" />
-                          )}
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          onClick={(e) => handleDeleteAssignment(e, assignment.id)}
-                          disabled={deletingId === assignment.id}
-                          data-testid={`button-delete-assignment-${assignment.id}`}
-                          title="Delete assignment"
-                        >
-                          {deletingId === assignment.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          )}
-                        </Button>
+                <div className="space-y-5 max-h-[600px] overflow-y-auto pr-1">
+                  {/* Drafts first — these are the ones waiting for a tap. */}
+                  {draftAssignments.length > 0 && (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <FileClock className="h-4 w-4 text-amber-600" />
+                        <h3 className="text-sm font-semibold" data-testid="heading-drafts">
+                          Drafts ({draftAssignments.length})
+                        </h3>
+                        <span className="text-xs text-muted-foreground">
+                          Ready to publish — students can't see these yet
+                        </span>
                       </div>
+                      {draftAssignments.map((assignment) => renderAssignmentRow(assignment, true))}
                     </div>
-                  ))}
+                  )}
+
+                  {/* Live — already released to students. */}
+                  {liveAssignments.length > 0 && (
+                    <div className="space-y-3">
+                      {draftAssignments.length > 0 && (
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4 text-primary" />
+                          <h3 className="text-sm font-semibold" data-testid="heading-live">
+                            Live ({liveAssignments.length})
+                          </h3>
+                        </div>
+                      )}
+                      {liveAssignments.map((assignment) => renderAssignmentRow(assignment, false))}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="text-center py-8">

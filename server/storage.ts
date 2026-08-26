@@ -44,7 +44,7 @@ export interface IStorage {
   
   // Assignments
   getAssignment(id: number): Promise<Assignment | undefined>;
-  getAssignments(form?: string, studentId?: number, archived?: boolean): Promise<Assignment[]>;
+  getAssignments(form?: string, studentId?: number, archived?: boolean, includeDrafts?: boolean): Promise<Assignment[]>;
   createAssignment(assignment: InsertAssignment): Promise<Assignment>;
   updateAssignment(id: number, data: Partial<InsertAssignment>): Promise<Assignment>;
   extendDeadline(assignmentId: number, studentId: number, newDueDate: string, reason?: string): Promise<void>;
@@ -191,12 +191,21 @@ export class DatabaseStorage implements IStorage {
     return assignment || undefined;
   }
 
-  async getAssignments(form?: string, studentId?: number, archived?: boolean): Promise<Assignment[]> {
+  // Fetch assignments. `includeDrafts` defaults to false, so unpublished drafts
+  // are hidden from every caller unless it explicitly asks for them — that is
+  // what keeps drafts out of the student dashboard, the games, the gradebook
+  // and the reports without each of them needing its own check.
+  async getAssignments(form?: string, studentId?: number, archived?: boolean, includeDrafts = false): Promise<Assignment[]> {
     const isArchived = archived === true;
-    
+
+    // A draft is anything explicitly marked published = false. Anything else
+    // (including older rows saved before this column existed) counts as live.
+    const isDraft = (a: Assignment) => a.published === false;
+
     if (form) {
       const conditions = [eq(assignments.form, form), eq(assignments.archived, isArchived)];
-      const results = await db.select().from(assignments).where(and(...conditions));
+      let results = await db.select().from(assignments).where(and(...conditions));
+      if (!includeDrafts) results = results.filter(a => !isDraft(a));
       if (studentId) {
         return results.filter(a => {
           const targets = a.targetStudentIds || [];
@@ -205,8 +214,9 @@ export class DatabaseStorage implements IStorage {
       }
       return results;
     }
-    
-    return db.select().from(assignments).where(eq(assignments.archived, isArchived));
+
+    const all = await db.select().from(assignments).where(eq(assignments.archived, isArchived));
+    return includeDrafts ? all : all.filter(a => !isDraft(a));
   }
 
   async createAssignment(assignment: InsertAssignment): Promise<Assignment> {

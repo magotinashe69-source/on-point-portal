@@ -15,7 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { ArrowLeft, PlusCircle, Trash2, Loader2, Save, X, Image, Users, Circle, CheckCircle2, ChevronUp, ChevronDown, RefreshCw } from "lucide-react";
+import { ArrowLeft, PlusCircle, Trash2, Loader2, Save, X, Image, Users, Circle, CheckCircle2, ChevronUp, ChevronDown, RefreshCw, FileClock } from "lucide-react";
 import logoPath from "@assets/logo.webp";
 import { SimpleUploader } from "@/components/SimpleUploader";
 import { FileAttachmentZone } from "@/components/FileAttachmentZone";
@@ -132,6 +132,9 @@ export default function CreateAssignment() {
     queryKey: ["/api/assignments", editId],
     enabled: isEdit,
   });
+  // True when the assignment being edited hasn't been published yet.
+  const isEditingDraft = editAssignment?.published === false;
+
   const { data: editSubmissions = [] } = useQuery<Submission[]>({
     queryKey: ["/api/submissions", { assignmentId: editId }],
     enabled: isEdit,
@@ -305,7 +308,10 @@ export default function CreateAssignment() {
   // Validate + save the assignment (create or edit). Returns true on success.
   // `navigate` controls whether we leave the page afterwards — the re-mark flow
   // saves without navigating so it can then re-mark on the same screen.
-  async function doSave(values: CreateAssignmentForm, navigate: boolean): Promise<boolean> {
+  // `asDraft` is only used when creating: true saves it hidden from students
+  // until the teacher taps Publish. Editing never changes the draft state — a
+  // draft stays a draft until it is published on purpose.
+  async function doSave(values: CreateAssignmentForm, navigate: boolean, asDraft = false): Promise<boolean> {
     if (!teacher) return false;
 
     // Validate student selection
@@ -373,7 +379,7 @@ export default function CreateAssignment() {
       };
       const response = isEdit
         ? await apiRequest("PUT", `/api/assignments/${editId}`, payload)
-        : await apiRequest("POST", "/api/assignments", { ...payload, createdById: teacher.id });
+        : await apiRequest("POST", "/api/assignments", { ...payload, createdById: teacher.id, published: !asDraft });
 
       const data = await response.json();
 
@@ -386,8 +392,12 @@ export default function CreateAssignment() {
         }
         if (navigate) {
           toast({
-            title: isEdit ? "Assignment updated!" : "Assignment created!",
-            description: isEdit ? "Your changes have been saved." : "Your assignment has been created successfully.",
+            title: isEdit ? "Assignment updated!" : asDraft ? "Draft saved!" : "Assignment created!",
+            description: isEdit
+              ? "Your changes have been saved."
+              : asDraft
+                ? "It is hidden from students until you tap Publish."
+                : "Your assignment has been created successfully.",
           });
           setLocation(isEdit ? `/teacher/assignments/${editId}` : "/teacher/dashboard");
         }
@@ -414,6 +424,13 @@ export default function CreateAssignment() {
   function onSubmit(values: CreateAssignmentForm) {
     void doSave(values, true);
   }
+
+  // "Save as Draft" — same assignment, same checks, just not released yet.
+  // Runs the form's own validation first so the teacher gets the usual
+  // messages about missing fields.
+  const handleSaveAsDraft = () => {
+    void formMethods.handleSubmit((values) => doSave(values, true, true))();
+  };
 
   // The ids of questions that existed when this assignment was loaded — i.e.
   // questions that may already have student answers.
@@ -1023,19 +1040,50 @@ export default function CreateAssignment() {
                   />
                 </div>
 
-                <Button 
-                  type="submit" 
-                  className="w-full" 
-                  disabled={isLoading}
-                  data-testid="button-create"
-                >
-                  {isLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : (
-                    <Save className="h-4 w-4 mr-2" />
+                {/* Editing a draft: remind the teacher it is still hidden, and
+                    that saving here does not release it. */}
+                {isEditingDraft && (
+                  <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-700 dark:bg-amber-950">
+                    <FileClock className="h-4 w-4 mt-0.5 shrink-0 text-amber-600" />
+                    <p className="text-amber-900 dark:text-amber-100">
+                      This is a draft — students can't see it yet. Saving keeps it a draft;
+                      use the Publish button when you're ready to release it.
+                    </p>
+                  </div>
+                )}
+
+                {/* Save. When creating, "Save as Draft" sits beside the normal
+                    create button so the assignment can be prepared ahead of time
+                    and released later with one tap. */}
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={isLoading}
+                    data-testid="button-create"
+                  >
+                    {isLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <Save className="h-4 w-4 mr-2" />
+                    )}
+                    {isEdit ? (isEditingDraft ? "Save Draft" : "Save Changes") : "Create Assignment"}
+                  </Button>
+
+                  {!isEdit && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      disabled={isLoading}
+                      onClick={handleSaveAsDraft}
+                      data-testid="button-save-draft"
+                    >
+                      <FileClock className="h-4 w-4 mr-2" />
+                      Save as Draft
+                    </Button>
                   )}
-                  {isEdit ? "Save Changes" : "Create Assignment"}
-                </Button>
+                </div>
               </form>
             </Form>
           </CardContent>

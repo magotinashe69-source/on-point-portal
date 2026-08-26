@@ -445,13 +445,30 @@ export async function registerRoutes(
   });
 
   // Assignments
+
+  // Is a teacher logged in on this request? Unlike requireTeacherAuth below,
+  // this only answers the question — it never sends back an error. Used where a
+  // page is open to students but teachers are allowed to see extra things
+  // (drafts), so a student simply gets the normal, draft-free result.
+  async function isTeacherLoggedIn(req: Request): Promise<boolean> {
+    const teacherId = req.session?.teacherId;
+    if (!teacherId) return false;
+    return Boolean(await storage.getTeacher(teacherId));
+  }
+
+  // A draft is only visible to a logged-in teacher.
+  const isDraft = (assignment: { published?: boolean | null }) => assignment.published === false;
+
   app.get("/api/assignments", async (req, res) => {
     try {
       const form = req.query.form as string | undefined;
       const studentId = req.query.studentId ? parseInt(req.query.studentId as string) : undefined;
       const archived = req.query.archived === "true";
       const validForm = form && form !== 'undefined' ? form : undefined;
-      const assignments = await storage.getAssignments(validForm, studentId, archived);
+      // Drafts are only ever added for a logged-in teacher, so a student adding
+      // ?includeDrafts=true by hand still gets the published list only.
+      const includeDrafts = req.query.includeDrafts === "true" && await isTeacherLoggedIn(req);
+      const assignments = await storage.getAssignments(validForm, studentId, archived, includeDrafts);
       res.json(assignments);
     } catch (error) {
       res.status(500).json({ success: false, message: "Server error" });
@@ -462,6 +479,11 @@ export async function registerRoutes(
     try {
       const assignment = await storage.getAssignment(parseInt(req.params.id));
       if (!assignment) {
+        return res.status(404).json({ success: false, message: "Assignment not found" });
+      }
+      // A draft doesn't exist as far as students are concerned — otherwise
+      // someone could reach an unreleased assignment by guessing its address.
+      if (isDraft(assignment) && !(await isTeacherLoggedIn(req))) {
         return res.status(404).json({ success: false, message: "Assignment not found" });
       }
       res.json(assignment);
@@ -505,6 +527,10 @@ export async function registerRoutes(
     totalMarks: z.number().min(1),
     targetStudentIds: z.array(z.number()).optional(),
     createdById: z.number(),
+    // Draft & Publish: leave this out (or send true) for the normal "create and
+    // go live" flow. "Save as Draft" sends false, which keeps it hidden from
+    // students until the teacher taps Publish.
+    published: z.boolean().optional(),
   });
 
   app.post("/api/assignments", async (req, res) => {
@@ -523,6 +549,8 @@ export async function registerRoutes(
         ...validation.data,
         attachments: validation.data.attachments || [],
         targetStudentIds: validation.data.targetStudentIds || [],
+        // Default to live, so creating an assignment the normal way is unchanged.
+        published: validation.data.published !== false,
       });
       res.json({ success: true, assignment });
     } catch (error) {
@@ -887,6 +915,29 @@ export async function registerRoutes(
     }
   });
 
+  // Publish a draft — the one-tap action. From this moment the assignment is a
+  // completely ordinary assignment: the assigned students see it, can submit,
+  // and auto-marking works exactly as it does for one created the normal way.
+  // Teacher-only, and publishing something already live is harmless (no-op).
+  app.post("/api/assignments/:id/publish", async (req, res) => {
+    try {
+      const validatedEmail = await requireTeacherAuth(req, res);
+      if (!validatedEmail) return;
+
+      const id = parseInt(req.params.id);
+      const assignment = await storage.getAssignment(id);
+      if (!assignment) {
+        return res.status(404).json({ success: false, message: "Assignment not found" });
+      }
+
+      const updated = await storage.updateAssignment(id, { published: true } as any);
+      res.json({ success: true, assignment: updated });
+    } catch (error) {
+      console.error("Publish assignment error:", error);
+      res.status(500).json({ success: false, message: "Server error" });
+    }
+  });
+
   app.patch("/api/assignments/:id/archive", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -997,7 +1048,12 @@ export async function registerRoutes(
       if (!assignment) {
         return res.json({ success: false, message: "Assignment not found" });
       }
-      
+
+      // Belt and braces: a draft isn't released yet, so it can't be answered.
+      if (isDraft(assignment)) {
+        return res.json({ success: false, message: "Assignment not found" });
+      }
+
       if (assignment.form !== student.form) {
         return res.status(403).json({ success: false, message: "Unauthorized: Assignment is not for your form" });
       }

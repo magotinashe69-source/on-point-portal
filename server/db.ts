@@ -103,6 +103,13 @@ const PENALTY_BEST_ADDED_COLUMNS: { name: string; type: string }[] = [
   { name: "best_out_of", type: "INTEGER NOT NULL DEFAULT 0" },
 ];
 
+// Columns added to assignments after it first shipped, handled the same way.
+const ASSIGNMENTS_ADDED_COLUMNS: { name: string; type: string }[] = [
+  // Draft & Publish. Existing assignments default to "published" (1 / true), so
+  // everything already in the database stays visible to students as before.
+  { name: "published", type: "BOOLEAN NOT NULL DEFAULT true" },
+];
+
 // Filled in below depending on which database we use.
 let activeDb: unknown;
 let pgPoolInstance: pg.Pool | undefined;
@@ -129,6 +136,9 @@ if (usePostgres) {
     for (const col of PENALTY_BEST_ADDED_COLUMNS) {
       await pgPoolInstance!.query(`ALTER TABLE penalty_best ADD COLUMN IF NOT EXISTS ${col.name} ${col.type}`);
     }
+    for (const col of ASSIGNMENTS_ADDED_COLUMNS) {
+      await pgPoolInstance!.query(`ALTER TABLE assignments ADD COLUMN IF NOT EXISTS ${col.name} ${col.type}`);
+    }
   };
 
   console.log("[db] Using PostgreSQL (DATABASE_URL is set)");
@@ -152,6 +162,12 @@ if (usePostgres) {
     }
     for (const col of PENALTY_BEST_ADDED_COLUMNS) {
       try { await client.execute(`ALTER TABLE penalty_best ADD COLUMN ${col.name} ${col.type}`); }
+      catch { /* column already present */ }
+    }
+    for (const col of ASSIGNMENTS_ADDED_COLUMNS) {
+      // SQLite stores booleans as 0/1, so swap the PostgreSQL wording here.
+      const type = col.type.replace("BOOLEAN", "INTEGER").replace("true", "1").replace("false", "0");
+      try { await client.execute(`ALTER TABLE assignments ADD COLUMN ${col.name} ${type}`); }
       catch { /* column already present */ }
     }
   };
