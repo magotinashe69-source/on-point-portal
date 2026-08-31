@@ -157,7 +157,7 @@ export default function CreateAssignment() {
     setAssignToAll(true);
   }, [selectedForm]);
 
-  const { fields, append, remove, update, move } = useFieldArray({
+  const { fields, append, remove, move } = useFieldArray({
     control: formMethods.control,
     name: "questions",
   });
@@ -228,32 +228,33 @@ export default function CreateAssignment() {
     );
   };
 
+  // Merge some changes into one question.
+  //
+  // Each field is written on its own path with setValue. The obvious way to do
+  // this — useFieldArray's update() — hands the question a brand new field id,
+  // and because the list of questions is keyed by that id, React throws the
+  // whole question card away and builds a fresh one. That is what used to make
+  // a text box lose focus after every single character: you were not typing
+  // into the same box any more. setValue changes the value and leaves the id
+  // alone, so the box you are typing in stays put.
+  const patchQuestion = (index: number, patch: Record<string, unknown>) => {
+    for (const [key, value] of Object.entries(patch)) {
+      formMethods.setValue(`questions.${index}.${key}` as any, value as any, { shouldDirty: true });
+    }
+  };
+
   const handleQuestionImageUpload = (questionIndex: number, url: string) => {
-    const currentQuestion = formMethods.getValues(`questions.${questionIndex}`);
-    const currentImages = currentQuestion.imageUrls || [];
-    update(questionIndex, {
-      ...currentQuestion,
-      imageUrls: [...currentImages, url],
-    });
+    const currentImages = formMethods.getValues(`questions.${questionIndex}.imageUrls`) || [];
+    patchQuestion(questionIndex, { imageUrls: [...currentImages, url] });
   };
 
   const removeQuestionImage = (questionIndex: number, imageIndex: number) => {
-    const currentQuestion = formMethods.getValues(`questions.${questionIndex}`);
-    const newImages = [...(currentQuestion.imageUrls || [])];
+    const newImages = [...(formMethods.getValues(`questions.${questionIndex}.imageUrls`) || [])];
     newImages.splice(imageIndex, 1);
-    update(questionIndex, {
-      ...currentQuestion,
-      imageUrls: newImages,
-    });
+    patchQuestion(questionIndex, { imageUrls: newImages });
   };
 
   // --- Auto-marking answer-key helpers ---
-  // Small helper: merge some changes into one question and refresh the field.
-  const patchQuestion = (index: number, patch: Record<string, unknown>) => {
-    const current = formMethods.getValues(`questions.${index}`);
-    update(index, { ...current, ...patch });
-  };
-
   // Change a question's type, filling in sensible defaults for the new type.
   const changeQuestionType = (index: number, type: string) => {
     const q = formMethods.getValues(`questions.${index}`);
