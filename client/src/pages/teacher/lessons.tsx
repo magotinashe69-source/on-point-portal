@@ -8,6 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { BulkPasteDialog } from "@/components/BulkPasteDialog";
+import { splitPastedLines, separateDuplicates, type SkippedLine } from "@/lib/bulk-paste";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -31,9 +34,98 @@ import {
   Clock,
   BookOpen,
   Circle,
+  ClipboardPaste,
 } from "lucide-react";
 import type { Lesson } from "@shared/schema";
 import logoPath from "@assets/logo.webp";
+
+// Option lists shared by the single-lesson form and the bulk paste dialog.
+const LESSON_SUBJECTS: { value: string; label: string }[] = [
+  { value: "MATHS", label: "Maths" }, { value: "ENGLISH", label: "English" },
+  { value: "SCIENCE", label: "Science" }, { value: "PHYSICS", label: "Physics" },
+  { value: "CHEMISTRY", label: "Chemistry" }, { value: "BIOLOGY", label: "Biology" },
+  { value: "ECONOMICS", label: "Economics" }, { value: "BUSINESS_STUDIES", label: "Business Studies" },
+  { value: "GEOGRAPHY", label: "Geography" }, { value: "COMPUTER_SCIENCE", label: "Computer Science" },
+  { value: "HISTORY", label: "History" }, { value: "ACCOUNTING", label: "Accounting" },
+];
+const LESSON_FORMS = ["Stage 3", "Stage 4", "Stage 5", "Stage 6", "Form 1", "Form 2"] as const;
+
+// --- Bulk paste ---------------------------------------------------------
+// A teacher who already has their recordings hosted somewhere can add them all
+// at once instead of one dialog per lesson. Each line is one lesson:
+//
+//   Fractions part 1 | https://example.com/fractions-1.mp4
+//   Reading aloud | https://example.com/reading.mp3 | Chapter 3
+//
+// The subject and class are chosen once for the batch, and anything after a
+// second separator becomes the description. The line splitting is shared with
+// the other paste dialogs (see lib/bulk-paste).
+//
+// Important: the player here is a plain <video>/<audio> tag, so the link has to
+// point at the media file itself. A YouTube or Vimeo page needs their embedded
+// player, which this page does not use — pasting one would make a lesson that
+// looks fine in the list but plays nothing, so those are refused with a reason
+// rather than quietly accepted.
+const PAGE_ONLY_HOSTS = ["youtube.com", "youtu.be", "vimeo.com", "dailymotion.com"];
+const VIDEO_EXTENSIONS = ["mp4", "webm", "ogv", "mov", "m4v"];
+const AUDIO_EXTENSIONS = ["mp3", "m4a", "wav", "ogg", "oga", "aac", "flac"];
+
+// Work out whether a link is video or audio from its file ending. Anything we
+// do not recognise falls back to whatever the teacher picked for the batch.
+function mediaTypeFromUrl(url: string): "VIDEO" | "AUDIO" | null {
+  const withoutQuery = url.split("?")[0].split("#")[0];
+  const ext = withoutQuery.split(".").pop()?.toLowerCase() ?? "";
+  if (VIDEO_EXTENSIONS.includes(ext)) return "VIDEO";
+  if (AUDIO_EXTENSIONS.includes(ext)) return "AUDIO";
+  return null;
+}
+
+export interface ParsedLessonLine {
+  lineNumber: number;
+  title: string;
+  fileUrl: string;
+  description: string;
+  type: "VIDEO" | "AUDIO" | null; // null = use the batch default
+}
+
+export interface ParsedLessons {
+  rows: ParsedLessonLine[];
+  skipped: SkippedLine[];
+}
+
+export function parsePastedLessons(raw: string): ParsedLessons {
+  const rows: ParsedLessonLine[] = [];
+  const skipped: SkippedLine[] = [];
+
+  for (const line of splitPastedLines(raw)) {
+    const title = line.parts[0] ?? "";
+    const fileUrl = line.parts[1] ?? "";
+    const description = line.parts.slice(2).join(" | ").trim();
+
+    if (title === "") {
+      skipped.push({ lineNumber: line.lineNumber, text: line.text, reason: "No title" });
+      continue;
+    }
+    if (fileUrl === "") {
+      skipped.push({ lineNumber: line.lineNumber, text: line.text, reason: 'No link — put it after a "|"' });
+      continue;
+    }
+
+    const host = fileUrl.toLowerCase();
+    if (PAGE_ONLY_HOSTS.some(h => host.includes(h))) {
+      skipped.push({
+        lineNumber: line.lineNumber,
+        text: line.text,
+        reason: "This player cannot play YouTube or Vimeo links — upload the file, or use a direct link to the .mp4 or .mp3",
+      });
+      continue;
+    }
+
+    rows.push({ lineNumber: line.lineNumber, title, fileUrl, description, type: mediaTypeFromUrl(fileUrl) });
+  }
+
+  return { rows, skipped };
+}
 
 const createLessonSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -190,6 +282,15 @@ export default function TeacherLessons() {
   const { teacher } = useAuth();
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  // Bulk paste: the dialog, the pasted list, and the settings applied to the
+  // whole batch. `pasteBusy` blocks a second click while lessons are going in.
+  const [isPasteOpen, setIsPasteOpen] = useState(false);
+  const [pasteText, setPasteText] = useState("");
+  const [pasteType, setPasteType] = useState<"VIDEO" | "AUDIO">("VIDEO");
+  const [pasteSubject, setPasteSubject] = useState<string>("MATHS");
+  const [pasteForm, setPasteForm] = useState<string>("Form 1");
+  const [pasteBusy, setPasteBusy] = useState(false);
   const [uploadMode, setUploadMode] = useState<"upload" | "record">("upload");
   const [filterForm, setFilterForm] = useState<string>("all");
   const [filterSubject, setFilterSubject] = useState<string>("all");
@@ -243,6 +344,65 @@ export default function TeacherLessons() {
       }
     },
   });
+
+
+  // Work out what a paste would actually do, so the preview and the button
+  // agree with what happens. A lesson whose file is already on the shelf is
+  // skipped, and so is the same file twice in the pasted list itself.
+  const pasteParsed = parsePastedLessons(pasteText);
+  const pasteReview = separateDuplicates(pasteParsed.rows, {
+    keyOf: r => r.fileUrl,
+    labelOf: r => r.title,
+    lineNumberOf: r => r.lineNumber,
+    existingKeys: new Set(
+      (lessons || []).map(l => (l.fileUrl || "").trim().toLowerCase()).filter(u => u !== "")
+    ),
+    existingReason: "This file is already a lesson",
+  });
+
+  // Add everything in the preview. Lessons go in one at a time so that one bad
+  // row cannot lose the rest; the toast says exactly what happened.
+  const addPastedLessons = async () => {
+    const rows = pasteReview.toAdd;
+    if (rows.length === 0 || pasteBusy) return;
+    setPasteBusy(true);
+
+    let added = 0;
+    const failed: string[] = [];
+    for (const row of rows) {
+      try {
+        const response = await apiRequest("POST", "/api/lessons", {
+          title: row.title,
+          description: row.description || undefined,
+          subject: pasteSubject,
+          form: pasteForm,
+          type: row.type ?? pasteType,
+          fileUrl: row.fileUrl,
+          createdById: teacher?.id,
+        });
+        const data = await response.json();
+        if (data.success) added++;
+        else failed.push(row.title);
+      } catch {
+        failed.push(row.title);
+      }
+    }
+
+    queryClient.invalidateQueries({ queryKey: ["/api/lessons"] });
+    setPasteBusy(false);
+    setIsPasteOpen(false);
+    setPasteText("");
+
+    const skippedCount = pasteReview.duplicates.length;
+    toast({
+      title: `Added ${added} lesson${added === 1 ? "" : "s"}`,
+      description: [
+        skippedCount > 0 ? `${skippedCount} already added or repeated — skipped.` : "",
+        failed.length > 0 ? `Could not add: ${failed.join(", ")}.` : "",
+      ].filter(Boolean).join(" ") || "Everything on the list was added.",
+      variant: failed.length > 0 ? "destructive" : undefined,
+    });
+  };
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
@@ -329,6 +489,83 @@ export default function TeacherLessons() {
             <h1 className="text-3xl font-bold">Video & Audio Lessons</h1>
             <p className="text-muted-foreground">Upload or record lessons for your students</p>
           </div>
+          <div className="flex items-center gap-2">
+          {/* Bulk paste — add a whole list of already-hosted recordings. */}
+          <Button variant="outline" onClick={() => setIsPasteOpen(true)} data-testid="button-paste-lessons">
+            <ClipboardPaste className="h-4 w-4 mr-2" />
+            Paste lessons
+          </Button>
+          <BulkPasteDialog
+            open={isPasteOpen}
+            onOpenChange={setIsPasteOpen}
+            title="Paste lessons"
+            description="One lesson per line, with a direct link to the video or audio file after a bar. They all share the subject and class you pick here."
+            noun={{ one: "lesson", many: "lessons" }}
+            countSuffix={`to ${pasteForm}`}
+            settings={
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Subject</Label>
+                  <Select value={pasteSubject} onValueChange={setPasteSubject}>
+                    <SelectTrigger data-testid="select-paste-subject"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {LESSON_SUBJECTS.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Class</Label>
+                  <Select value={pasteForm} onValueChange={setPasteForm}>
+                    <SelectTrigger data-testid="select-paste-class"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {LESSON_FORMS.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Type if unclear</Label>
+                  <Select value={pasteType} onValueChange={(v) => setPasteType(v as "VIDEO" | "AUDIO")}>
+                    <SelectTrigger data-testid="select-paste-type"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="VIDEO">Video Lesson</SelectItem>
+                      <SelectItem value="AUDIO">Audio Lesson</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            }
+            value={pasteText}
+            onValueChange={setPasteText}
+            placeholder={"Fractions part 1 | https://example.com/fractions-1.mp4\nReading aloud | https://example.com/reading.mp3 | Chapter 3"}
+            hint="The link must point at the file itself (.mp4, .mp3 and so on) — YouTube and Vimeo pages will not play here. Video or audio is read from the file ending where possible."
+            toAdd={pasteReview.toAdd}
+            keyOfRow={(r) => r.lineNumber}
+            renderRow={(r) => (
+              <>
+                {r.title}
+                <span className="ml-2 text-xs text-muted-foreground">
+                  {(r.type ?? pasteType) === "VIDEO" ? "Video" : "Audio"}
+                </span>
+                <div className="text-xs text-muted-foreground truncate">
+                  {r.fileUrl}{r.description ? " — " + r.description : ""}
+                </div>
+              </>
+            )}
+            emptyMessage="Nothing new to add — every file here is already a lesson."
+            duplicates={pasteReview.duplicates}
+            skipped={pasteParsed.skipped}
+            busy={pasteBusy}
+            onConfirm={addPastedLessons}
+            testIds={{
+              textarea: "textarea-paste-lessons",
+              preview: "paste-lessons-preview",
+              rowPrefix: "paste-lesson-row-",
+              duplicates: "paste-lessons-duplicates",
+              skipped: "paste-lessons-skipped",
+              confirm: "button-paste-lessons-confirm",
+              cancel: "button-paste-lessons-cancel",
+            }}
+          />
           <Dialog open={isDialogOpen} onOpenChange={(open) => {
             setIsDialogOpen(open);
             if (!open) {
@@ -535,6 +772,7 @@ export default function TeacherLessons() {
               </Form>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
 
         <Card className="mb-6">
