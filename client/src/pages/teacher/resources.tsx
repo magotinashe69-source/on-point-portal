@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -29,10 +30,76 @@ import {
   ExternalLink,
   Loader2,
   Download,
-  Lock
+  Lock,
+  ClipboardPaste
 } from "lucide-react";
 import type { Resource } from "@shared/schema";
 import logoPath from "@assets/logo.webp";
+
+// Option lists shared by the single-resource form and the bulk paste dialog.
+const RESOURCE_SUBJECTS: { value: string; label: string }[] = [
+  { value: "MATHS", label: "Maths" }, { value: "ENGLISH", label: "English" },
+  { value: "SCIENCE", label: "Science" }, { value: "PHYSICS", label: "Physics" },
+  { value: "CHEMISTRY", label: "Chemistry" }, { value: "BIOLOGY", label: "Biology" },
+  { value: "ECONOMICS", label: "Economics" }, { value: "BUSINESS_STUDIES", label: "Business Studies" },
+  { value: "GEOGRAPHY", label: "Geography" }, { value: "COMPUTER_SCIENCE", label: "Computer Science" },
+  { value: "HISTORY", label: "History" }, { value: "ACCOUNTING", label: "Accounting" },
+];
+const RESOURCE_FORMS = ["Stage 3", "Stage 4", "Stage 5", "Stage 6", "Form 1", "Form 2"] as const;
+const RESOURCE_TYPES: { value: "TEXTBOOK" | "YOUTUBE" | "LESSON_PLAN" | "OTHER"; label: string }[] = [
+  { value: "TEXTBOOK", label: "Textbook" }, { value: "YOUTUBE", label: "YouTube Video" },
+  { value: "LESSON_PLAN", label: "Lesson Plan" }, { value: "OTHER", label: "Other" },
+];
+
+// --- Bulk paste ---------------------------------------------------------
+// Adding a term's worth of links one dialog at a time is slow. This reads a
+// pasted list instead — one resource per line:
+//
+//   Grade 7 Maths Textbook | https://example.com/maths.pdf
+//   Photosynthesis video | https://youtu.be/abc123 | Covers the light stage
+//
+// The type, subject and class are chosen once for the whole batch. Anything
+// after a second "|" becomes the description. Blank lines are ignored, and a
+// line without a link is reported rather than silently dropped.
+export interface ParsedResourceLine {
+  lineNumber: number;
+  title: string;
+  url: string;
+  description: string;
+}
+
+export interface ParsedResources {
+  rows: ParsedResourceLine[];
+  skipped: { lineNumber: number; text: string; reason: string }[];
+}
+
+export function parsePastedResources(raw: string): ParsedResources {
+  const rows: ParsedResourceLine[] = [];
+  const skipped: ParsedResources["skipped"] = [];
+
+  raw.split("\n").forEach((line, i) => {
+    const lineNumber = i + 1;
+    const text = line.replace("\r", "").trim();
+    if (text === "") return; // blank lines are just spacing
+
+    const parts = text.split("|").map(p => p.trim());
+    const title = parts[0] ?? "";
+    const url = parts[1] ?? "";
+    const description = parts.slice(2).join(" | ").trim();
+
+    if (title === "") {
+      skipped.push({ lineNumber, text, reason: "No title" });
+      return;
+    }
+    if (url === "") {
+      skipped.push({ lineNumber, text, reason: 'No link — put it after a "|"' });
+      return;
+    }
+    rows.push({ lineNumber, title, url, description });
+  });
+
+  return { rows, skipped };
+}
 
 const createResourceSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -55,6 +122,17 @@ export default function TeacherResources() {
   const [filterForm, setFilterForm] = useState<string>("all");
   const [filterSubject, setFilterSubject] = useState<string>("all");
   const [filterType, setFilterType] = useState<string>("all");
+
+  // Bulk paste: the dialog, the pasted list, and the settings applied to the
+  // whole batch. `pasteBusy` blocks a second click while resources are going in.
+  const [isPasteOpen, setIsPasteOpen] = useState(false);
+  const [pasteText, setPasteText] = useState("");
+  const [pasteType, setPasteType] = useState<"TEXTBOOK" | "YOUTUBE" | "LESSON_PLAN" | "OTHER">("TEXTBOOK");
+  const [pasteSubject, setPasteSubject] = useState<string>("");
+  const [pasteForm, setPasteForm] = useState<string>("");
+  const [pasteTeacherOnly, setPasteTeacherOnly] = useState(false);
+  const [pasteBusy, setPasteBusy] = useState(false);
+
 
   useEffect(() => {
     if (!teacher) {
@@ -100,6 +178,78 @@ export default function TeacherResources() {
       }
     },
   });
+
+
+  // Work out what a paste would actually do, so the preview and the button
+  // agree with what happens. A link already on the shelf is skipped, and so is
+  // the same link repeated twice in the pasted list itself.
+  const pasteParsed = parsePastedResources(pasteText);
+  const pasteReview = (() => {
+    const existingUrls = new Set(
+      (resources || []).map(r => (r.url || "").trim().toLowerCase()).filter(u => u !== "")
+    );
+    const seenInPaste = new Set<string>();
+    const toAdd: ParsedResourceLine[] = [];
+    const duplicates: { line: ParsedResourceLine; reason: string }[] = [];
+
+    for (const row of pasteParsed.rows) {
+      const key = row.url.toLowerCase();
+      if (existingUrls.has(key)) {
+        duplicates.push({ line: row, reason: "This link is already saved" });
+      } else if (seenInPaste.has(key)) {
+        duplicates.push({ line: row, reason: "Repeated in this list" });
+      } else {
+        seenInPaste.add(key);
+        toAdd.push(row);
+      }
+    }
+    return { toAdd, duplicates };
+  })();
+
+  // Add everything in the preview. Resources go in one at a time so that one
+  // bad row cannot lose the rest; the toast says exactly what happened.
+  const addPastedResources = async () => {
+    const rows = pasteReview.toAdd;
+    if (rows.length === 0 || pasteBusy) return;
+    setPasteBusy(true);
+
+    let added = 0;
+    const failed: string[] = [];
+    for (const row of rows) {
+      try {
+        const response = await apiRequest("POST", "/api/resources", {
+          title: row.title,
+          description: row.description || undefined,
+          type: pasteType,
+          url: row.url,
+          subject: pasteSubject || undefined,
+          form: pasteForm || undefined,
+          isTeacherOnly: pasteTeacherOnly,
+          createdById: teacher?.id,
+        });
+        const data = await response.json();
+        if (data.success) added++;
+        else failed.push(row.title);
+      } catch {
+        failed.push(row.title);
+      }
+    }
+
+    queryClient.invalidateQueries({ queryKey: ["/api/resources"] });
+    setPasteBusy(false);
+    setIsPasteOpen(false);
+    setPasteText("");
+
+    const skippedCount = pasteReview.duplicates.length;
+    toast({
+      title: `Added ${added} resource${added === 1 ? "" : "s"}`,
+      description: [
+        skippedCount > 0 ? `${skippedCount} already saved or repeated — skipped.` : "",
+        failed.length > 0 ? `Could not add: ${failed.join(", ")}.` : "",
+      ].filter(Boolean).join(" ") || "Everything on the list was added.",
+      variant: failed.length > 0 ? "destructive" : undefined,
+    });
+  };
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
@@ -164,6 +314,149 @@ export default function TeacherResources() {
             <h1 className="text-3xl font-bold">Learning Resources</h1>
             <p className="text-muted-foreground">Manage textbooks, videos, and lesson plans</p>
           </div>
+          <div className="flex items-center gap-2">
+          {/* Bulk paste — add a whole list of links at once. */}
+          <Dialog open={isPasteOpen} onOpenChange={setIsPasteOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" data-testid="button-paste-resources">
+                <ClipboardPaste className="h-4 w-4 mr-2" />
+                Paste resources
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Paste resources</DialogTitle>
+                <DialogDescription>
+                  One resource per line, with the link after a bar. They all share the type,
+                  subject and class you pick here. Links already saved are skipped.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="space-y-1.5">
+                    <Label>Type</Label>
+                    <Select value={pasteType} onValueChange={(v) => setPasteType(v as typeof pasteType)}>
+                      <SelectTrigger data-testid="select-paste-type"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {RESOURCE_TYPES.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Subject</Label>
+                    <Select value={pasteSubject || "__none__"} onValueChange={(v) => setPasteSubject(v === "__none__" ? "" : v)}>
+                      <SelectTrigger data-testid="select-paste-subject"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">No subject</SelectItem>
+                        {RESOURCE_SUBJECTS.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Class</Label>
+                    <Select value={pasteForm || "__all__"} onValueChange={(v) => setPasteForm(v === "__all__" ? "" : v)}>
+                      <SelectTrigger data-testid="select-paste-class"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__all__">All classes</SelectItem>
+                        {RESOURCE_FORMS.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={pasteTeacherOnly}
+                    onChange={(e) => setPasteTeacherOnly(e.target.checked)}
+                    data-testid="checkbox-paste-teacher-only"
+                  />
+                  Teachers only — students will not see these
+                </label>
+
+                <Textarea
+                  rows={8}
+                  value={pasteText}
+                  onChange={(e) => setPasteText(e.target.value)}
+                  placeholder={"Grade 7 Maths Textbook | https://example.com/maths.pdf\nPhotosynthesis video | https://youtu.be/abc123 | Covers the light stage"}
+                  className="font-mono text-sm"
+                  data-testid="textarea-paste-resources"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Anything after a second bar becomes the description.
+                </p>
+
+                {pasteText.trim() !== "" && (
+                  <div className="rounded-md border" data-testid="paste-resources-preview">
+                    <div className="border-b bg-muted/50 px-3 py-2 text-sm font-medium">
+                      Preview — {pasteReview.toAdd.length} resource{pasteReview.toAdd.length === 1 ? "" : "s"} will be added
+                    </div>
+                    <div className="max-h-52 overflow-y-auto divide-y">
+                      {pasteReview.toAdd.map((r, i) => (
+                        <div key={r.lineNumber} className="px-3 py-1.5 text-sm" data-testid={`paste-resource-row-${i}`}>
+                          <span className="text-muted-foreground mr-2">{i + 1}.</span>{r.title}
+                          <div className="text-xs text-muted-foreground truncate">{r.url}{r.description ? " — " + r.description : ""}</div>
+                        </div>
+                      ))}
+                      {pasteReview.toAdd.length === 0 && (
+                        <p className="px-3 py-3 text-sm text-muted-foreground">
+                          Nothing new to add — every link here is already saved.
+                        </p>
+                      )}
+                    </div>
+
+                    {pasteReview.duplicates.length > 0 && (
+                      <div className="border-t bg-amber-50 px-3 py-2 dark:bg-amber-950/40" data-testid="paste-resources-duplicates">
+                        <p className="text-xs font-medium text-amber-900 dark:text-amber-100">
+                          {pasteReview.duplicates.length} skipped as duplicate{pasteReview.duplicates.length === 1 ? "" : "s"}:
+                        </p>
+                        <ul className="mt-1 space-y-0.5">
+                          {pasteReview.duplicates.slice(0, 6).map(d => (
+                            <li key={d.line.lineNumber} className="text-xs text-amber-900/80 dark:text-amber-100/80">
+                              {d.line.title} — {d.reason}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {pasteParsed.skipped.length > 0 && (
+                      <div className="border-t bg-amber-50 px-3 py-2 dark:bg-amber-950/40" data-testid="paste-resources-skipped">
+                        <p className="text-xs font-medium text-amber-900 dark:text-amber-100">
+                          {pasteParsed.skipped.length} line{pasteParsed.skipped.length === 1 ? "" : "s"} could not be read:
+                        </p>
+                        <ul className="mt-1 space-y-0.5">
+                          {pasteParsed.skipped.slice(0, 5).map(sk => (
+                            <li key={sk.lineNumber} className="text-xs text-amber-900/80 dark:text-amber-100/80">
+                              Line {sk.lineNumber}: {sk.reason} — {sk.text.slice(0, 40)}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-2 pt-1">
+                  <Button type="button" variant="outline" onClick={() => setIsPasteOpen(false)} data-testid="button-paste-resources-cancel">
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={addPastedResources}
+                    disabled={pasteReview.toAdd.length === 0 || pasteBusy}
+                    data-testid="button-paste-resources-confirm"
+                  >
+                    {pasteBusy
+                      ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Adding…</>
+                      : <><PlusCircle className="h-4 w-4 mr-2" />Add {pasteReview.toAdd.length || ""} resource{pasteReview.toAdd.length === 1 ? "" : "s"}</>}
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button data-testid="button-add-resource">
@@ -352,6 +645,7 @@ export default function TeacherResources() {
               </Form>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
 
         <Card className="mb-6">
