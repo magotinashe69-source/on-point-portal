@@ -4,7 +4,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { BulkPasteDialog } from "@/components/BulkPasteDialog";
+import { splitPastedLines, separateDuplicates, type SkippedLine } from "@/lib/bulk-paste";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -18,15 +19,15 @@ import logoPath from "@assets/logo.webp";
 import type { Student } from "@shared/schema";
 
 // --- Bulk paste ---------------------------------------------------------
-// Enrolling a class means typing the same thing thirty times. This reads a
-// pasted list instead — one pupil per line:
+// Enrolling a class means typing the same thing thirty times. Each line is one
+// pupil:
 //
 //   Tafara Moyo
 //   Rudo Chikwanha | Female
 //
-// The class is chosen once for the whole batch. A gender after a "|" applies
-// to that pupil; without one they take the batch default. Blank lines are
-// ignored, and anything unusable is reported rather than silently dropped.
+// The class is chosen once for the whole batch. A gender after a separator
+// applies to that pupil; without one they take the batch default. The line
+// splitting is shared with the other paste dialogs (see lib/bulk-paste).
 export interface ParsedStudentLine {
   lineNumber: number;
   fullName: string;
@@ -35,25 +36,20 @@ export interface ParsedStudentLine {
 
 export interface ParsedStudents {
   rows: ParsedStudentLine[];
-  skipped: { lineNumber: number; text: string; reason: string }[];
+  skipped: SkippedLine[];
 }
 
 export function parsePastedStudents(raw: string): ParsedStudents {
   const rows: ParsedStudentLine[] = [];
-  const skipped: ParsedStudents["skipped"] = [];
+  const skipped: SkippedLine[] = [];
 
-  raw.split("\n").forEach((line, i) => {
-    const lineNumber = i + 1;
-    const text = line.replace("\r", "").trim();
-    if (text === "") return; // blank lines are just spacing
-
-    const parts = text.split("|").map(p => p.trim());
-    const fullName = parts[0] ?? "";
-    const genderRaw = (parts[1] ?? "").toLowerCase();
+  for (const line of splitPastedLines(raw)) {
+    const fullName = line.parts[0] ?? "";
+    const genderRaw = (line.parts[1] ?? "").toLowerCase();
 
     if (fullName === "") {
-      skipped.push({ lineNumber, text, reason: "No name" });
-      return;
+      skipped.push({ lineNumber: line.lineNumber, text: line.text, reason: "No name" });
+      continue;
     }
 
     let gender: "Male" | "Female" | null = null;
@@ -61,13 +57,13 @@ export function parsePastedStudents(raw: string): ParsedStudents {
       if (genderRaw === "m" || genderRaw === "male") gender = "Male";
       else if (genderRaw === "f" || genderRaw === "female") gender = "Female";
       else {
-        skipped.push({ lineNumber, text, reason: 'Gender should be "Male" or "Female"' });
-        return;
+        skipped.push({ lineNumber: line.lineNumber, text: line.text, reason: 'Gender should be "Male" or "Female"' });
+        continue;
       }
     }
 
-    rows.push({ lineNumber, fullName, gender });
-  });
+    rows.push({ lineNumber: line.lineNumber, fullName, gender });
+  }
 
   return { rows, skipped };
 }
@@ -187,25 +183,13 @@ export default function StudentManagement() {
   // agree with what happens. A pupil already on the register is skipped, and so
   // is a name repeated twice in the pasted list itself.
   const pasteParsed = parsePastedStudents(pasteText);
-  const pasteReview = (() => {
-    const existingNames = new Set(students.map(s => s.fullName.trim().toLowerCase()));
-    const seenInPaste = new Set<string>();
-    const toAdd: ParsedStudentLine[] = [];
-    const duplicates: { line: ParsedStudentLine; reason: string }[] = [];
-
-    for (const row of pasteParsed.rows) {
-      const key = row.fullName.toLowerCase();
-      if (existingNames.has(key)) {
-        duplicates.push({ line: row, reason: "Already on the register" });
-      } else if (seenInPaste.has(key)) {
-        duplicates.push({ line: row, reason: "Repeated in this list" });
-      } else {
-        seenInPaste.add(key);
-        toAdd.push(row);
-      }
-    }
-    return { toAdd, duplicates };
-  })();
+  const pasteReview = separateDuplicates(pasteParsed.rows, {
+    keyOf: r => r.fullName,
+    labelOf: r => r.fullName,
+    lineNumberOf: r => r.lineNumber,
+    existingKeys: new Set(students.map(s => s.fullName.trim().toLowerCase())),
+    existingReason: "Already on the register",
+  });
 
   // Student IDs for the batch. Carries on from the highest number already used
   // in that class, so it cannot collide with an existing pupil even if someone
@@ -295,129 +279,69 @@ export default function StudentManagement() {
               </div>
               <div className="flex items-center gap-2">
               {/* Bulk paste — enrol a whole class from a pasted list. */}
-              <Dialog open={isPasteDialogOpen} onOpenChange={setIsPasteDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" data-testid="button-paste-students">
-                    <ClipboardPaste className="h-4 w-4 mr-2" />
-                    Paste students
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-2xl">
-                  <DialogHeader>
-                    <DialogTitle>Paste students</DialogTitle>
-                    <DialogDescription>
-                      One pupil per line. They all join the class you pick here. Anyone already on
-                      the register is skipped.
-                    </DialogDescription>
-                  </DialogHeader>
-
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <Label>Class</Label>
-                        <Select value={pasteForm} onValueChange={(v) => setPasteForm(v as typeof pasteForm)}>
-                          <SelectTrigger data-testid="select-paste-form"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {Object.keys(FORM_ID_PREFIX).map(f => (
-                              <SelectItem key={f} value={f}>{f}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label>Gender if not given</Label>
-                        <Select value={pasteGender} onValueChange={(v) => setPasteGender(v as "Male" | "Female")}>
-                          <SelectTrigger data-testid="select-paste-gender"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Male">Male</SelectItem>
-                            <SelectItem value="Female">Female</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    <Textarea
-                      rows={8}
-                      value={pasteText}
-                      onChange={(e) => setPasteText(e.target.value)}
-                      placeholder={"Tafara Moyo\nRudo Chikwanha | Female\nTendai Ncube | M"}
-                      className="font-mono text-sm"
-                      data-testid="textarea-paste-students"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Add “| Female” or “| Male” after a name to set that pupil's gender. Student
-                      IDs are given out automatically.
-                    </p>
-
-                    {pasteText.trim() !== "" && (
-                      <div className="rounded-md border" data-testid="paste-students-preview">
-                        <div className="border-b bg-muted/50 px-3 py-2 text-sm font-medium">
-                          Preview — {pasteReview.toAdd.length} student{pasteReview.toAdd.length === 1 ? "" : "s"} will be added to {pasteForm}
-                        </div>
-                        <div className="max-h-52 overflow-y-auto divide-y">
-                          {pasteReview.toAdd.map((r, i) => (
-                            <div key={r.lineNumber} className="flex items-center justify-between px-3 py-1.5 text-sm" data-testid={`paste-student-row-${i}`}>
-                              <span><span className="text-muted-foreground mr-2">{i + 1}.</span>{r.fullName}</span>
-                              <span className="text-xs text-muted-foreground">{r.gender ?? pasteGender}</span>
-                            </div>
+              <Button variant="outline" onClick={() => setIsPasteDialogOpen(true)} data-testid="button-paste-students">
+                <ClipboardPaste className="h-4 w-4 mr-2" />
+                Paste students
+              </Button>
+              <BulkPasteDialog
+                open={isPasteDialogOpen}
+                onOpenChange={setIsPasteDialogOpen}
+                title="Paste students"
+                description="One pupil per line. They all join the class you pick here. Anyone already on the register is skipped."
+                noun={{ one: "student", many: "students" }}
+                countSuffix={`to ${pasteForm}`}
+                settings={
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label>Class</Label>
+                      <Select value={pasteForm} onValueChange={(v) => setPasteForm(v as typeof pasteForm)}>
+                        <SelectTrigger data-testid="select-paste-form"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {Object.keys(FORM_ID_PREFIX).map(f => (
+                            <SelectItem key={f} value={f}>{f}</SelectItem>
                           ))}
-                          {pasteReview.toAdd.length === 0 && (
-                            <p className="px-3 py-3 text-sm text-muted-foreground">
-                              Nobody new to add — every name here is already on the register.
-                            </p>
-                          )}
-                        </div>
-
-                        {pasteReview.duplicates.length > 0 && (
-                          <div className="border-t bg-amber-50 px-3 py-2 dark:bg-amber-950/40" data-testid="paste-students-duplicates">
-                            <p className="text-xs font-medium text-amber-900 dark:text-amber-100">
-                              {pasteReview.duplicates.length} skipped as duplicate{pasteReview.duplicates.length === 1 ? "" : "s"}:
-                            </p>
-                            <ul className="mt-1 space-y-0.5">
-                              {pasteReview.duplicates.slice(0, 6).map(d => (
-                                <li key={d.line.lineNumber} className="text-xs text-amber-900/80 dark:text-amber-100/80">
-                                  {d.line.fullName} — {d.reason}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-
-                        {pasteParsed.skipped.length > 0 && (
-                          <div className="border-t bg-amber-50 px-3 py-2 dark:bg-amber-950/40" data-testid="paste-students-skipped">
-                            <p className="text-xs font-medium text-amber-900 dark:text-amber-100">
-                              {pasteParsed.skipped.length} line{pasteParsed.skipped.length === 1 ? "" : "s"} could not be read:
-                            </p>
-                            <ul className="mt-1 space-y-0.5">
-                              {pasteParsed.skipped.slice(0, 5).map(sk => (
-                                <li key={sk.lineNumber} className="text-xs text-amber-900/80 dark:text-amber-100/80">
-                                  Line {sk.lineNumber}: {sk.reason} — “{sk.text.slice(0, 40)}”
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-                    )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Gender if not given</Label>
+                      <Select value={pasteGender} onValueChange={(v) => setPasteGender(v as "Male" | "Female")}>
+                        <SelectTrigger data-testid="select-paste-gender"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Male">Male</SelectItem>
+                          <SelectItem value="Female">Female</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-
-                  <DialogFooter>
-                    <Button type="button" variant="outline" onClick={() => setIsPasteDialogOpen(false)} data-testid="button-paste-students-cancel">
-                      Cancel
-                    </Button>
-                    <Button
-                      type="button"
-                      onClick={addPastedStudents}
-                      disabled={pasteReview.toAdd.length === 0 || pasteBusy}
-                      data-testid="button-paste-students-confirm"
-                    >
-                      {pasteBusy
-                        ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Adding…</>
-                        : <><PlusCircle className="h-4 w-4 mr-2" />Add {pasteReview.toAdd.length || ""} student{pasteReview.toAdd.length === 1 ? "" : "s"}</>}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+                }
+                value={pasteText}
+                onValueChange={setPasteText}
+                placeholder={"Tafara Moyo\nRudo Chikwanha | Female\nTendai Ncube | M"}
+                hint="Add “| Female” or “| Male” after a name to set that pupil's gender. Student IDs are given out automatically."
+                toAdd={pasteReview.toAdd}
+                keyOfRow={(r) => r.lineNumber}
+                renderRow={(r) => (
+                  <span className="flex items-center justify-between gap-2">
+                    <span>{r.fullName}</span>
+                    <span className="text-xs text-muted-foreground">{r.gender ?? pasteGender}</span>
+                  </span>
+                )}
+                emptyMessage="Nobody new to add — every name here is already on the register."
+                duplicates={pasteReview.duplicates}
+                skipped={pasteParsed.skipped}
+                busy={pasteBusy}
+                onConfirm={addPastedStudents}
+                testIds={{
+                  textarea: "textarea-paste-students",
+                  preview: "paste-students-preview",
+                  rowPrefix: "paste-student-row-",
+                  duplicates: "paste-students-duplicates",
+                  skipped: "paste-students-skipped",
+                  confirm: "button-paste-students-confirm",
+                  cancel: "button-paste-students-cancel",
+                }}
+              />
 
               <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
                 <DialogTrigger asChild>

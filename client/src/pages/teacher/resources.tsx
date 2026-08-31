@@ -9,6 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { BulkPasteDialog } from "@/components/BulkPasteDialog";
+import { splitPastedLines, separateDuplicates, type SkippedLine } from "@/lib/bulk-paste";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -52,15 +54,15 @@ const RESOURCE_TYPES: { value: "TEXTBOOK" | "YOUTUBE" | "LESSON_PLAN" | "OTHER";
 ];
 
 // --- Bulk paste ---------------------------------------------------------
-// Adding a term's worth of links one dialog at a time is slow. This reads a
-// pasted list instead — one resource per line:
+// Adding a term's worth of links one dialog at a time is slow. Each line is one
+// resource:
 //
 //   Grade 7 Maths Textbook | https://example.com/maths.pdf
 //   Photosynthesis video | https://youtu.be/abc123 | Covers the light stage
 //
-// The type, subject and class are chosen once for the whole batch. Anything
-// after a second "|" becomes the description. Blank lines are ignored, and a
-// line without a link is reported rather than silently dropped.
+// The type, subject and class are chosen once for the whole batch, and anything
+// after a second separator becomes the description. The line splitting is
+// shared with the other paste dialogs (see lib/bulk-paste).
 export interface ParsedResourceLine {
   lineNumber: number;
   title: string;
@@ -70,33 +72,28 @@ export interface ParsedResourceLine {
 
 export interface ParsedResources {
   rows: ParsedResourceLine[];
-  skipped: { lineNumber: number; text: string; reason: string }[];
+  skipped: SkippedLine[];
 }
 
 export function parsePastedResources(raw: string): ParsedResources {
   const rows: ParsedResourceLine[] = [];
-  const skipped: ParsedResources["skipped"] = [];
+  const skipped: SkippedLine[] = [];
 
-  raw.split("\n").forEach((line, i) => {
-    const lineNumber = i + 1;
-    const text = line.replace("\r", "").trim();
-    if (text === "") return; // blank lines are just spacing
-
-    const parts = text.split("|").map(p => p.trim());
-    const title = parts[0] ?? "";
-    const url = parts[1] ?? "";
-    const description = parts.slice(2).join(" | ").trim();
+  for (const line of splitPastedLines(raw)) {
+    const title = line.parts[0] ?? "";
+    const url = line.parts[1] ?? "";
+    const description = line.parts.slice(2).join(" | ").trim();
 
     if (title === "") {
-      skipped.push({ lineNumber, text, reason: "No title" });
-      return;
+      skipped.push({ lineNumber: line.lineNumber, text: line.text, reason: "No title" });
+      continue;
     }
     if (url === "") {
-      skipped.push({ lineNumber, text, reason: 'No link — put it after a "|"' });
-      return;
+      skipped.push({ lineNumber: line.lineNumber, text: line.text, reason: 'No link — put it after a "|"' });
+      continue;
     }
-    rows.push({ lineNumber, title, url, description });
-  });
+    rows.push({ lineNumber: line.lineNumber, title, url, description });
+  }
 
   return { rows, skipped };
 }
@@ -184,27 +181,15 @@ export default function TeacherResources() {
   // agree with what happens. A link already on the shelf is skipped, and so is
   // the same link repeated twice in the pasted list itself.
   const pasteParsed = parsePastedResources(pasteText);
-  const pasteReview = (() => {
-    const existingUrls = new Set(
+  const pasteReview = separateDuplicates(pasteParsed.rows, {
+    keyOf: r => r.url,
+    labelOf: r => r.title,
+    lineNumberOf: r => r.lineNumber,
+    existingKeys: new Set(
       (resources || []).map(r => (r.url || "").trim().toLowerCase()).filter(u => u !== "")
-    );
-    const seenInPaste = new Set<string>();
-    const toAdd: ParsedResourceLine[] = [];
-    const duplicates: { line: ParsedResourceLine; reason: string }[] = [];
-
-    for (const row of pasteParsed.rows) {
-      const key = row.url.toLowerCase();
-      if (existingUrls.has(key)) {
-        duplicates.push({ line: row, reason: "This link is already saved" });
-      } else if (seenInPaste.has(key)) {
-        duplicates.push({ line: row, reason: "Repeated in this list" });
-      } else {
-        seenInPaste.add(key);
-        toAdd.push(row);
-      }
-    }
-    return { toAdd, duplicates };
-  })();
+    ),
+    existingReason: "This link is already saved",
+  });
 
   // Add everything in the preview. Resources go in one at a time so that one
   // bad row cannot lose the rest; the toast says exactly what happened.
@@ -316,22 +301,17 @@ export default function TeacherResources() {
           </div>
           <div className="flex items-center gap-2">
           {/* Bulk paste — add a whole list of links at once. */}
-          <Dialog open={isPasteOpen} onOpenChange={setIsPasteOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline" data-testid="button-paste-resources">
-                <ClipboardPaste className="h-4 w-4 mr-2" />
-                Paste resources
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Paste resources</DialogTitle>
-                <DialogDescription>
-                  One resource per line, with the link after a bar. They all share the type,
-                  subject and class you pick here. Links already saved are skipped.
-                </DialogDescription>
-              </DialogHeader>
-
+          <Button variant="outline" onClick={() => setIsPasteOpen(true)} data-testid="button-paste-resources">
+            <ClipboardPaste className="h-4 w-4 mr-2" />
+            Paste resources
+          </Button>
+          <BulkPasteDialog
+            open={isPasteOpen}
+            onOpenChange={setIsPasteOpen}
+            title="Paste resources"
+            description="One resource per line, with the link after a bar. They all share the type, subject and class you pick here. Links already saved are skipped."
+            noun={{ one: "resource", many: "resources" }}
+            settings={
               <div className="space-y-3">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="space-y-1.5">
@@ -364,7 +344,6 @@ export default function TeacherResources() {
                     </Select>
                   </div>
                 </div>
-
                 <label className="flex items-center gap-2 text-sm">
                   <input
                     type="checkbox"
@@ -374,88 +353,37 @@ export default function TeacherResources() {
                   />
                   Teachers only — students will not see these
                 </label>
-
-                <Textarea
-                  rows={8}
-                  value={pasteText}
-                  onChange={(e) => setPasteText(e.target.value)}
-                  placeholder={"Grade 7 Maths Textbook | https://example.com/maths.pdf\nPhotosynthesis video | https://youtu.be/abc123 | Covers the light stage"}
-                  className="font-mono text-sm"
-                  data-testid="textarea-paste-resources"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Anything after a second bar becomes the description.
-                </p>
-
-                {pasteText.trim() !== "" && (
-                  <div className="rounded-md border" data-testid="paste-resources-preview">
-                    <div className="border-b bg-muted/50 px-3 py-2 text-sm font-medium">
-                      Preview — {pasteReview.toAdd.length} resource{pasteReview.toAdd.length === 1 ? "" : "s"} will be added
-                    </div>
-                    <div className="max-h-52 overflow-y-auto divide-y">
-                      {pasteReview.toAdd.map((r, i) => (
-                        <div key={r.lineNumber} className="px-3 py-1.5 text-sm" data-testid={`paste-resource-row-${i}`}>
-                          <span className="text-muted-foreground mr-2">{i + 1}.</span>{r.title}
-                          <div className="text-xs text-muted-foreground truncate">{r.url}{r.description ? " — " + r.description : ""}</div>
-                        </div>
-                      ))}
-                      {pasteReview.toAdd.length === 0 && (
-                        <p className="px-3 py-3 text-sm text-muted-foreground">
-                          Nothing new to add — every link here is already saved.
-                        </p>
-                      )}
-                    </div>
-
-                    {pasteReview.duplicates.length > 0 && (
-                      <div className="border-t bg-amber-50 px-3 py-2 dark:bg-amber-950/40" data-testid="paste-resources-duplicates">
-                        <p className="text-xs font-medium text-amber-900 dark:text-amber-100">
-                          {pasteReview.duplicates.length} skipped as duplicate{pasteReview.duplicates.length === 1 ? "" : "s"}:
-                        </p>
-                        <ul className="mt-1 space-y-0.5">
-                          {pasteReview.duplicates.slice(0, 6).map(d => (
-                            <li key={d.line.lineNumber} className="text-xs text-amber-900/80 dark:text-amber-100/80">
-                              {d.line.title} — {d.reason}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
-                    {pasteParsed.skipped.length > 0 && (
-                      <div className="border-t bg-amber-50 px-3 py-2 dark:bg-amber-950/40" data-testid="paste-resources-skipped">
-                        <p className="text-xs font-medium text-amber-900 dark:text-amber-100">
-                          {pasteParsed.skipped.length} line{pasteParsed.skipped.length === 1 ? "" : "s"} could not be read:
-                        </p>
-                        <ul className="mt-1 space-y-0.5">
-                          {pasteParsed.skipped.slice(0, 5).map(sk => (
-                            <li key={sk.lineNumber} className="text-xs text-amber-900/80 dark:text-amber-100/80">
-                              Line {sk.lineNumber}: {sk.reason} — {sk.text.slice(0, 40)}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <div className="flex justify-end gap-2 pt-1">
-                  <Button type="button" variant="outline" onClick={() => setIsPasteOpen(false)} data-testid="button-paste-resources-cancel">
-                    Cancel
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={addPastedResources}
-                    disabled={pasteReview.toAdd.length === 0 || pasteBusy}
-                    data-testid="button-paste-resources-confirm"
-                  >
-                    {pasteBusy
-                      ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Adding…</>
-                      : <><PlusCircle className="h-4 w-4 mr-2" />Add {pasteReview.toAdd.length || ""} resource{pasteReview.toAdd.length === 1 ? "" : "s"}</>}
-                  </Button>
-                </div>
               </div>
-            </DialogContent>
-          </Dialog>
+            }
+            value={pasteText}
+            onValueChange={setPasteText}
+            placeholder={"Grade 7 Maths Textbook | https://example.com/maths.pdf\nPhotosynthesis video | https://youtu.be/abc123 | Covers the light stage"}
+            hint="Anything after a second bar becomes the description."
+            toAdd={pasteReview.toAdd}
+            keyOfRow={(r) => r.lineNumber}
+            renderRow={(r) => (
+              <>
+                {r.title}
+                <div className="text-xs text-muted-foreground truncate">
+                  {r.url}{r.description ? " — " + r.description : ""}
+                </div>
+              </>
+            )}
+            emptyMessage="Nothing new to add — every link here is already saved."
+            duplicates={pasteReview.duplicates}
+            skipped={pasteParsed.skipped}
+            busy={pasteBusy}
+            onConfirm={addPastedResources}
+            testIds={{
+              textarea: "textarea-paste-resources",
+              preview: "paste-resources-preview",
+              rowPrefix: "paste-resource-row-",
+              duplicates: "paste-resources-duplicates",
+              skipped: "paste-resources-skipped",
+              confirm: "button-paste-resources-confirm",
+              cancel: "button-paste-resources-cancel",
+            }}
+          />
 
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>

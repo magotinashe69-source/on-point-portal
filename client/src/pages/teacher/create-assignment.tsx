@@ -11,7 +11,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { BulkPasteDialog } from "@/components/BulkPasteDialog";
+import { splitPastedLines, type SkippedLine } from "@/lib/bulk-paste";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -76,14 +77,14 @@ const newQuestion = () => ({
 });
 
 // --- Bulk paste ---------------------------------------------------------
-// Teachers often already have their questions typed out somewhere. This reads
-// a pasted block, one question per line, in the form:
+// Teachers often already have their questions typed out somewhere. Each line is
+// a question and its answer(s):
 //
 //   What is the capital of Zimbabwe? | Harare
 //
-// Anything after a further "|" counts as another acceptable answer, so
-// "2 + 2 = ? | 4 | four" marks both as correct. Blank lines are ignored, and a
-// line with no "|" is reported back rather than silently dropped.
+// Anything after a further separator counts as another acceptable answer, so
+// "2 + 2 = ? | 4 | four" marks both as correct. The line splitting itself is
+// shared with the other paste dialogs (see lib/bulk-paste).
 export interface ParsedPasteLine {
   lineNumber: number;
   text: string;
@@ -93,33 +94,27 @@ export interface ParsedPasteLine {
 
 export interface ParsedPaste {
   questions: ParsedPasteLine[];
-  skipped: { lineNumber: number; text: string; reason: string }[];
+  skipped: SkippedLine[];
 }
 
 export function parsePastedQuestions(raw: string): ParsedPaste {
   const questions: ParsedPasteLine[] = [];
-  const skipped: ParsedPaste["skipped"] = [];
+  const skipped: SkippedLine[] = [];
 
-  raw.split(/\r?\n/).forEach((line, i) => {
-    const lineNumber = i + 1;
-    const text = line.trim();
-    if (text === "") return; // blank lines are just spacing
-
-    // Accept the common separators a teacher might already have used.
-    const parts = text.split(/\s*[|\t]\s*/).map(p => p.trim());
-    const questionText = parts[0] ?? "";
-    const answers = parts.slice(1).filter(a => a !== "");
+  for (const line of splitPastedLines(raw)) {
+    const questionText = line.parts[0] ?? "";
+    const answers = line.parts.slice(1).filter(a => a !== "");
 
     if (questionText === "") {
-      skipped.push({ lineNumber, text, reason: "No question text" });
-      return;
+      skipped.push({ lineNumber: line.lineNumber, text: line.text, reason: "No question text" });
+      continue;
     }
     if (answers.length === 0) {
-      skipped.push({ lineNumber, text, reason: 'No answer — put it after a "|"' });
-      return;
+      skipped.push({ lineNumber: line.lineNumber, text: line.text, reason: 'No answer — put it after a "|"' });
+      continue;
     }
-    questions.push({ lineNumber, text, questionText, answers });
-  });
+    questions.push({ lineNumber: line.lineNumber, text: line.text, questionText, answers });
+  }
 
   return { questions, skipped };
 }
@@ -1166,85 +1161,39 @@ export default function CreateAssignment() {
 
                 {/* Bulk paste. The teacher pastes a block they already have, sees
                     exactly what will be created, and only then adds it. */}
-                <Dialog open={pasteOpen} onOpenChange={setPasteOpen}>
-                  <DialogContent className="max-w-2xl">
-                    <DialogHeader>
-                      <DialogTitle>Paste questions</DialogTitle>
-                      <DialogDescription>
-                        One question per line, with the answer after a “|”. Each line becomes a
-                        Short text question worth 1 mark, marked automatically.
-                      </DialogDescription>
-                    </DialogHeader>
-
-                    <div className="space-y-3">
-                      <Textarea
-                        rows={8}
-                        value={pasteText}
-                        onChange={(e) => setPasteText(e.target.value)}
-                        placeholder={"What is the capital of Zimbabwe? | Harare\nHow many sides does a triangle have? | 3 | three\nWho wrote Nervous Conditions? | Tsitsi Dangarembga"}
-                        className="font-mono text-sm"
-                        data-testid="textarea-paste-questions"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Tip: add more answers after further “|” marks — “2 + 2 = ? | 4 | four” accepts both.
-                      </p>
-
-                      {/* Preview — always shown before anything is added. */}
-                      {pasteText.trim() !== "" && (
-                        <div className="rounded-md border" data-testid="paste-preview">
-                          <div className="border-b bg-muted/50 px-3 py-2 text-sm font-medium">
-                            Preview — {pastePreview.questions.length} question{pastePreview.questions.length === 1 ? "" : "s"} will be added
-                          </div>
-                          <div className="max-h-60 overflow-y-auto divide-y">
-                            {pastePreview.questions.map((q, i) => (
-                              <div key={q.lineNumber} className="px-3 py-2 text-sm" data-testid={`paste-preview-row-${i}`}>
-                                <span className="text-muted-foreground mr-2">{i + 1}.</span>
-                                {q.questionText}
-                                <div className="mt-0.5 text-xs text-muted-foreground">
-                                  Answer key: {q.answers.join("  ·  ")}
-                                </div>
-                              </div>
-                            ))}
-                            {pastePreview.questions.length === 0 && (
-                              <p className="px-3 py-3 text-sm text-muted-foreground">
-                                Nothing to add yet — every line needs an answer after a “|”.
-                              </p>
-                            )}
-                          </div>
-                          {pastePreview.skipped.length > 0 && (
-                            <div className="border-t bg-amber-50 px-3 py-2 dark:bg-amber-950/40" data-testid="paste-preview-skipped">
-                              <p className="text-xs font-medium text-amber-900 dark:text-amber-100">
-                                {pastePreview.skipped.length} line{pastePreview.skipped.length === 1 ? "" : "s"} will be skipped:
-                              </p>
-                              <ul className="mt-1 space-y-0.5">
-                                {pastePreview.skipped.slice(0, 5).map(sk => (
-                                  <li key={sk.lineNumber} className="text-xs text-amber-900/80 dark:text-amber-100/80">
-                                    Line {sk.lineNumber}: {sk.reason} — “{sk.text.slice(0, 50)}”
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    <DialogFooter>
-                      <Button type="button" variant="outline" onClick={() => setPasteOpen(false)} data-testid="button-paste-cancel">
-                        Cancel
-                      </Button>
-                      <Button
-                        type="button"
-                        onClick={addPastedQuestions}
-                        disabled={pastePreview.questions.length === 0}
-                        data-testid="button-paste-confirm"
-                      >
-                        <PlusCircle className="h-4 w-4 mr-2" />
-                        Add {pastePreview.questions.length || ""} question{pastePreview.questions.length === 1 ? "" : "s"}
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
+                <BulkPasteDialog
+                  open={pasteOpen}
+                  onOpenChange={setPasteOpen}
+                  title="Paste questions"
+                  description="One question per line, with the answer after a bar. Each line becomes a Short text question worth 1 mark, marked automatically."
+                  noun={{ one: "question", many: "questions" }}
+                  value={pasteText}
+                  onValueChange={setPasteText}
+                  placeholder={"What is the capital of Zimbabwe? | Harare\nHow many sides does a triangle have? | 3 | three\nWho wrote Nervous Conditions? | Tsitsi Dangarembga"}
+                  hint="Tip: add more answers after further bars — “2 + 2 = ? | 4 | four” accepts both."
+                  toAdd={pastePreview.questions}
+                  keyOfRow={(q) => q.lineNumber}
+                  renderRow={(q) => (
+                    <>
+                      {q.questionText}
+                      <div className="mt-0.5 text-xs text-muted-foreground">
+                        Answer key: {q.answers.join("  ·  ")}
+                      </div>
+                    </>
+                  )}
+                  emptyMessage="Nothing to add yet — every line needs an answer after a bar."
+                  skipped={pastePreview.skipped}
+                  onConfirm={addPastedQuestions}
+                  testIds={{
+                    textarea: "textarea-paste-questions",
+                    preview: "paste-preview",
+                    rowPrefix: "paste-preview-row-",
+                    duplicates: "paste-preview-duplicates",
+                    skipped: "paste-preview-skipped",
+                    confirm: "button-paste-confirm",
+                    cancel: "button-paste-cancel",
+                  }}
+                />
 
                 <div className="space-y-2">
                   <h3 className="font-semibold">Attachments (optional)</h3>
