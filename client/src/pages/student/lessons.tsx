@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import type { Lesson } from "@shared/schema";
 import logoPath from "@assets/logo.webp";
+import { LessonPlayer } from "@/components/LessonPlayer";
 
 export default function StudentLessons() {
   const [, setLocation] = useLocation();
@@ -136,17 +137,12 @@ export default function StudentLessons() {
                   {lesson.description && (
                     <p className="text-sm text-muted-foreground mb-4">{lesson.description}</p>
                   )}
-                  {lesson.type === "VIDEO" ? (
-                    <video controls className="w-full rounded-md" preload="metadata" data-testid={`video-player-${lesson.id}`}>
-                      <source src={lesson.fileUrl} />
-                      Your browser does not support the video element.
-                    </video>
-                  ) : (
-                    <audio controls className="w-full" preload="metadata" data-testid={`audio-player-${lesson.id}`}>
-                      <source src={lesson.fileUrl} />
-                      Your browser does not support the audio element.
-                    </audio>
-                  )}
+                  <LessonPlayer
+                    lessonId={lesson.id}
+                    title={lesson.title}
+                    fileUrl={lesson.fileUrl}
+                    type={lesson.type}
+                  />
                 </CardContent>
               </Card>
             ))}

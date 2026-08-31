@@ -21,6 +21,8 @@ import { useAuth } from "@/lib/auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { SimpleUploader } from "@/components/SimpleUploader";
+import { LessonPlayer } from "@/components/LessonPlayer";
+import { isYouTubeLesson } from "@/lib/lesson-media";
 import {
   ArrowLeft,
   PlusCircle,
@@ -61,18 +63,20 @@ const LESSON_FORMS = ["Stage 3", "Stage 4", "Stage 5", "Stage 6", "Form 1", "For
 // second separator becomes the description. The line splitting is shared with
 // the other paste dialogs (see lib/bulk-paste).
 //
-// Important: the player here is a plain <video>/<audio> tag, so the link has to
-// point at the media file itself. A YouTube or Vimeo page needs their embedded
-// player, which this page does not use — pasting one would make a lesson that
-// looks fine in the list but plays nothing, so those are refused with a reason
-// rather than quietly accepted.
-const PAGE_ONLY_HOSTS = ["youtube.com", "youtu.be", "vimeo.com", "dailymotion.com"];
+// About links: YouTube addresses are fine — the player embeds those through
+// YouTube itself. Any other link has to point at the media file, because that
+// is played by a plain <video>/<audio> tag. Vimeo and Dailymotion pages have no
+// embed here yet, so they are refused with a reason rather than quietly
+// accepted — otherwise the lesson would look right in the list and play
+// nothing.
+const PAGE_ONLY_HOSTS = ["vimeo.com", "dailymotion.com"];
 const VIDEO_EXTENSIONS = ["mp4", "webm", "ogv", "mov", "m4v"];
 const AUDIO_EXTENSIONS = ["mp3", "m4a", "wav", "ogg", "oga", "aac", "flac"];
 
 // Work out whether a link is video or audio from its file ending. Anything we
 // do not recognise falls back to whatever the teacher picked for the batch.
 function mediaTypeFromUrl(url: string): "VIDEO" | "AUDIO" | null {
+  if (isYouTubeLesson(url)) return "VIDEO"; // a YouTube lesson is always a video
   const withoutQuery = url.split("?")[0].split("#")[0];
   const ext = withoutQuery.split(".").pop()?.toLowerCase() ?? "";
   if (VIDEO_EXTENSIONS.includes(ext)) return "VIDEO";
@@ -116,7 +120,7 @@ export function parsePastedLessons(raw: string): ParsedLessons {
       skipped.push({
         lineNumber: line.lineNumber,
         text: line.text,
-        reason: "This player cannot play YouTube or Vimeo links — upload the file, or use a direct link to the .mp4 or .mp3",
+        reason: "Vimeo and Dailymotion links cannot be played here — upload the file, use a YouTube link, or link straight to the .mp4 or .mp3",
       });
       continue;
     }
@@ -499,7 +503,7 @@ export default function TeacherLessons() {
             open={isPasteOpen}
             onOpenChange={setIsPasteOpen}
             title="Paste lessons"
-            description="One lesson per line, with a direct link to the video or audio file after a bar. They all share the subject and class you pick here."
+            description="One lesson per line, with a YouTube link or a link to the video or audio file after a bar. They all share the subject and class you pick here."
             noun={{ one: "lesson", many: "lessons" }}
             countSuffix={`to ${pasteForm}`}
             settings={
@@ -537,7 +541,7 @@ export default function TeacherLessons() {
             value={pasteText}
             onValueChange={setPasteText}
             placeholder={"Fractions part 1 | https://example.com/fractions-1.mp4\nReading aloud | https://example.com/reading.mp3 | Chapter 3"}
-            hint="The link must point at the file itself (.mp4, .mp3 and so on) — YouTube and Vimeo pages will not play here. Video or audio is read from the file ending where possible."
+            hint="A YouTube link works, or a link straight to the file (.mp4, .mp3 and so on). Video or audio is read from the file ending where possible."
             toAdd={pasteReview.toAdd}
             keyOfRow={(r) => r.lineNumber}
             renderRow={(r) => (
@@ -872,17 +876,12 @@ export default function TeacherLessons() {
                       {lesson.duration}
                     </div>
                   )}
-                  {lesson.type === "VIDEO" ? (
-                    <video controls className="w-full rounded-md" preload="metadata" data-testid={`video-player-${lesson.id}`}>
-                      <source src={lesson.fileUrl} />
-                      Your browser does not support the video element.
-                    </video>
-                  ) : (
-                    <audio controls className="w-full" preload="metadata" data-testid={`audio-player-${lesson.id}`}>
-                      <source src={lesson.fileUrl} />
-                      Your browser does not support the audio element.
-                    </audio>
-                  )}
+                  <LessonPlayer
+                    lessonId={lesson.id}
+                    title={lesson.title}
+                    fileUrl={lesson.fileUrl}
+                    type={lesson.type}
+                  />
                   <p className="text-xs text-muted-foreground mt-2">
                     Added {new Date(lesson.createdAt).toLocaleDateString()}
                   </p>
