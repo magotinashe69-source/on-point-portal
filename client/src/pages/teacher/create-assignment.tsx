@@ -11,11 +11,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { ArrowLeft, PlusCircle, Trash2, Loader2, Save, X, Image, Users, Circle, CheckCircle2, ChevronUp, ChevronDown, RefreshCw, FileClock } from "lucide-react";
+import { ArrowLeft, PlusCircle, Trash2, Loader2, Save, X, Image, Users, Circle, CheckCircle2, ChevronUp, ChevronDown, RefreshCw, FileClock, ClipboardPaste, Copy } from "lucide-react";
 import logoPath from "@assets/logo.webp";
 import { SimpleUploader } from "@/components/SimpleUploader";
 import { FileAttachmentZone } from "@/components/FileAttachmentZone";
@@ -55,15 +56,16 @@ const questionSchema = z.object({
 // A short unique id for a brand-new question.
 const newQid = () => "q_" + Math.random().toString(36).slice(2, 10);
 
-// A fresh question starts as multiple choice with two blank options, so the
-// auto-marking path is the default and easy to discover. Each call gets its own
-// unique qid.
+// A fresh question starts as Short text worth 1 mark — the quickest kind to
+// write (type the question, type the answer) and still marked automatically.
+// The other types are one tap away in the Answer Type box. Each call gets its
+// own unique qid.
 const newQuestion = () => ({
   qid: newQid(),
   questionText: "",
   maxScore: 1, // new questions start at 1 mark; the teacher can type any value
   imageUrls: [] as string[],
-  type: "multiple_choice" as const,
+  type: "short_text" as const,
   options: ["", ""],
   correctOption: 0,
   correctBool: true,
@@ -72,6 +74,55 @@ const newQuestion = () => ({
   acceptedAnswers: [""],
   explanation: "",
 });
+
+// --- Bulk paste ---------------------------------------------------------
+// Teachers often already have their questions typed out somewhere. This reads
+// a pasted block, one question per line, in the form:
+//
+//   What is the capital of Zimbabwe? | Harare
+//
+// Anything after a further "|" counts as another acceptable answer, so
+// "2 + 2 = ? | 4 | four" marks both as correct. Blank lines are ignored, and a
+// line with no "|" is reported back rather than silently dropped.
+export interface ParsedPasteLine {
+  lineNumber: number;
+  text: string;
+  questionText: string;
+  answers: string[];
+}
+
+export interface ParsedPaste {
+  questions: ParsedPasteLine[];
+  skipped: { lineNumber: number; text: string; reason: string }[];
+}
+
+export function parsePastedQuestions(raw: string): ParsedPaste {
+  const questions: ParsedPasteLine[] = [];
+  const skipped: ParsedPaste["skipped"] = [];
+
+  raw.split(/\r?\n/).forEach((line, i) => {
+    const lineNumber = i + 1;
+    const text = line.trim();
+    if (text === "") return; // blank lines are just spacing
+
+    // Accept the common separators a teacher might already have used.
+    const parts = text.split(/\s*[|\t]\s*/).map(p => p.trim());
+    const questionText = parts[0] ?? "";
+    const answers = parts.slice(1).filter(a => a !== "");
+
+    if (questionText === "") {
+      skipped.push({ lineNumber, text, reason: "No question text" });
+      return;
+    }
+    if (answers.length === 0) {
+      skipped.push({ lineNumber, text, reason: 'No answer — put it after a "|"' });
+      return;
+    }
+    questions.push({ lineNumber, text, questionText, answers });
+  });
+
+  return { questions, skipped };
+}
 
 const createAssignmentSchema = z.object({
   subject: z.enum(["MATHS", "ENGLISH", "SCIENCE", "PHYSICS", "CHEMISTRY", "BIOLOGY", "ECONOMICS", "BUSINESS_STUDIES", "GEOGRAPHY", "COMPUTER_SCIENCE", "HISTORY", "ACCOUNTING"]),
@@ -94,6 +145,9 @@ export default function CreateAssignment() {
   const [selectedStudentIds, setSelectedStudentIds] = useState<number[]>([]);
   const [assignToAll, setAssignToAll] = useState(true);
   const [remarkingQid, setRemarkingQid] = useState<string | null>(null);
+  // Bulk paste: whether the dialog is open, and the text pasted into it.
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [pasteText, setPasteText] = useState("");
   // When set, the effect below scrolls to that question's text box and focuses
   // it — so after "Add Question" the teacher can type immediately.
   const [focusIndex, setFocusIndex] = useState<number | null>(null);
@@ -157,7 +211,7 @@ export default function CreateAssignment() {
     setAssignToAll(true);
   }, [selectedForm]);
 
-  const { fields, append, remove, move } = useFieldArray({
+  const { fields, append, remove, move, insert } = useFieldArray({
     control: formMethods.control,
     name: "questions",
   });
@@ -202,6 +256,60 @@ export default function CreateAssignment() {
     const newIndex = fields.length;
     append(newQuestion());
     setFocusIndex(newIndex);
+  };
+
+  // Copy a question's settings into a new one right below it. Everything is
+  // carried over — type, marks, options, accepted answers, explanation — except
+  // the wording, which is left blank and focused so only the text has to change.
+  const duplicateQuestion = (index: number) => {
+    const q = formMethods.getValues(`questions.${index}`);
+    insert(index + 1, {
+      ...q,
+      qid: newQid(),            // a new question, not the same one twice
+      questionText: "",         // the one thing the teacher still types
+      options: [...(q.options || [])],
+      acceptedAnswers: [...(q.acceptedAnswers || [])],
+      imageUrls: [],            // images belong to the question they were added to
+    });
+    setFocusIndex(index + 1);
+  };
+
+  // What the pasted box currently works out to. Recomputed as they type, so the
+  // preview below the box is always what would actually be added.
+  const pastePreview = parsePastedQuestions(pasteText);
+
+  // Turn the preview into real questions. Each pasted line becomes a Short text
+  // question worth 1 mark, with its answers as the answer key.
+  const addPastedQuestions = () => {
+    const parsed = pastePreview.questions;
+    if (parsed.length === 0) return;
+
+    const built = parsed.map(p => ({
+      ...newQuestion(),
+      qid: newQid(),
+      questionText: p.questionText,
+      type: "short_text" as const,
+      maxScore: 1,
+      acceptedAnswers: p.answers,
+    }));
+
+    // If the only question so far is the untouched blank one the form starts
+    // with, replace it rather than leaving an empty card above the pasted set.
+    const existing = formMethods.getValues("questions") || [];
+    const onlyBlankStarter =
+      existing.length === 1 && !existing[0]?.questionText?.trim();
+
+    const firstNewIndex = onlyBlankStarter ? 0 : existing.length;
+    append(built);
+    if (onlyBlankStarter) remove(0);
+
+    setPasteOpen(false);
+    setPasteText("");
+    toast({
+      title: `Added ${built.length} question${built.length === 1 ? "" : "s"}`,
+      description: "Each one is Short text, 1 mark, with its answer key filled in.",
+    });
+    setFocusIndex(firstNewIndex);
   };
 
   useEffect(() => {
@@ -722,16 +830,28 @@ export default function CreateAssignment() {
                       <h3 className="font-semibold">Questions</h3>
                       <p className="text-sm text-muted-foreground">Total Marks: {totalMarks}</p>
                     </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={addQuestionAndFocus}
-                      data-testid="button-add-question"
-                    >
-                      <PlusCircle className="h-4 w-4 mr-2" />
-                      Add Question
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPasteOpen(true)}
+                        data-testid="button-paste-questions"
+                      >
+                        <ClipboardPaste className="h-4 w-4 mr-2" />
+                        Paste questions
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={addQuestionAndFocus}
+                        data-testid="button-add-question"
+                      >
+                        <PlusCircle className="h-4 w-4 mr-2" />
+                        Add Question
+                      </Button>
+                    </div>
                   </div>
 
                   {fields.map((field, index) => (
@@ -765,6 +885,20 @@ export default function CreateAssignment() {
                                 <span className="hidden sm:inline">Re-mark</span>
                               </Button>
                             )}
+
+                            {/* Copy this question's settings into a fresh one
+                                below it, so only the wording has to change. */}
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => duplicateQuestion(index)}
+                              title="Make another question with these same settings"
+                              data-testid={`button-duplicate-question-${index}`}
+                            >
+                              <Copy className="h-4 w-4 sm:mr-1" />
+                              <span className="hidden sm:inline">Duplicate</span>
+                            </Button>
 
                             <SimpleUploader
                               onUpload={(url) => handleQuestionImageUpload(index, url)}
@@ -1029,6 +1163,88 @@ export default function CreateAssignment() {
                     Add Question
                   </Button>
                 </div>
+
+                {/* Bulk paste. The teacher pastes a block they already have, sees
+                    exactly what will be created, and only then adds it. */}
+                <Dialog open={pasteOpen} onOpenChange={setPasteOpen}>
+                  <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                      <DialogTitle>Paste questions</DialogTitle>
+                      <DialogDescription>
+                        One question per line, with the answer after a “|”. Each line becomes a
+                        Short text question worth 1 mark, marked automatically.
+                      </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-3">
+                      <Textarea
+                        rows={8}
+                        value={pasteText}
+                        onChange={(e) => setPasteText(e.target.value)}
+                        placeholder={"What is the capital of Zimbabwe? | Harare\nHow many sides does a triangle have? | 3 | three\nWho wrote Nervous Conditions? | Tsitsi Dangarembga"}
+                        className="font-mono text-sm"
+                        data-testid="textarea-paste-questions"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Tip: add more answers after further “|” marks — “2 + 2 = ? | 4 | four” accepts both.
+                      </p>
+
+                      {/* Preview — always shown before anything is added. */}
+                      {pasteText.trim() !== "" && (
+                        <div className="rounded-md border" data-testid="paste-preview">
+                          <div className="border-b bg-muted/50 px-3 py-2 text-sm font-medium">
+                            Preview — {pastePreview.questions.length} question{pastePreview.questions.length === 1 ? "" : "s"} will be added
+                          </div>
+                          <div className="max-h-60 overflow-y-auto divide-y">
+                            {pastePreview.questions.map((q, i) => (
+                              <div key={q.lineNumber} className="px-3 py-2 text-sm" data-testid={`paste-preview-row-${i}`}>
+                                <span className="text-muted-foreground mr-2">{i + 1}.</span>
+                                {q.questionText}
+                                <div className="mt-0.5 text-xs text-muted-foreground">
+                                  Answer key: {q.answers.join("  ·  ")}
+                                </div>
+                              </div>
+                            ))}
+                            {pastePreview.questions.length === 0 && (
+                              <p className="px-3 py-3 text-sm text-muted-foreground">
+                                Nothing to add yet — every line needs an answer after a “|”.
+                              </p>
+                            )}
+                          </div>
+                          {pastePreview.skipped.length > 0 && (
+                            <div className="border-t bg-amber-50 px-3 py-2 dark:bg-amber-950/40" data-testid="paste-preview-skipped">
+                              <p className="text-xs font-medium text-amber-900 dark:text-amber-100">
+                                {pastePreview.skipped.length} line{pastePreview.skipped.length === 1 ? "" : "s"} will be skipped:
+                              </p>
+                              <ul className="mt-1 space-y-0.5">
+                                {pastePreview.skipped.slice(0, 5).map(sk => (
+                                  <li key={sk.lineNumber} className="text-xs text-amber-900/80 dark:text-amber-100/80">
+                                    Line {sk.lineNumber}: {sk.reason} — “{sk.text.slice(0, 50)}”
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <DialogFooter>
+                      <Button type="button" variant="outline" onClick={() => setPasteOpen(false)} data-testid="button-paste-cancel">
+                        Cancel
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={addPastedQuestions}
+                        disabled={pastePreview.questions.length === 0}
+                        data-testid="button-paste-confirm"
+                      >
+                        <PlusCircle className="h-4 w-4 mr-2" />
+                        Add {pastePreview.questions.length || ""} question{pastePreview.questions.length === 1 ? "" : "s"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
 
                 <div className="space-y-2">
                   <h3 className="font-semibold">Attachments (optional)</h3>
