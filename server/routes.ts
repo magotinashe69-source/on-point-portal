@@ -873,16 +873,22 @@ export async function registerRoutes(
       }
       const totalMarked = marks.length;
 
-      const stats = (assignment.questions || []).map((q, index) => {
+      const questions = Array.isArray(assignment.questions) ? assignment.questions.filter(Boolean) : [];
+      const stats = questions.map((q, index) => {
         let wrong = 0, correct = 0, partial = 0;
         for (const mark of marks) {
-          const qm = mark.questionMarks.find((m) => m.questionId === q.id);
+          // A mark can exist without any per-question detail (marked by hand,
+          // or saved before per-question marks existed). Treat that as "no
+          // score recorded" rather than letting it throw.
+          const questionMarks = Array.isArray(mark.questionMarks) ? mark.questionMarks : [];
+          const qm = questionMarks.find((m) => m && m.questionId === q.id);
           const score = qm?.score ?? 0;
-          if (q.maxScore > 0 && score >= q.maxScore) correct++;
+          const maxScore = typeof q.maxScore === "number" ? q.maxScore : 0;
+          if (maxScore > 0 && score >= maxScore) correct++;
           else if (score <= 0) wrong++;
           else { partial++; wrong++; } // partial counts as "not fully correct"
         }
-        return { index, questionId: q.id, questionText: q.questionText, type: q.type || "written", maxScore: q.maxScore, wrong, correct, partial, total: totalMarked };
+        return { index, questionId: q.id ?? `q${index}`, questionText: q.questionText ?? "", type: q.type || "written", maxScore: typeof q.maxScore === "number" ? q.maxScore : 0, wrong, correct, partial, total: totalMarked };
       });
 
       res.json({ success: true, totalMarked, stats });
@@ -2010,12 +2016,10 @@ export async function registerRoutes(
       // Get all submissions
       const allSubmissions = await storage.getSubmissions();
 
-      // Get all marks (keyed by submissionId)
-      const markMap = new Map<number, Awaited<ReturnType<typeof storage.getMark>>>();
-      for (const sub of allSubmissions) {
-        const mark = await storage.getMark(sub.id);
-        if (mark) markMap.set(sub.id, mark);
-      }
+      // Get all marks in one go, keyed by submissionId. This used to ask the
+      // database for one mark at a time — hundreds of round trips for a whole
+      // school, which is what left the Grade Book spinning instead of loading.
+      const markMap = await storage.getMarksBySubmissionIds(allSubmissions.map(s => s.id));
 
       const rows: Array<{
         studentId: number;
@@ -2061,17 +2065,19 @@ export async function registerRoutes(
             if (statusFilter === "NOT_SUBMITTED" && status !== "NOT_SUBMITTED") continue;
           }
 
+          // Every field is filled in even when the student has not submitted and
+          // has no mark yet, so the page never has to guess at a missing value.
           rows.push({
             studentId: student.id,
-            studentName: student.fullName,
-            form: student.form,
+            studentName: student.fullName ?? "Unknown student",
+            form: student.form ?? "—",
             assignmentId: assignment.id,
-            assignmentTitle: assignment.title,
-            subject: assignment.subject,
-            totalMarks: assignment.totalMarks,
+            assignmentTitle: assignment.title ?? "Untitled assignment",
+            subject: assignment.subject ?? "—",
+            totalMarks: typeof assignment.totalMarks === "number" ? assignment.totalMarks : 0,
             submissionId: submission ? submission.id : null,
             submittedAt: submission?.submittedAt ? new Date(submission.submittedAt).toISOString() : null,
-            score: mark ? mark.totalScore : null,
+            score: typeof mark?.totalScore === "number" ? mark.totalScore : null,
             status,
           });
         }
@@ -2116,6 +2122,10 @@ export async function registerRoutes(
       
       // Get all submissions and marks
       const allSubmissions = await storage.getSubmissions();
+      // All the marks in one request, for the same reason as the Grade Book:
+      // asking per submission meant one round trip each, and the export timed
+      // out on a full school.
+      const exportMarkMap = await storage.getMarksBySubmissionIds(allSubmissions.map(s => s.id));
       
       // Build CSV data
       const rows: string[] = [];
@@ -2128,7 +2138,7 @@ export async function registerRoutes(
           if (targetIds && targetIds.length > 0 && !targetIds.includes(student.id)) continue;
           
           const submission = allSubmissions.find(s => s.studentId === student.id && s.assignmentId === assignment.id);
-          const mark = submission ? await storage.getMark(submission.id) : null;
+          const mark = submission ? exportMarkMap.get(submission.id) ?? null : null;
           
           // Date filter — exclude unsubmitted rows when date filter is active
           if (dateFrom || dateTo) {

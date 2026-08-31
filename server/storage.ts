@@ -60,6 +60,7 @@ export interface IStorage {
   
   // Marks
   getMark(submissionId: number): Promise<Mark | undefined>;
+  getMarksBySubmissionIds(submissionIds: number[]): Promise<Map<number, Mark>>;
   createMark(mark: InsertMark): Promise<Mark>;
   
   // Resources
@@ -321,6 +322,25 @@ export class DatabaseStorage implements IStorage {
   async getMark(submissionId: number): Promise<Mark | undefined> {
     const [mark] = await db.select().from(marks).where(eq(marks.submissionId, submissionId));
     return mark || undefined;
+  }
+
+  // Look up the marks for many submissions at once, keyed by submission id.
+  // Pages like the Grade Book need a mark for every submission in the school;
+  // asking for them one at a time meant hundreds of separate database round
+  // trips, which is what made the page sit and spin. This asks once.
+  async getMarksBySubmissionIds(submissionIds: number[]): Promise<Map<number, Mark>> {
+    const found = new Map<number, Mark>();
+    if (submissionIds.length === 0) return found;
+
+    // Some databases limit how many values one "IN (...)" can hold, so ask in
+    // batches rather than in a single enormous query.
+    const BATCH_SIZE = 500;
+    for (let i = 0; i < submissionIds.length; i += BATCH_SIZE) {
+      const batch = submissionIds.slice(i, i + BATCH_SIZE);
+      const rows = await db.select().from(marks).where(inArray(marks.submissionId, batch));
+      for (const mark of rows) found.set(mark.submissionId, mark);
+    }
+    return found;
   }
 
   async createMark(mark: InsertMark): Promise<Mark> {

@@ -8,8 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth";
+import { PageErrorBoundary } from "@/components/ErrorBoundary";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { ArrowLeft, CheckCircle, XCircle, Download, Printer, Loader2, BookOpen } from "lucide-react";
+import { ArrowLeft, CheckCircle, XCircle, Download, Printer, Loader2, BookOpen, AlertTriangle } from "lucide-react";
 import logoPath from "@assets/logo.webp";
 
 interface GradebookRow {
@@ -26,7 +27,7 @@ interface GradebookRow {
   status: string;
 }
 
-export default function GradeBook() {
+function GradeBookContent() {
   const [, setLocation] = useLocation();
   const { teacher } = useAuth();
 
@@ -48,21 +49,35 @@ export default function GradeBook() {
   if (filterDateFrom) filters.dateFrom = filterDateFrom;
   if (filterDateTo) filters.dateTo = filterDateTo;
 
-  const { data, isLoading } = useQuery<{ success: boolean; rows: GradebookRow[] }>({
+  const { data, isLoading, isError } = useQuery<{ success: boolean; rows: GradebookRow[] }>({
     queryKey: ["/api/gradebook", filters],
     enabled: !!teacher,
   });
 
-  const rows = data?.rows || [];
+  // Only ever work with a real list of real rows. If the server sends back an
+  // error shape, or a row is missing, we show an empty table instead of letting
+  // the page fall over while it tries to read a name off nothing.
+  const toRows = (value: unknown): GradebookRow[] =>
+    Array.isArray(value) ? (value.filter(r => r && typeof r === "object") as GradebookRow[]) : [];
 
-  // Unique assignments for filter dropdown (from unfiltered data — always load all for dropdown)
+  const rows = toRows(data?.rows);
+
+  // Unique assignments for the filter dropdown. This uses the same "no filters"
+  // key as the table above, so when nothing is filtered both share one request
+  // instead of fetching the whole Grade Book twice.
   const { data: allData } = useQuery<{ success: boolean; rows: GradebookRow[] }>({
-    queryKey: ["/api/gradebook"],
+    queryKey: ["/api/gradebook", {}],
     enabled: !!teacher,
   });
 
+  // An assignment only belongs in the dropdown if it has a usable id — the
+  // dropdown refuses a blank value and would take the page down with it.
   const uniqueAssignments = Array.from(
-    new Map((allData?.rows || []).map(r => [r.assignmentId, { id: r.assignmentId, title: r.assignmentTitle }])).values()
+    new Map(
+      toRows(allData?.rows)
+        .filter(r => r.assignmentId !== null && r.assignmentId !== undefined && String(r.assignmentId) !== "")
+        .map(r => [r.assignmentId, { id: r.assignmentId, title: r.assignmentTitle || "Untitled assignment" }])
+    ).values()
   );
 
   // Class-wide per-question breakdown for the selected assignment.
@@ -72,8 +87,13 @@ export default function GradeBook() {
     enabled: !!teacher && filterAssignmentId !== "ALL",
   });
 
-  const submittedCount = rows.filter(r => r.status !== "NOT_SUBMITTED").length;
-  const notSubmittedCount = rows.filter(r => r.status === "NOT_SUBMITTED").length;
+  // Same care as the rows above: a breakdown we cannot read is simply not shown.
+  const questionStats: QuestionStat[] = Array.isArray(statsData?.stats)
+    ? statsData.stats.filter(s => s && typeof s === "object")
+    : [];
+
+  const submittedCount = rows.filter(r => r.status && r.status !== "NOT_SUBMITTED").length;
+  const notSubmittedCount = rows.filter(r => !r.status || r.status === "NOT_SUBMITTED").length;
 
   const handleExportCSV = () => {
     const params = new URLSearchParams();
@@ -91,7 +111,10 @@ export default function GradeBook() {
 
   const formatDate = (iso: string | null) => {
     if (!iso) return "—";
-    return new Date(iso).toLocaleDateString("en-GB", {
+    const date = new Date(iso);
+    // A date we cannot make sense of shows as a dash rather than "Invalid Date".
+    if (Number.isNaN(date.getTime())) return "—";
+    return date.toLocaleDateString("en-GB", {
       day: "2-digit",
       month: "short",
       year: "numeric",
@@ -278,7 +301,7 @@ export default function GradeBook() {
         </Card>
 
         {/* Class-wide per-question breakdown (when one assignment is selected). */}
-        {filterAssignmentId !== "ALL" && statsData?.success && statsData.stats.length > 0 && (
+        {filterAssignmentId !== "ALL" && statsData?.success && questionStats.length > 0 && (
           <Card className="mb-4" data-testid="class-breakdown">
             <CardHeader>
               <CardTitle className="text-base">Per-question breakdown</CardTitle>
@@ -287,11 +310,11 @@ export default function GradeBook() {
               </p>
             </CardHeader>
             <CardContent className="space-y-2">
-              {statsData.stats.map((s) => {
+              {questionStats.map((s) => {
                 const pctWrong = s.total > 0 ? Math.round((s.wrong / s.total) * 100) : 0;
                 const hard = pctWrong >= 50;
                 return (
-                  <div key={s.questionId} className="flex items-center gap-3" data-testid={`stat-q-${s.index}`}>
+                  <div key={s.questionId ?? s.index} className="flex items-center gap-3" data-testid={`stat-q-${s.index}`}>
                     <span className="w-8 shrink-0 text-sm font-medium">Q{s.index + 1}</span>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
@@ -321,6 +344,17 @@ export default function GradeBook() {
               <div className="flex items-center justify-center py-16">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
+            ) : isError ? (
+              // A load that failed is not the same as a class with no records —
+              // say which one it is, so nobody is left staring at an empty table.
+              <div className="flex flex-col items-center justify-center py-16 px-4 text-center" data-testid="gradebook-load-error">
+                <AlertTriangle className="h-10 w-10 mb-3 text-amber-500" />
+                <p className="font-medium">Couldn&apos;t load the Grade Book</p>
+                <p className="text-sm text-muted-foreground mt-1">Check your connection and try again.</p>
+                <Button variant="outline" className="mt-4" onClick={() => window.location.reload()} data-testid="button-gradebook-retry">
+                  Try again
+                </Button>
+              </div>
             ) : rows.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
                 <BookOpen className="h-10 w-10 mb-3 opacity-40" />
@@ -344,21 +378,23 @@ export default function GradeBook() {
                   <tbody>
                     {rows.map((row, idx) => (
                       <tr
-                        key={`${row.studentId}-${row.assignmentId}`}
+                        key={`${row.studentId}-${row.assignmentId}-${idx}`}
                         className={`border-b last:border-0 transition-colors ${idx % 2 === 0 ? "" : "bg-muted/20"} hover:bg-muted/40`}
                         data-testid={`row-gradebook-${row.studentId}-${row.assignmentId}`}
                       >
-                        <td className="px-4 py-3 font-medium">{row.studentName}</td>
-                        <td className="px-4 py-3 text-muted-foreground">{row.form}</td>
-                        <td className="px-4 py-3">{row.assignmentTitle}</td>
-                        <td className="px-4 py-3 text-muted-foreground">{row.subject}</td>
+                        <td className="px-4 py-3 font-medium">{row.studentName || "—"}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{row.form || "—"}</td>
+                        <td className="px-4 py-3">{row.assignmentTitle || "—"}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{row.subject || "—"}</td>
                         <td className="px-4 py-3">
+                          {/* No submission, or no mark yet, is normal — it shows a
+                              dash or "Awaiting mark", never a broken cell. */}
                           {row.status === "NOT_SUBMITTED" || !row.submissionId ? (
                             <span className="text-muted-foreground">—</span>
-                          ) : row.score !== null ? (
+                          ) : row.score !== null && row.score !== undefined ? (
                             <Link href={`/teacher/submissions/${row.submissionId}`}>
                               <span className="font-medium text-primary underline underline-offset-2 cursor-pointer hover:opacity-80" data-testid={`link-review-${row.submissionId}`} title="Open this submission">
-                                {row.score}/{row.totalMarks}
+                                {row.score}/{row.totalMarks ?? 0}
                               </span>
                             </Link>
                           ) : (
@@ -369,8 +405,8 @@ export default function GradeBook() {
                             </Link>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-muted-foreground text-xs">{formatDate(row.submittedAt)}</td>
-                        <td className="px-4 py-3">{getStatusBadge(row.status)}</td>
+                        <td className="px-4 py-3 text-muted-foreground text-xs">{formatDate(row.submittedAt ?? null)}</td>
+                        <td className="px-4 py-3">{getStatusBadge(row.status || "NOT_SUBMITTED")}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -385,5 +421,16 @@ export default function GradeBook() {
         </p>
       </main>
     </>
+  );
+}
+
+// The safety net. If anything inside the Grade Book throws — one odd row, one
+// unexpected answer from the server — the teacher sees a message with a way
+// back instead of a blank white screen.
+export default function GradeBook() {
+  return (
+    <PageErrorBoundary backHref="/teacher/dashboard" backLabel="Back to Dashboard" label="gradebook">
+      <GradeBookContent />
+    </PageErrorBoundary>
   );
 }
