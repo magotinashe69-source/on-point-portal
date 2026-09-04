@@ -15,6 +15,7 @@ import { useAuth } from "@/lib/auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ArrowLeft, PlusCircle, Pencil, Trash2, KeyRound, Loader2, Users, ClipboardPaste } from "lucide-react";
+import { QueryError, describeError } from "@/components/QueryError";
 import logoPath from "@assets/logo.webp";
 import type { Student } from "@shared/schema";
 
@@ -104,7 +105,7 @@ export default function StudentManagement() {
     }
   }, [teacher, setLocation]);
 
-  const { data: students = [], isLoading } = useQuery<Student[]>({
+  const { data: students = [], isLoading, isError, error, refetch } = useQuery<Student[]>({
     queryKey: ["/api/students"],
   });
 
@@ -123,6 +124,9 @@ export default function StudentManagement() {
         toast({ title: "Error", description: data.message, variant: "destructive" });
       }
     },
+    onError: (error) => {
+      toast({ title: "Couldn't add student", description: describeError(error, "the student"), variant: "destructive" });
+    },
   });
 
   const updateMutation = useMutation({
@@ -140,6 +144,9 @@ export default function StudentManagement() {
         toast({ title: "Error", description: data.message, variant: "destructive" });
       }
     },
+    onError: (error) => {
+      toast({ title: "Couldn't save changes", description: describeError(error, "the student"), variant: "destructive" });
+    },
   });
 
   const deleteMutation = useMutation({
@@ -147,9 +154,18 @@ export default function StudentManagement() {
       const response = await apiRequest("DELETE", `/api/students/${id}`);
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      // Previously this assumed success unconditionally, so a refusal from the
+      // server looked identical to a removal that worked.
+      if (data?.success === false) {
+        toast({ title: "Couldn't remove student", description: data.message, variant: "destructive" });
+        return;
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/students"] });
       toast({ title: "Student removed successfully!" });
+    },
+    onError: (error) => {
+      toast({ title: "Couldn't remove student", description: describeError(error, "the student"), variant: "destructive" });
     },
   });
 
@@ -166,8 +182,12 @@ export default function StudentManagement() {
         toast({ title: "Error", description: data.message, variant: "destructive" });
       }
     },
+    onError: (error) => {
+      toast({ title: "Couldn't reset password", description: describeError(error, "the student"), variant: "destructive" });
+    },
   });
 
+  const studentFiltersActive = filterForm !== "all";
   const filteredStudents = students.filter(s => 
     filterForm === "all" || s.form === filterForm
   );
@@ -457,8 +477,29 @@ export default function StudentManagement() {
               <div className="flex justify-center py-8">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
               </div>
+            ) : isError ? (
+              <QueryError error={error} what="the student register" onRetry={() => refetch()} data-testid="students-load-error" />
+            ) : studentFiltersActive && students.length > 0 && filteredStudents.length === 0 ? (
+              <div className="text-center py-8" data-testid="students-no-match">
+                <Users className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+                <p className="font-medium">No students in {filterForm}</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {students.length} student{students.length === 1 ? "" : "s"} on the register in other classes.
+                </p>
+                <Button variant="outline" size="sm" className="mt-4" onClick={() => setFilterForm("all")} data-testid="button-clear-student-filter">
+                  Show all classes
+                </Button>
+              </div>
             ) : filteredStudents.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">No students found</p>
+              <div className="text-center py-8" data-testid="students-empty">
+                <Users className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+                <p className="font-medium">No students yet</p>
+                <p className="text-sm text-muted-foreground mt-1 mb-4">Add your first student, or paste a whole class at once.</p>
+                <Button size="sm" onClick={() => setIsAddDialogOpen(true)} data-testid="button-add-first-student">
+                  <PlusCircle className="h-4 w-4 mr-2" />
+                  Add Student
+                </Button>
+              </div>
             ) : (
               <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
                 {filteredStudents.map((student) => (

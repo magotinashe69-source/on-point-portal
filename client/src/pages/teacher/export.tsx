@@ -14,6 +14,7 @@ import {
   Users, BookOpen, CheckCircle, Clock, XCircle, History,
   Database, Filter, Calendar, AlertTriangle,
 } from "lucide-react";
+import { QueryError } from "@/components/QueryError";
 import logoPath from "@assets/logo.webp";
 import type { Assignment } from "@shared/schema";
 
@@ -102,7 +103,7 @@ export default function TeacherExport() {
     return false;
   })();
 
-  const { data: preview, isLoading: previewLoading } = useQuery<PreviewData>({
+  const { data: preview, isLoading: previewLoading, isError: previewIsError, error: previewError } = useQuery<PreviewData>({
     queryKey: ["/api/export/preview", exportType, selectedTerm, selectedForm, selectedSubject, selectedAssignmentId],
     queryFn: async () => {
       const res = await fetch(`/api/export/preview?${buildQueryParams()}`);
@@ -422,6 +423,11 @@ export default function TeacherExport() {
                   </p>
                 )}
               </div>
+            ) : previewIsError && !sessionExpired ? (
+              /* A failed count is not the same as a count of zero. Without this
+                 branch a 500 read as "No data matches the current filters",
+                 which would talk a teacher out of an export that was fine. */
+              <QueryError error={previewError} what="the preview" data-testid="preview-load-error" />
             ) : (
               <p className="text-sm text-muted-foreground py-4">
                 {!previewReady

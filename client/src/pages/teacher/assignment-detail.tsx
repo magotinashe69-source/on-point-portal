@@ -20,6 +20,7 @@ import { AttachmentDisplay } from "@/components/FileAttachmentZone";
 import type { Assignment, Student } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { QueryError } from "@/components/QueryError";
 import logoPath from "@assets/logo.webp";
 
 interface EnrichedSubmission {
@@ -40,12 +41,7 @@ export default function AssignmentDetail() {
   const { teacher } = useAuth();
   const { toast } = useToast();
 
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isExtendDialogOpen, setIsExtendDialogOpen] = useState(false);
-  const [editTitle, setEditTitle] = useState("");
-  const [editInstructions, setEditInstructions] = useState("");
-  const [editDueDate, setEditDueDate] = useState("");
-  const [editTopic, setEditTopic] = useState("");
   const [extensionStudentId, setExtensionStudentId] = useState("");
   const [extensionNewDate, setExtensionNewDate] = useState("");
   const [extensionReason, setExtensionReason] = useState("");
@@ -58,7 +54,7 @@ export default function AssignmentDetail() {
     }
   }, [teacher, setLocation]);
 
-  const { data: assignment, isLoading: assignmentLoading } = useQuery<Assignment>({
+  const { data: assignment, isLoading: assignmentLoading, isError: assignmentIsError, error: assignmentError, refetch: refetchAssignment } = useQuery<Assignment>({
     queryKey: ["/api/assignments", id],
     enabled: !!teacher && !!id,
     refetchInterval: 30000,
@@ -74,21 +70,6 @@ export default function AssignmentDetail() {
     queryKey: ["/api/students"],
     enabled: !!teacher,
     refetchInterval: 30000,
-  });
-
-  const updateAssignmentMutation = useMutation({
-    mutationFn: async (data: { title?: string; instructions?: string; dueDate?: string; topic?: string }) => {
-      return await apiRequest("PUT", `/api/assignments/${id}`, data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/assignments", id] });
-      queryClient.invalidateQueries({ queryKey: ["/api/assignments"] });
-      setIsEditDialogOpen(false);
-      toast({ title: "Assignment updated successfully" });
-    },
-    onError: () => {
-      toast({ title: "Failed to update assignment", variant: "destructive" });
-    },
   });
 
   const archiveAssignmentMutation = useMutation({
@@ -158,25 +139,6 @@ export default function AssignmentDetail() {
   const getSubmissionForStudent = (studentId: number) =>
     submissions?.find(s => s.studentId === studentId);
 
-  const handleOpenEditDialog = () => {
-    if (assignment) {
-      setEditTitle(assignment.title);
-      setEditInstructions(assignment.instructions);
-      setEditDueDate(new Date(assignment.dueDate).toISOString().split("T")[0]);
-      setEditTopic(assignment.topic || "");
-    }
-    setIsEditDialogOpen(true);
-  };
-
-  const handleSaveEdit = () => {
-    updateAssignmentMutation.mutate({
-      title: editTitle,
-      instructions: editInstructions,
-      dueDate: editDueDate,
-      topic: editTopic || undefined,
-    });
-  };
-
   const handleExtendDeadline = () => {
     if (!extensionStudentId || !extensionNewDate) return;
     extendDeadlineMutation.mutate({
@@ -219,6 +181,8 @@ export default function AssignmentDetail() {
           <div className="flex items-center justify-center py-16">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
+        ) : assignmentIsError ? (
+          <QueryError error={assignmentError} what="this assignment" variant="page" onRetry={() => refetchAssignment()} data-testid="assignment-load-error" />
         ) : assignment ? (
           <>
             {/* Header */}

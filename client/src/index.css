@@ -2,70 +2,125 @@
 @tailwind components;
 @tailwind utilities;
 
-/* LIGHT MODE - On Point Education Centre Color Scheme */
-/* Primary: Navy Blue from logo | Accent: Red from logo */
+/* ===========================================================================
+   SEMANTIC TOKEN LAYER — On Point Education Centre
+   ---------------------------------------------------------------------------
+   Primitives (spacing / type / radius / grey ramp / brand hues) are declared
+   in tailwind.config.ts. This file decides WHICH primitive plays WHICH ROLE,
+   per theme. shadcn components read these names and need no edits.
+
+   FORMAT RULE — every colour var is a bare HSL channel triplet, never hex.
+   tailwind.config.ts wraps them as `hsl(var(--x) / <alpha-value>)`, which is
+   what makes `bg-primary/10`, `border-gold/30` etc. work. A hex value here
+   silently breaks ~90 opacity modifiers across the app.
+
+   Values carry their Carbon token name and source hex in a comment. The brand
+   triplets are given to 1 decimal place because they round-trip exactly to the
+   specified hex — rounding to whole numbers drifts navy to #1F3965 and gold to
+   #C29100, i.e. not the brand colours.
+   =========================================================================== */
+
 :root {
+  /* --- BRAND PRIMITIVES ---------------------------------------------------
+     Consumed by the `navy` / `gold` Tailwind colours and by the semantic
+     roles below. Full-strength gold is a deliberate-CTA colour; the softer
+     gold surface used for hover/focus is --accent. */
+  --brand-navy: 218.3 52.7% 25.7%;             /* #1F3864 */
+  --brand-gold: 45.2 100% 37.5%;               /* #BF9000 */
+  --brand-gold-foreground: 0 0% 8.6%;          /* grey-100 — 6.21:1 on gold.
+                                                  White is 2.91:1 and fails
+                                                  WCAG even for large text. */
+  /* Gold is a FILL colour, not a text colour: #BF9000 is only 2.91:1 on white
+     and 2.73:1 on the landing page's cream stats bar, so it fails even the 3:1
+     large-text floor. This deeper gold is the one to write WITH: 4.57:1 on that
+     cream, 4.93:1 on white, and still unmistakably gold. */
+  --brand-gold-ink: 45.2 100% 28%;             /* #8F6C00 */
+
+  /* --- RADIUS — exactly two values ---------------------------------------- */
+  --radius-sm: 4px;
+  --radius-lg: 8px;
+  --radius: var(--radius-lg);                  /* back-compat alias */
+
+  /* --- ELEVATION / OUTLINE (unchanged) ------------------------------------ */
   --button-outline: rgba(0,0,0, .10);
   --badge-outline: rgba(0,0,0, .05);
-
   --opaque-button-border-intensity: -8;
-
   --elevate-1: rgba(0,0,0, .03);
   --elevate-2: rgba(0,0,0, .08);
 
-  --background: 0 0% 98%;
-  --foreground: 224 50% 15%;
+  /* --- SURFACES — Carbon White theme --------------------------------------
+     Page sits on grey-10, cards lift to white. This keeps the existing
+     figure/ground relationship (was 98% / 100%) on Carbon's ramp. */
+  --background: 0 0% 95.7%;                    /* grey-10  #f4f4f4 */
+  --foreground: 0 0% 8.6%;                     /* grey-100 #161616  16.45:1 */
 
-  --border: 224 20% 88%;
+  --card: 0 0% 100%;                           /* white            18.10:1 */
+  --card-foreground: 0 0% 8.6%;                /* grey-100 */
+  --card-border: 0 0% 87.8%;                   /* grey-20  #e0e0e0 */
 
-  --card: 0 0% 100%;
-  --card-foreground: 224 50% 15%;
-  --card-border: 224 20% 90%;
+  --popover: 0 0% 100%;                        /* white */
+  --popover-foreground: 0 0% 8.6%;             /* grey-100 */
+  --popover-border: 0 0% 87.8%;                /* grey-20 */
 
-  --sidebar: 224 45% 18%;
-  --sidebar-foreground: 0 0% 98%;
-  --sidebar-border: 224 45% 25%;
+  --muted: 0 0% 87.8%;                         /* grey-20  #e0e0e0 */
+  --muted-foreground: 0 0% 32.2%;              /* grey-70  #525252  7.81:1
+                                                  Carbon $text-secondary.
+                                                  grey-60 would be 5.02:1 —
+                                                  AA but thin for the ~360
+                                                  small-text uses. */
 
-  --sidebar-primary: 0 75% 50%;
-  --sidebar-primary-foreground: 0 0% 100%;
+  --border: 0 0% 87.8%;                        /* grey-20 — Carbon border-subtle */
+  --input: 0 0% 77.6%;                         /* grey-30 #c6c6c6 */
 
-  --sidebar-accent: 224 40% 25%;
-  --sidebar-accent-foreground: 0 0% 98%;
-
-  --sidebar-ring: 224 45% 35%;
-
-  --popover: 0 0% 100%;
-  --popover-foreground: 224 50% 15%;
-  --popover-border: 224 20% 88%;
-
-  --primary: 224 65% 35%;
+  /* --- BRAND ROLES --------------------------------------------------------- */
+  --primary: var(--brand-navy);                /* #1F3864 — white text 11.62:1 */
   --primary-foreground: 0 0% 100%;
+  --ring: var(--brand-navy);
 
+  /* Gold as accent. shadcn drives hover/focus surfaces off --accent (56 uses,
+     mostly focus:bg-accent rows in menus/selects), so this slot holds a soft
+     gold WASH rather than full-strength gold — a solid #BF9000 highlight bar
+     is overwhelming at that size. Full gold stays available as `bg-gold`.
+     Note this replaces the previous value, which was 0 75% 50% — the exact
+     same saturated red as --secondary, so menu focus rows were solid red. */
+  --accent: 45 85% 90%;                        /* #FBF0D0  gold wash  15.92:1 */
+  --accent-foreground: 0 0% 8.6%;              /* grey-100 */
+
+  /* Logo red. Out of scope for this change — it carries "pending / awaiting
+     review" meaning in ~25 places — so it keeps its value. */
   --secondary: 0 75% 50%;
   --secondary-foreground: 0 0% 100%;
-
-  --muted: 224 15% 94%;
-  --muted-foreground: 224 20% 45%;
-
-  --accent: 0 75% 50%;
-  --accent-foreground: 0 0% 100%;
 
   --destructive: 0 85% 50%;
   --destructive-foreground: 0 0% 100%;
 
-  --input: 224 20% 85%;
-  --ring: 224 65% 35%;
-  
-  --chart-1: 224 65% 35%;
-  --chart-2: 0 75% 50%;
-  --chart-3: 224 45% 55%;
-  --chart-4: 0 60% 65%;
-  --chart-5: 224 30% 70%;
+  /* --- CHARTS — navy, gold, then Carbon greys ------------------------------
+     NOTE: client/src/pages/teacher/reports.tsx hardcodes hsl(224,65%,35%) and
+     hsl(0,75%,50%) — the OLD light-mode values of these two vars — so its
+     charts do not follow the theme and stay light in dark mode. Switch those
+     to hsl(var(--chart-1)) / hsl(var(--chart-2)) to pick this up. */
+  --chart-1: 218.3 52.7% 25.7%;                /* navy */
+  --chart-2: 45.2 100% 37.5%;                  /* gold */
+  --chart-3: 0 0% 43.5%;                       /* grey-60 */
+  --chart-4: 218.3 40% 55%;                    /* navy, lifted */
+  --chart-5: 0 0% 77.6%;                       /* grey-30 */
 
+  /* --- SIDEBAR — navy surface, gold active state --------------------------- */
+  --sidebar: 218.3 52.7% 18%;                  /* navy, deepened */
+  --sidebar-foreground: 0 0% 95.7%;            /* grey-10 */
+  --sidebar-border: 218.3 40% 28%;
+  --sidebar-primary: var(--brand-gold);
+  --sidebar-primary-foreground: 0 0% 8.6%;     /* grey-100 on gold */
+  --sidebar-accent: 218.3 45% 28%;
+  --sidebar-accent-foreground: 0 0% 95.7%;
+  --sidebar-ring: 45.2 100% 37.5%;
+
+  /* --- TYPE / SHADOW (unchanged) ------------------------------------------- */
   --font-sans: 'Poppins', sans-serif;
   --font-serif: 'Playfair Display', serif;
   --font-mono: 'JetBrains Mono', monospace;
-  --radius: .5rem;
+  --tracking-normal: 0em;
+
   --shadow-2xs: 0 1px 2px rgba(30, 58, 138, 0.04);
   --shadow-xs: 0 1px 3px rgba(30, 58, 138, 0.06);
   --shadow-sm: 0 1px 3px rgba(30, 58, 138, 0.06), 0 1px 2px rgba(30, 58, 138, 0.04);
@@ -74,9 +129,8 @@
   --shadow-lg: 0 10px 15px rgba(30, 58, 138, 0.1), 0 4px 6px rgba(30, 58, 138, 0.05);
   --shadow-xl: 0 20px 25px rgba(30, 58, 138, 0.1), 0 8px 10px rgba(30, 58, 138, 0.04);
   --shadow-2xl: 0 25px 50px rgba(30, 58, 138, 0.15);
-  --tracking-normal: 0em;
-  --spacing: 0.25rem;
 
+  /* --- DERIVED BORDERS (unchanged) ----------------------------------------- */
   --sidebar-primary-border: hsl(var(--sidebar-primary));
   --sidebar-primary-border: hsl(from hsl(var(--sidebar-primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
 
@@ -99,63 +153,71 @@
   --destructive-border: hsl(from hsl(var(--destructive)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
 }
 
+/* ===========================================================================
+   DARK — Carbon Gray 100 theme
+   Surfaces step DOWN the ramp (100 -> 90 -> 80); text steps UP (10 / 30).
+   Brand hues keep their hue and saturation and gain lightness so they read
+   against a #161616 ground.
+   =========================================================================== */
 .dark {
+  --brand-navy: 218 53% 62%;                   /* #6B90D1 — navy, lifted */
+  --brand-gold: 45 90% 55%;                    /* #F4C025 — gold, lifted */
+  --brand-gold-foreground: 0 0% 8.6%;          /* grey-100 — 10.70:1 */
+  --brand-gold-ink: 45 90% 55%;                /* on a dark ground the lifted gold IS readable */
+
   --button-outline: rgba(255,255,255, .10);
   --badge-outline: rgba(255,255,255, .05);
-
   --opaque-button-border-intensity: 9;
-
   --elevate-1: rgba(255,255,255, .04);
   --elevate-2: rgba(255,255,255, .09);
 
-  --background: 224 45% 8%;
-  --foreground: 0 0% 95%;
+  --background: 0 0% 8.6%;                     /* grey-100 #161616 */
+  --foreground: 0 0% 95.7%;                    /* grey-10  #f4f4f4  16.45:1 */
 
-  --border: 224 30% 20%;
+  --card: 0 0% 14.9%;                          /* grey-90  #262626  13.76:1 */
+  --card-foreground: 0 0% 95.7%;
+  --card-border: 0 0% 22.4%;                   /* grey-80  #393939 */
 
-  --card: 224 40% 12%;
-  --card-foreground: 0 0% 95%;
-  --card-border: 224 30% 22%;
+  --popover: 0 0% 14.9%;                       /* grey-90 */
+  --popover-foreground: 0 0% 95.7%;
+  --popover-border: 0 0% 22.4%;                /* grey-80 */
 
-  --sidebar: 224 50% 10%;
-  --sidebar-foreground: 0 0% 95%;
-  --sidebar-border: 224 40% 18%;
+  --muted: 0 0% 22.4%;                         /* grey-80  #393939 */
+  --muted-foreground: 0 0% 77.6%;              /* grey-30  #c6c6c6  8.86:1
+                                                  Carbon $text-secondary (dark) */
 
-  --sidebar-primary: 0 70% 55%;
-  --sidebar-primary-foreground: 0 0% 100%;
+  --border: 0 0% 22.4%;                        /* grey-80 */
+  --input: 0 0% 32.2%;                         /* grey-70  #525252 */
 
-  --sidebar-accent: 224 45% 20%;
-  --sidebar-accent-foreground: 0 0% 95%;
+  --primary: var(--brand-navy);                /* #6B90D1 */
+  --primary-foreground: 0 0% 8.6%;             /* grey-100 — 5.63:1.
+                                                  White would be 3.21:1, which
+                                                  fails AA for button text. */
+  --ring: var(--brand-navy);
 
-  --sidebar-ring: 224 45% 30%;
-
-  --popover: 224 40% 12%;
-  --popover-foreground: 0 0% 95%;
-  --popover-border: 224 30% 22%;
-
-  --primary: 224 55% 50%;
-  --primary-foreground: 0 0% 100%;
+  --accent: 45 55% 20%;                        /* #4F4117 deep gold  9.09:1 */
+  --accent-foreground: 0 0% 95.7%;             /* grey-10 */
 
   --secondary: 0 70% 55%;
   --secondary-foreground: 0 0% 100%;
 
-  --muted: 224 30% 18%;
-  --muted-foreground: 224 15% 60%;
-
-  --accent: 0 70% 55%;
-  --accent-foreground: 0 0% 100%;
-
   --destructive: 0 75% 55%;
   --destructive-foreground: 0 0% 100%;
 
-  --input: 224 30% 25%;
-  --ring: 224 55% 50%;
-  
-  --chart-1: 224 55% 55%;
-  --chart-2: 0 70% 55%;
-  --chart-3: 224 40% 65%;
-  --chart-4: 0 55% 70%;
-  --chart-5: 224 25% 75%;
+  --chart-1: 218 53% 62%;                      /* navy, lifted */
+  --chart-2: 45 90% 55%;                       /* gold, lifted */
+  --chart-3: 0 0% 65.9%;                       /* grey-40 */
+  --chart-4: 218 40% 75%;
+  --chart-5: 0 0% 43.5%;                       /* grey-60 */
+
+  --sidebar: 0 0% 8.6%;                        /* grey-100 */
+  --sidebar-foreground: 0 0% 95.7%;
+  --sidebar-border: 0 0% 22.4%;                /* grey-80 */
+  --sidebar-primary: var(--brand-gold);
+  --sidebar-primary-foreground: 0 0% 8.6%;
+  --sidebar-accent: 0 0% 22.4%;                /* grey-80 */
+  --sidebar-accent-foreground: 0 0% 95.7%;
+  --sidebar-ring: 45 90% 55%;
 
   --shadow-2xs: 0 1px 2px rgba(0, 0, 0, 0.2);
   --shadow-xs: 0 1px 3px rgba(0, 0, 0, 0.25);
@@ -165,6 +227,50 @@
   --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.35), 0 4px 6px rgba(0, 0, 0, 0.2);
   --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.35), 0 8px 10px rgba(0, 0, 0, 0.2);
   --shadow-2xl: 0 25px 50px rgba(0, 0, 0, 0.4);
+}
+
+
+/* ===========================================================================
+   LANDING PAGE SCOPE
+   ---------------------------------------------------------------------------
+   The front door is deliberately bright in BOTH themes. That was already true
+   before tokens (the page hardcoded a light background); this makes the choice
+   explicit and, more importantly, safe.
+
+   Why it has to exist: the page uses brand utilities like `bg-navy` and
+   `text-navy`. Those read --brand-navy, which lightens to #6B90D1 in dark mode
+   so it can sit on a dark ground. On a page that stays light, that lightened
+   navy would be unreadable. Re-declaring the tokens here pins them to their
+   light values for this subtree only, so the page can use the real design
+   tokens instead of hardcoded hex without breaking when the app is dark.
+
+   To let the landing page follow the theme instead, delete this block and the
+   `op-landing` class on the page's root <div>. Expect to design dark values for
+   the pastel feature cards and the hero gradient before doing so.
+   =========================================================================== */
+.op-landing {
+  /* Brand, pinned to the light values from :root */
+  --brand-navy: 218.3 52.7% 25.7%;             /* #1F3864 */
+  --brand-gold: 45.2 100% 37.5%;               /* #BF9000 */
+  --brand-gold-foreground: 0 0% 8.6%;          /* grey-100 - 6.21:1 on gold */
+  --brand-gold-ink: 45.2 100% 28%;             /* #8F6C00 - gold you can read */
+
+  /* Surfaces */
+  --background: 222 100% 98%;                  /* #F5F8FF - the page's own tint */
+  --foreground: 0 0% 8.6%;                     /* grey-100 */
+  --card: 0 0% 100%;                           /* white */
+  --card-foreground: 0 0% 8.6%;
+  --muted-foreground: 0 0% 32.2%;              /* grey-70 */
+  --border: 0 0% 87.8%;                        /* grey-20 */
+
+  /* Landing-only decorative ramp: the hero/CTA gradients and the drifting
+     stars. Scoped here because nothing else in the app uses them. */
+  --landing-navy-400: 219.4 46.8% 42.7%;       /* #3A5DA0 */
+  --landing-navy-500: 218.1 49.7% 33.5%;       /* #2B4A80 */
+  --landing-sky: 215.6 73% 78.2%;              /* #9FC0F0 */
+  --landing-sky-soft: 215.7 65.9% 73.5%;       /* #8FB3E8 */
+  --landing-gold-300: 45.2 86.5% 62.4%;        /* #F2C94C */
+  --landing-gold-50: 40.8 100% 95.1%;          /* #FFF7E6 */
 }
 
 @layer base {

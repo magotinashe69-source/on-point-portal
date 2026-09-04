@@ -16,7 +16,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import logoPath from "@assets/logo.webp";
 
 export default function TeacherLogin() {
-  const [location, setLocation] = useLocation();
+  const [, setLocation] = useLocation();
   const { teacher, setTeacher } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);

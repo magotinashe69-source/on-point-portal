@@ -17,7 +17,6 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { 
   ArrowLeft, 
   Loader2, 
-  Save, 
   CheckCircle, 
   Image as ImageIcon,
   ZoomIn,
@@ -28,6 +27,7 @@ import {
 } from "lucide-react";
 import { Lightbox } from "@/components/Lightbox";
 import type { Submission, Assignment, Mark, Student } from "@shared/schema";
+import { QueryError } from "@/components/QueryError";
 import logoPath from "@assets/logo.webp";
 
 const markQuestionSchema = z.object({
@@ -66,7 +66,7 @@ export default function MarkSubmission() {
     }
   }, [teacher, setLocation]);
 
-  const { data: submissionData, isLoading: submissionLoading } = useQuery<Submission & { assignment?: Assignment }>({
+  const { data: submissionData, isLoading: submissionLoading, isError: submissionIsError, error: submissionError, refetch: refetchSubmission } = useQuery<Submission & { assignment?: Assignment }>({
     queryKey: ["/api/submissions", id],
     enabled: !!teacher && !!id,
   });
@@ -190,6 +190,8 @@ export default function MarkSubmission() {
           <div className="flex items-center justify-center py-16">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
+        ) : submissionIsError ? (
+          <QueryError error={submissionError} what="this submission" variant="page" onRetry={() => refetchSubmission()} data-testid="submission-load-error" />
         ) : submission && assignment && assignment.questions ? (
           <>
             <div className="mb-8">

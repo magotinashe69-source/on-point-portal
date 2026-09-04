@@ -30,7 +30,6 @@ import {
   ChevronDown,
   ChevronUp,
   ClipboardList,
-  XCircle,
   Pencil
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -38,6 +37,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import type { Assignment, Student, Announcement } from "@shared/schema";
+import { QueryError, describeError } from "@/components/QueryError";
 import logoPath from "@assets/logo.webp";
 
 interface EnrichedSubmission {
@@ -63,33 +63,36 @@ export default function TeacherDashboard() {
 
   // The teacher's list is the one place that also shows drafts. The server only
   // honours includeDrafts for a logged-in teacher, so students never get them.
-  const { data: assignments, isLoading: assignmentsLoading } = useQuery<Assignment[]>({
+  const { data: assignments, isLoading: assignmentsLoading, isError: assignmentsError, error: assignmentsErr, refetch: refetchAssignments } = useQuery<Assignment[]>({
     queryKey: ["/api/assignments", { includeDrafts: true }],
     enabled: !!teacher,
     refetchInterval: 30000,
   });
 
-  const { data: students, isLoading: studentsLoading } = useQuery<Student[]>({
+  const { data: students, isLoading: studentsLoading, isError: studentsError } = useQuery<Student[]>({
     queryKey: ["/api/students"],
     enabled: !!teacher,
     refetchInterval: 30000,
   });
 
-  const { data: submissions, isLoading: submissionsLoading } = useQuery<EnrichedSubmission[]>({
+  const { data: submissions, isLoading: submissionsLoading, isError: submissionsError, error: submissionsErr, refetch: refetchSubmissions } = useQuery<EnrichedSubmission[]>({
     queryKey: ["/api/submissions"],
     enabled: !!teacher,
     refetchInterval: 30000,
   });
 
-  const { data: announcements, isLoading: announcementsLoading } = useQuery<Announcement[]>({
+  const { data: announcements } = useQuery<Announcement[]>({
     queryKey: ["/api/announcements"],
     enabled: !!teacher,
   });
 
-  const { data: archivedAssignments, isLoading: archivedLoading } = useQuery<Assignment[]>({
+  const { data: archivedAssignments } = useQuery<Assignment[]>({
     queryKey: ["/api/assignments", { archived: true }],
     queryFn: async () => {
+      // Was `return res.json()` with no check - an error body from a 500 flowed
+      // through as if it were the list of archived assignments.
       const res = await fetch("/api/assignments?archived=true");
+      if (!res.ok) throw new Error(res.status + ": failed to load archived assignments");
       return res.json();
     },
     enabled: !!teacher,
@@ -202,6 +205,9 @@ export default function TeacherDashboard() {
     onSuccess: () => {
       toast({ title: "Announcement Deleted" });
       queryClient.invalidateQueries({ queryKey: ["/api/announcements"] });
+    },
+    onError: (error) => {
+      toast({ title: "Couldn't delete announcement", description: describeError(error, "the announcement"), variant: "destructive" });
     },
   });
 
@@ -394,7 +400,7 @@ export default function TeacherDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold" data-testid="text-total-students">
-                {studentsLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : `${students?.length || 0} students`}
+                {studentsLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : studentsError ? "—" : `${students?.length || 0} students`}
               </div>
             </CardContent>
           </Card>
@@ -406,7 +412,7 @@ export default function TeacherDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {assignmentsLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : assignments?.length || 0}
+                {assignmentsLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : assignmentsError ? "—" : assignments?.length || 0}
               </div>
             </CardContent>
           </Card>
@@ -418,7 +424,7 @@ export default function TeacherDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-secondary">
-                {submissionsLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : pendingSubmissions.length}
+                {submissionsLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : submissionsError ? "—" : pendingSubmissions.length}
               </div>
             </CardContent>
           </Card>
@@ -430,7 +436,7 @@ export default function TeacherDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-primary">
-                {submissionsLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : markedSubmissions.length}
+                {submissionsLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : submissionsError ? "—" : markedSubmissions.length}
               </div>
             </CardContent>
           </Card>
@@ -442,7 +448,7 @@ export default function TeacherDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {submissionsLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : submissions?.length || 0}
+                {submissionsLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : submissionsError ? "—" : submissions?.length || 0}
               </div>
             </CardContent>
           </Card>
@@ -802,6 +808,8 @@ export default function TeacherDashboard() {
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
+              ) : assignmentsError ? (
+                <QueryError error={assignmentsErr} what="your assignments" onRetry={() => refetchAssignments()} data-testid="assignments-load-error" />
               ) : filteredAssignments.length > 0 ? (
                 <div className="space-y-5 max-h-[600px] overflow-y-auto pr-1">
                   {/* Drafts first — these are the ones waiting for a tap. */}
@@ -861,6 +869,8 @@ export default function TeacherDashboard() {
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
+              ) : submissionsError ? (
+                <QueryError error={submissionsErr} what="pending submissions" onRetry={() => refetchSubmissions()} data-testid="submissions-load-error" />
               ) : filteredPendingSubmissions.length > 0 ? (
                 <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
                   {filteredPendingSubmissions.map((submission) => (

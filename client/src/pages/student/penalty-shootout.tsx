@@ -33,6 +33,7 @@ import {
   ANSWER_REVEAL_MS, CORNERS, MIN_QUESTIONS, SHOTS_PER_ROUND, TOTAL_SHOTS,
   scoreLine, type Corner, type Shot,
 } from "@shared/penalty";
+import { QueryError } from "@/components/QueryError";
 import logoPath from "@assets/logo.webp";
 
 interface SubjectChoice {
@@ -108,7 +109,7 @@ function PenaltyShootoutContent() {
     if (!isPrimaryForm(student.form)) setLocation("/student/dashboard");
   }, [student, setLocation]);
 
-  const { data: subjectData, isLoading: subjectsLoading } = useQuery<{ success: boolean; subjects: SubjectChoice[] }>({
+  const { data: subjectData, isLoading: subjectsLoading, isError: subjectsIsError, error: subjectsError, refetch: refetchSubjects } = useQuery<{ success: boolean; subjects: SubjectChoice[] }>({
     queryKey: ["/api/students", student?.id, "penalty", "subjects"],
     enabled: !!student && isPrimaryForm(student?.form ?? ""),
   });
@@ -313,6 +314,11 @@ function PenaltyShootoutContent() {
 
             {subjectsLoading ? (
               <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
+            ) : subjectsIsError ? (
+              /* Without this a failed request read as "No games ready yet",
+                 which tells the child their teacher has not set enough
+                 questions - when really we just could not ask. */
+              <QueryError error={subjectsError} what="your games" role="student" onRetry={() => refetchSubjects()} data-testid="penalty-subjects-error" />
             ) : subjects.length === 0 ? (
               <Card>
                 <CardContent className="py-10 text-center text-sm text-muted-foreground">
@@ -340,6 +346,7 @@ function PenaltyShootoutContent() {
                         <div className="font-semibold text-lg">{s.subject}</div>
                         <div className="text-xs text-muted-foreground">
                           {SHOTS_PER_ROUND} penalties + {SHOTS_PER_ROUND} saves
+                          {s.questionCount > 0 && ` · ${s.questionCount} question${s.questionCount === 1 ? "" : "s"}`}
                           {s.gamesPlayed > 0 && ` · played ${s.gamesPlayed} time${s.gamesPlayed === 1 ? "" : "s"}`}
                         </div>
                       </div>

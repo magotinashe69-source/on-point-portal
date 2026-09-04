@@ -16,7 +16,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import logoPath from "@assets/logo.webp";
 
 export default function StudentLoginPage() {
-  const [location, setLocation] = useLocation();
+  const [, setLocation] = useLocation();
   const { student, setStudent, logout } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);

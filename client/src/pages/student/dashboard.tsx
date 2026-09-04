@@ -27,6 +27,7 @@ import { isPrimaryForm } from "@shared/schema";
 import { XpLevelBar } from "@/components/XpLevelBar";
 import { StreakFlame } from "@/components/StreakFlame";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { QueryError } from "@/components/QueryError";
 import logoPath from "@assets/logo.webp";
 
 interface EnrichedSubmission {
@@ -38,6 +39,7 @@ interface EnrichedSubmission {
   studentName?: string;
   assignmentTitle?: string;
   totalMarks?: number;
+  score?: number | null;
 }
 
 export default function StudentDashboard() {
@@ -50,12 +52,12 @@ export default function StudentDashboard() {
     }
   }, [student, setLocation]);
 
-  const { data: assignments, isLoading: assignmentsLoading } = useQuery<Assignment[]>({
+  const { data: assignments, isLoading: assignmentsLoading, isError: assignmentsError, error: assignmentsErr, refetch: refetchAssignments } = useQuery<Assignment[]>({
     queryKey: ["/api/assignments", { form: student?.form, studentId: student?.id }],
     enabled: !!student,
   });
 
-  const { data: submissions, isLoading: submissionsLoading } = useQuery<EnrichedSubmission[]>({
+  const { data: submissions, isLoading: submissionsLoading, isError: submissionsError, error: submissionsErr, refetch: refetchSubmissions } = useQuery<EnrichedSubmission[]>({
     queryKey: ["/api/submissions", { studentId: student?.id }],
     enabled: !!student,
   });
@@ -81,7 +83,7 @@ export default function StudentDashboard() {
     };
   }
 
-  const { data: statsData, isLoading: statsLoading } = useQuery<{ success: boolean; stats: StudentStats }>({
+  const { data: statsData, isLoading: statsLoading, isError: statsError } = useQuery<{ success: boolean; stats: StudentStats }>({
     queryKey: ["/api/students", student?.id, "stats"],
     enabled: !!student,
   });
@@ -109,6 +111,15 @@ export default function StudentDashboard() {
     const now = new Date();
     const diffDays = (due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
     return diffDays <= 2 && diffDays >= 0;
+  };
+
+  // Same bands the results page uses, so a score is the same colour wherever
+  // this student sees it.
+  const gradeBadgeClass = (pct: number) => {
+    if (pct >= 80) return "bg-green-600 text-white hover:bg-green-600";
+    if (pct >= 60) return "bg-primary text-primary-foreground hover:bg-primary";
+    if (pct >= 40) return "bg-yellow-500 text-white hover:bg-yellow-500";
+    return "bg-destructive text-destructive-foreground hover:bg-destructive";
   };
 
   const getPriorityBadge = (priority: string | null) => {
@@ -150,6 +161,18 @@ export default function StudentDashboard() {
             from the stats already loaded above, so this adds no extra request.
             Shows zeroed values until stats arrive. */}
         <ErrorBoundary label="xp-streak">
+          {/* If the stats request failed we must NOT fall back to zeros here:
+              level 0 / 0 XP / no streak is a real, meaningful state for a new
+              student, so showing it would tell this student something untrue
+              about their own progress. Say we couldn't load it instead. */}
+          {statsError ? (
+            <div
+              className="rounded-xl border bg-muted/40 px-4 py-3 text-center text-sm text-muted-foreground"
+              data-testid="stats-load-error"
+            >
+              Couldn&apos;t load your level and streak just now — your progress is safe. Pull down to refresh.
+            </div>
+          ) : (
           <div className="flex flex-col sm:flex-row sm:items-start gap-3">
             <div className="flex-1 min-w-0">
               <XpLevelBar
@@ -165,6 +188,7 @@ export default function StudentDashboard() {
               maxFreezes={statsData?.stats?.streak?.maxFreezes ?? 2}
             />
           </div>
+          )}
 
           {/* A gentle one-time note when a freeze saved the streak, a milestone
               was reached, or a lost streak needs an encouraging nudge. */}
@@ -225,7 +249,7 @@ export default function StudentDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-primary">
-                {statsLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : `${statsData?.stats?.averageScore || 0}%`}
+                {statsLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : statsError ? <span className="text-muted-foreground">—</span> : `${statsData?.stats?.averageScore || 0}%`}
               </div>
               <p className="text-xs text-muted-foreground">across all marked work</p>
             </CardContent>
@@ -353,6 +377,8 @@ export default function StudentDashboard() {
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
+              ) : assignmentsError ? (
+                <QueryError error={assignmentsErr} what="your assignments" role="student" onRetry={() => refetchAssignments()} data-testid="assignments-load-error" />
               ) : pendingAssignments.length > 0 ? (
                 <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
                   {pendingAssignments.map((assignment) => (
@@ -409,6 +435,8 @@ export default function StudentDashboard() {
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
+              ) : submissionsError ? (
+                <QueryError error={submissionsErr} what="your results" role="student" onRetry={() => refetchSubmissions()} data-testid="results-load-error" />
               ) : markedSubmissions.length > 0 ? (
                 <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
                   {markedSubmissions.map((submission) => (
@@ -424,7 +452,19 @@ export default function StudentDashboard() {
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Badge variant="default">View Results</Badge>
+                          {/* The mark itself, not a "View Results" label. This row
+                              exists because the work has been marked, so the score
+                              is the one thing worth showing without a tap. */}
+                          {submission.score !== null && submission.score !== undefined && submission.totalMarks ? (
+                            <Badge
+                              className={gradeBadgeClass(Math.round((submission.score / submission.totalMarks) * 100))}
+                              data-testid={`badge-score-${submission.id}`}
+                            >
+                              {submission.score}/{submission.totalMarks}
+                            </Badge>
+                          ) : (
+                            <Badge variant="default">View Results</Badge>
+                          )}
                           <ArrowRight className="h-4 w-4 text-muted-foreground" />
                         </div>
                       </div>

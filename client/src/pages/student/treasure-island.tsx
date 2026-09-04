@@ -10,6 +10,7 @@ import { ArrowLeft, Loader2, Lock, CheckCircle } from "lucide-react";
 import { COLLECTIBLES, TREASURE_HUNT_TOTAL } from "@shared/collectibles";
 import { isPrimaryForm, type StudentReward } from "@shared/schema";
 import { collectibleEmoji } from "@/lib/collectible-emoji";
+import { QueryError } from "@/components/QueryError";
 import logoPath from "@assets/logo.webp";
 
 // Where each of the 12 treasures sits on the island. The order matches
@@ -238,7 +239,7 @@ export default function TreasureIsland() {
     }
   }, [student, setLocation]);
 
-  const { data, isLoading } = useQuery<{ success: boolean; rewards: StudentReward[] }>({
+  const { data, isLoading, isError, error, refetch } = useQuery<{ success: boolean; rewards: StudentReward[] }>({
     queryKey: ["/api/students/" + student?.id + "/rewards"],
     enabled: !!student && isPrimaryForm(student.form),
   });
@@ -314,6 +315,10 @@ export default function TreasureIsland() {
           <div className="flex items-center justify-center py-16">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
+        ) : isError ? (
+          /* Without this, a failed rewards fetch drew all twelve chests locked -
+             which looks exactly like a child who has not collected anything yet. */
+          <QueryError error={error} what="your treasures" variant="page" role="student" onRetry={() => refetch()} data-testid="treasure-load-error" />
         ) : (
           <>
             {/* The island map — the winding trail with all 12 treasure spots. */}

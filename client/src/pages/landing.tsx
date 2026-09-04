@@ -15,12 +15,29 @@ import logoPath from "@assets/logo.webp";
 //    off automatically when the phone asks for reduced motion.
 // ---------------------------------------------------------------------------
 
-// Brand colours in one place so they are easy to change later.
-const NAVY = "#1F3864";
-const GOLD = "#BF9000";
+// Brand colours come from the design tokens, not from literals. The page is
+// wrapped in `.op-landing` (see client/src/index.css), which pins those tokens
+// to their light values, so the front door stays bright even when the rest of
+// the app is in dark mode — and `bg-navy` / `bg-gold` still mean the brand
+// colours rather than their dark-mode variants.
+const NAVY = "hsl(var(--brand-navy))";        /* #1F3864 */
+const GOLD = "hsl(var(--brand-gold))";        /* #BF9000 */
+
+// Decorative ramp used only by this page's hero, stars and gradients.
+const GOLD_LIGHT = "hsl(var(--landing-gold-300))";  /* #F2C94C */
+const NAVY_MID = "hsl(var(--landing-navy-500))";    /* #2B4A80 */
+const NAVY_LIGHT = "hsl(var(--landing-navy-400))";  /* #3A5DA0 */
+const SKY = "hsl(var(--landing-sky))";              /* #9FC0F0 */
+const SKY_SOFT = "hsl(var(--landing-sky-soft))";    /* #8FB3E8 */
 
 // The subjects shown as colourful tiles. Each has a friendly emoji and its
 // own bright colour. "More" hints there are others (the app has 12 subjects).
+//
+// These stay as literals on purpose: they are a CATEGORICAL palette (one
+// arbitrary colour per subject, used only as a soft tinted chip behind an
+// emoji), not brand or semantic colour. Turning them into design tokens would
+// imply they mean something reusable elsewhere. Same for the FEATURES pastels
+// and the mascot artwork below.
 const SUBJECTS = [
   { name: "Maths", emoji: "➗", color: "#EF6F6C" },
   { name: "English", emoji: "📚", color: "#5B8DEF" },
@@ -64,7 +81,7 @@ function StarMascot() {
     <svg viewBox="0 0 200 200" className="w-full h-full" role="img" aria-label="On Point star mascot">
       <defs>
         <linearGradient id="starFill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#F2C94C" />
+          <stop offset="0%" stopColor={GOLD_LIGHT} />
           <stop offset="100%" stopColor={GOLD} />
         </linearGradient>
       </defs>
@@ -108,9 +125,9 @@ export default function Landing() {
 
   return (
     // Explicit light background so the page stays bright even in dark theme.
-    <div className="min-h-screen" style={{ backgroundColor: "#F5F8FF" }}>
+    <div className="op-landing min-h-screen bg-background">
       {/* ================= NAV ================= */}
-      <header className="sticky top-0 z-50 w-full backdrop-blur bg-white/85 border-b border-black/5">
+      <header className="sticky top-0 z-50 w-full backdrop-blur bg-card/85 border-b border-black/5">
         <div className="mx-auto max-w-6xl flex h-16 items-center justify-between gap-4 px-4">
           <Link href="/" className="flex items-center gap-2 shrink-0">
             <img src={logoPath} alt="On Point Education Centre" className="h-9 w-auto" />
@@ -138,8 +155,7 @@ export default function Landing() {
             </Link>
             <Link
               href="/student/login"
-              className="font-bold px-5 py-2 rounded-full text-white shadow-sm transition-transform hover:scale-105"
-              style={{ backgroundColor: GOLD }}
+              className="font-bold px-5 py-2 rounded-full bg-gold text-gold-foreground shadow-sm transition-transform hover:scale-105"
               data-testid="link-signup"
             >
               Sign Up
@@ -182,7 +198,7 @@ export default function Landing() {
       {/* ================= HERO ================= */}
       <section
         className="relative overflow-hidden"
-        style={{ background: "linear-gradient(160deg, #3A5DA0 0%, #2B4A80 55%, #1F3864 100%)" }}
+        style={{ background: `linear-gradient(160deg, ${NAVY_LIGHT} 0%, ${NAVY_MID} 55%, ${NAVY} 100%)` }}
       >
         {/* Drifting gold stars — pure CSS, positioned by hand. */}
         {[
@@ -195,7 +211,7 @@ export default function Landing() {
           <span
             key={i}
             className="op-drift absolute select-none"
-            style={{ top: star.top, left: star.left, animationDelay: star.d, fontSize: star.s, color: "#F2C94C" }}
+            style={{ top: star.top, left: star.left, animationDelay: star.d, fontSize: star.s, color: GOLD_LIGHT }}
             aria-hidden="true"
           >
             ★
@@ -205,7 +221,7 @@ export default function Landing() {
         {/* A small planet floating in the background. */}
         <div className="op-float absolute -right-6 top-10 opacity-70" aria-hidden="true">
           <svg width="90" height="90" viewBox="0 0 90 90">
-            <circle cx="45" cy="45" r="26" fill="#8FB3E8" />
+            <circle cx="45" cy="45" r="26" fill={SKY_SOFT} />
             <ellipse cx="45" cy="45" rx="42" ry="12" fill="none" stroke={GOLD} strokeWidth="4" transform="rotate(-20 45 45)" />
           </svg>
         </div>
@@ -215,12 +231,12 @@ export default function Landing() {
           <div className="op-slide-in text-center md:text-left">
             <h1 className="font-extrabold leading-tight tracking-tight text-4xl sm:text-5xl lg:text-6xl">
               <span className="text-white">Homework </span>
-              <span style={{ color: "#F2C94C" }}>Made </span>
-              <span style={{ color: "#9FC0F0" }}>Fun, </span>
+              <span style={{ color: GOLD_LIGHT }}>Made </span>
+              <span style={{ color: SKY }}>Fun, </span>
               <br className="hidden sm:block" />
-              <span style={{ color: "#F2C94C" }}>Learning </span>
+              <span style={{ color: GOLD_LIGHT }}>Learning </span>
               <span className="text-white">Made </span>
-              <span style={{ color: "#9FC0F0" }}>Easy!</span>
+              <span style={{ color: SKY }}>Easy!</span>
             </h1>
             <p className="mt-5 text-lg text-white/85 max-w-lg mx-auto md:mx-0">
               Your fun buddy for homework, practice &amp; success at On Point Education Centre.
@@ -228,8 +244,7 @@ export default function Landing() {
             <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center md:justify-start">
               <Link
                 href="/student/login"
-                className="op-lift rounded-full px-7 py-4 font-bold text-lg text-white shadow-lg"
-                style={{ backgroundColor: GOLD }}
+                className="op-lift rounded-full px-7 py-4 font-bold text-lg bg-gold text-gold-foreground shadow-lg"
                 data-testid="button-student-start"
               >
                 Let's Start! 🚀
@@ -254,7 +269,7 @@ export default function Landing() {
 
         {/* Wavy bottom edge (SVG) into the next section. */}
         <svg className="block w-full" viewBox="0 0 1440 80" preserveAspectRatio="none" style={{ height: 48 }} aria-hidden="true">
-          <path d="M0 40 C240 90 480 0 720 30 C960 60 1200 10 1440 40 L1440 80 L0 80 Z" fill="#F5F8FF" />
+          <path d="M0 40 C240 90 480 0 720 30 C960 60 1200 10 1440 40 L1440 80 L0 80 Z" fill="hsl(var(--background))" />
         </svg>
       </section>
 
@@ -274,8 +289,7 @@ export default function Landing() {
             >
               {f.soon && (
                 <span
-                  className="absolute top-3 -right-8 rotate-45 text-white text-[10px] font-bold px-8 py-1 shadow"
-                  style={{ backgroundColor: GOLD }}
+                  className="absolute top-3 -right-8 rotate-45 bg-gold text-gold-foreground text-[10px] font-bold px-8 py-1 shadow"
                 >
                   Coming soon
                 </span>
@@ -289,7 +303,7 @@ export default function Landing() {
       </section>
 
       {/* ================= SUBJECTS STRIP ================= */}
-      <section id="subjects" className="relative overflow-hidden py-14" style={{ background: "linear-gradient(160deg, #2B4A80 0%, #1F3864 100%)" }}>
+      <section id="subjects" className="relative overflow-hidden py-14" style={{ background: `linear-gradient(160deg, ${NAVY_MID} 0%, ${NAVY} 100%)` }}>
         {/* Floating backpack decoration. */}
         <div className="op-float absolute right-4 top-4 w-16 h-16 sm:w-24 sm:h-24 opacity-90" aria-hidden="true">
           <Backpack />
@@ -302,7 +316,7 @@ export default function Landing() {
             {SUBJECTS.map((s, i) => (
               <div
                 key={s.name}
-                className="op-lift op-slide-in rounded-2xl bg-white/95 p-5 flex items-center gap-3 shadow-sm"
+                className="op-lift op-slide-in rounded-2xl bg-card/95 p-5 flex items-center gap-3 shadow-sm"
                 style={{ animationDelay: `${i * 0.06}s` }}
                 data-testid={`tile-subject-${i}`}
               >
@@ -333,7 +347,7 @@ export default function Landing() {
         <div className="op-slide-in rounded-3xl overflow-hidden shadow-md">
           <div
             className="w-full h-48 sm:h-72 flex items-center justify-center text-white text-center px-6"
-            style={{ background: "linear-gradient(120deg, #3A5DA0, #1F3864)" }}
+            style={{ background: `linear-gradient(120deg, ${NAVY_LIGHT}, ${NAVY})` }}
           >
             <div>
               <div className="text-5xl mb-2">🏫📸</div>
@@ -345,11 +359,11 @@ export default function Landing() {
       </section>
 
       {/* ================= STATS BAR ================= */}
-      <section className="py-10" style={{ backgroundColor: "#FFF7E6" }}>
+      <section className="py-10" style={{ backgroundColor: "hsl(var(--landing-gold-50))" }}>
         <div className="mx-auto max-w-6xl px-4 grid grid-cols-2 sm:grid-cols-4 gap-6 text-center">
           {STATS.map((s, i) => (
             <div key={s.label} className="op-slide-in" style={{ animationDelay: `${i * 0.08}s` }} data-testid={`stat-${i}`}>
-              <div className="text-3xl sm:text-4xl font-extrabold" style={{ color: GOLD }}>{s.value}</div>
+              <div className="text-3xl sm:text-4xl font-extrabold text-gold-ink">{s.value}</div>
               <div className="font-semibold mt-1" style={{ color: NAVY }}>{s.label}</div>
             </div>
           ))}
@@ -360,18 +374,17 @@ export default function Landing() {
       <section className="mx-auto max-w-6xl px-4 py-16">
         <div
           className="op-slide-in relative overflow-hidden rounded-[2rem] px-6 py-14 text-center shadow-xl"
-          style={{ background: "linear-gradient(160deg, #3A5DA0 0%, #1F3864 100%)" }}
+          style={{ background: `linear-gradient(160deg, ${NAVY_LIGHT} 0%, ${NAVY} 100%)` }}
         >
           {/* A couple of drifting stars for sparkle. */}
-          <span className="op-drift absolute top-6 left-10 text-xl" style={{ color: "#F2C94C" }} aria-hidden="true">★</span>
-          <span className="op-drift absolute bottom-8 right-12 text-lg" style={{ color: "#F2C94C", animationDelay: "1.5s" }} aria-hidden="true">★</span>
+          <span className="op-drift absolute top-6 left-10 text-xl" style={{ color: GOLD_LIGHT }} aria-hidden="true">★</span>
+          <span className="op-drift absolute bottom-8 right-12 text-lg" style={{ color: GOLD_LIGHT, animationDelay: "1.5s" }} aria-hidden="true">★</span>
           <h2 className="text-2xl sm:text-4xl font-extrabold text-white mb-6">
             Start your learning adventure today!
           </h2>
           <Link
             href="/student/login"
-            className="op-lift inline-block rounded-full px-8 py-4 font-bold text-lg text-white shadow-lg"
-            style={{ backgroundColor: GOLD }}
+            className="op-lift inline-block rounded-full px-8 py-4 font-bold text-lg bg-gold text-gold-foreground shadow-lg"
             data-testid="button-final-cta"
           >
             Let's Go! →
@@ -380,7 +393,7 @@ export default function Landing() {
       </section>
 
       {/* ================= FOOTER ================= */}
-      <footer className="border-t border-black/5 py-8" style={{ backgroundColor: "#F5F8FF" }}>
+      <footer className="border-t border-black/5 py-8 bg-background">
         <div className="mx-auto max-w-6xl px-4 text-center">
           <div className="flex items-center justify-center gap-2 mb-2">
             <img src={logoPath} alt="On Point" className="h-8 w-auto" />

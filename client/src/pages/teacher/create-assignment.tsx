@@ -17,7 +17,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { ArrowLeft, PlusCircle, Trash2, Loader2, Save, X, Image, Users, Circle, CheckCircle2, ChevronUp, ChevronDown, RefreshCw, FileClock, ClipboardPaste, Copy } from "lucide-react";
+import { ArrowLeft, PlusCircle, Trash2, Loader2, Save, X, Users, Circle, CheckCircle2, ChevronUp, ChevronDown, RefreshCw, FileClock, ClipboardPaste, Copy } from "lucide-react";
+import { QueryError } from "@/components/QueryError";
 import logoPath from "@assets/logo.webp";
 import { SimpleUploader } from "@/components/SimpleUploader";
 import { FileAttachmentZone } from "@/components/FileAttachmentZone";
@@ -177,7 +178,7 @@ export default function CreateAssignment() {
 
   // In edit mode, load the assignment (to pre-fill) and its submissions (for the
   // "already submitted" notice and the per-question re-mark actions).
-  const { data: editAssignment } = useQuery<Assignment>({
+  const { data: editAssignment, isLoading: editLoading, isError: editIsError, error: editError, refetch: refetchEdit } = useQuery<Assignment>({
     queryKey: ["/api/assignments", editId],
     enabled: isEdit,
   });
@@ -585,6 +586,19 @@ export default function CreateAssignment() {
 
   if (!teacher) return null;
 
+  // In edit mode the form must not be shown until the real assignment is in
+  // hand - otherwise it shows the "new assignment" defaults first.
+  const editGate = !isEdit ? null
+    : editIsError ? (
+        <QueryError error={editError} what="this assignment" variant="page" onRetry={() => refetchEdit()} data-testid="edit-load-error" />
+      )
+    : (editLoading || !editAssignment) ? (
+        <div className="flex items-center justify-center py-16" data-testid="edit-loading">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      )
+    : null;
+
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur">
@@ -601,6 +615,7 @@ export default function CreateAssignment() {
       </header>
 
       <main className="container mx-auto px-4 py-8 max-w-3xl">
+        {editGate ?? (<>
         {/* When editing an assignment that already has submissions, warn that
             changing questions won't retroactively alter marks already given. */}
         {isEdit && submissionCount > 0 && (
@@ -1254,6 +1269,7 @@ export default function CreateAssignment() {
             </Form>
           </CardContent>
         </Card>
+        </>)}
       </main>
     </div>
   );

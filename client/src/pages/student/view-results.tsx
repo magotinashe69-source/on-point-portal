@@ -15,6 +15,7 @@ import { XpRewardBadge } from "@/components/XpRewardBadge";
 import { takePendingXp } from "@/lib/xp-handoff";
 import { ResourcePayout } from "@/components/ResourcePayout";
 import { takePendingResources } from "@/lib/dream-handoff";
+import { QueryError } from "@/components/QueryError";
 import logoPath from "@assets/logo.webp";
 
 export default function ViewResults() {
@@ -36,7 +37,7 @@ export default function ViewResults() {
     }
   }, [student, setLocation]);
 
-  const { data: submissionData, isLoading: submissionLoading } = useQuery<Submission & { assignment?: Assignment }>({
+  const { data: submissionData, isLoading: submissionLoading, isError: submissionIsError, error: submissionError, refetch: refetchSubmission } = useQuery<Submission & { assignment?: Assignment }>({
     queryKey: ["/api/submissions", id],
     enabled: !!student && !!id,
   });
@@ -45,7 +46,7 @@ export default function ViewResults() {
   const submission = submissionData;
   const assignment = submissionData?.assignment;
 
-  const { data: mark } = useQuery<Mark>({
+  const { data: mark, isError: markIsError, error: markError, refetch: refetchMark } = useQuery<Mark>({
     queryKey: ["/api/marks", id],
     enabled: !!submission && submission.status === "MARKED",
   });
@@ -98,6 +99,13 @@ export default function ViewResults() {
           <div className="flex items-center justify-center py-16">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
+        ) : submissionIsError ? (
+          <QueryError error={submissionError} what="your results" variant="page" role="student" onRetry={() => refetchSubmission()} data-testid="results-load-error" />
+        ) : markIsError ? (
+          /* The submission loaded but its mark did not. Without this the page
+             fell through to "Results not found", which reads as if the work
+             itself had vanished. */
+          <QueryError error={markError} what="your mark" variant="page" role="student" onRetry={() => refetchMark()} data-testid="mark-load-error" />
         ) : submission && assignment && assignment.questions && mark ? (
           <>
             <Card className="mb-6">

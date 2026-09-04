@@ -3,6 +3,7 @@ import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -12,9 +13,9 @@ import {
   Mic,
   Loader2,
   Clock,
-  BookOpen,
 } from "lucide-react";
 import type { Lesson } from "@shared/schema";
+import { QueryError } from "@/components/QueryError";
 import logoPath from "@assets/logo.webp";
 import { LessonPlayer } from "@/components/LessonPlayer";
 
@@ -30,17 +31,24 @@ export default function StudentLessons() {
     }
   }, [student, setLocation]);
 
-  const { data: lessons, isLoading } = useQuery<Lesson[]>({
+  const { data: lessons, isLoading, isError, error, refetch } = useQuery<Lesson[]>({
     queryKey: ["/api/lessons", { form: student?.form }],
     enabled: !!student,
   });
 
-  const filteredLessons = lessons?.filter(l => {
-    if (l.form !== student?.form) return false;
+  // Two different things were being decided in one pass. Which lessons belong
+  // to this student is not a choice they made; the subject and type dropdowns
+  // are. Separating them lets the empty state say whether their teacher has
+  // added nothing, or whether their own filters are hiding it.
+  const availableLessons = (lessons || []).filter(l => l.form === student?.form);
+  const lessonFiltersActive = filterSubject !== "all" || filterType !== "all";
+  const clearLessonFilters = () => { setFilterSubject("all"); setFilterType("all"); };
+
+  const filteredLessons = availableLessons.filter(l => {
     if (filterSubject !== "all" && l.subject !== filterSubject) return false;
     if (filterType !== "all" && l.type !== filterType) return false;
     return true;
-  }) || [];
+  });
 
   if (!student) return null;
 
@@ -107,6 +115,10 @@ export default function StudentLessons() {
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
+        ) : isError ? (
+          <Card><CardContent className="p-0">
+            <QueryError error={error} what="your lessons" role="student" onRetry={() => refetch()} data-testid="lessons-load-error" />
+          </CardContent></Card>
         ) : filteredLessons.length > 0 ? (
           <div className="grid gap-6 md:grid-cols-2">
             {filteredLessons.map((lesson) => (
@@ -147,6 +159,19 @@ export default function StudentLessons() {
               </Card>
             ))}
           </div>
+        ) : lessonFiltersActive && availableLessons.length > 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center" data-testid="lessons-no-match">
+              <Video className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="font-semibold mb-2">Nothing matches your filters</h3>
+              <p className="text-muted-foreground mb-4">
+                You have {availableLessons.length} lesson{availableLessons.length === 1 ? "" : "s"} — just not in this subject and type.
+              </p>
+              <Button variant="outline" onClick={clearLessonFilters} data-testid="button-clear-lesson-filters">
+                Show all my lessons
+              </Button>
+            </CardContent>
+          </Card>
         ) : (
           <Card>
             <CardContent className="py-12 text-center">

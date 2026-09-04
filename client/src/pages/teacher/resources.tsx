@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -36,6 +36,7 @@ import {
   ClipboardPaste
 } from "lucide-react";
 import type { Resource } from "@shared/schema";
+import { QueryError, describeError } from "@/components/QueryError";
 import logoPath from "@assets/logo.webp";
 
 // Option lists shared by the single-resource form and the bulk paste dialog.
@@ -137,7 +138,7 @@ export default function TeacherResources() {
     }
   }, [teacher, setLocation]);
 
-  const { data: resources, isLoading } = useQuery<Resource[]>({
+  const { data: resources, isLoading, isError, error, refetch } = useQuery<Resource[]>({
     queryKey: ["/api/resources", { teacherOnly: true }],
     enabled: !!teacher,
   });
@@ -173,6 +174,9 @@ export default function TeacherResources() {
       } else {
         toast({ title: "Error", description: data.message, variant: "destructive" });
       }
+    },
+    onError: (error) => {
+      toast({ title: "Couldn't add resource", description: describeError(error, "the resource"), variant: "destructive" });
     },
   });
 
@@ -249,14 +253,23 @@ export default function TeacherResources() {
         toast({ title: "Error", description: data.message, variant: "destructive" });
       }
     },
+    onError: (error) => {
+      toast({ title: "Couldn't delete resource", description: describeError(error, "the resource"), variant: "destructive" });
+    },
   });
 
-  const filteredResources = resources?.filter(r => {
+  // See the note in teacher/lessons.tsx: an empty list and a list emptied by
+  // filters are different situations and must not share one message.
+  const allResources = resources || [];
+  const resourceFiltersActive = filterForm !== "all" || filterSubject !== "all" || filterType !== "all";
+  const clearResourceFilters = () => { setFilterForm("all"); setFilterSubject("all"); setFilterType("all"); };
+
+  const filteredResources = allResources.filter(r => {
     if (filterForm !== "all" && r.form !== filterForm) return false;
     if (filterSubject !== "all" && r.subject !== filterSubject) return false;
     if (filterType !== "all" && r.type !== filterType) return false;
     return true;
-  }) || [];
+  });
 
   const getTypeIcon = (type: string) => {
     switch (type) {
@@ -635,6 +648,10 @@ export default function TeacherResources() {
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
+        ) : isError ? (
+          <Card><CardContent className="p-0">
+            <QueryError error={error} what="your resources" onRetry={() => refetch()} data-testid="resources-load-error" />
+          </CardContent></Card>
         ) : filteredResources.length > 0 ? (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {filteredResources.map((resource) => (
@@ -696,6 +713,19 @@ export default function TeacherResources() {
               </Card>
             ))}
           </div>
+        ) : resourceFiltersActive && allResources.length > 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center" data-testid="resources-no-match">
+              <BookOpen className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="font-semibold mb-2">No resources match these filters</h3>
+              <p className="text-muted-foreground mb-4">
+                You have {allResources.length} resource{allResources.length === 1 ? "" : "s"} — none of them match this class, subject and type.
+              </p>
+              <Button variant="outline" onClick={clearResourceFilters} data-testid="button-clear-resource-filters">
+                Clear filters
+              </Button>
+            </CardContent>
+          </Card>
         ) : (
           <Card>
             <CardContent className="py-12 text-center">

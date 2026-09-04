@@ -18,6 +18,7 @@ import {
   Download
 } from "lucide-react";
 import type { Resource } from "@shared/schema";
+import { QueryError } from "@/components/QueryError";
 import logoPath from "@assets/logo.webp";
 
 export default function StudentResources() {
@@ -32,18 +33,28 @@ export default function StudentResources() {
     }
   }, [student, setLocation]);
 
-  const { data: resources, isLoading } = useQuery<Resource[]>({
+  const { data: resources, isLoading, isError, error, refetch } = useQuery<Resource[]>({
     queryKey: ["/api/resources", { form: student?.form }],
     enabled: !!student,
   });
 
-  const filteredResources = resources?.filter(r => {
+  // Who is allowed to see a resource, and which ones this student has chosen to
+  // look at, were tangled together. Kept apart, the empty state can tell the
+  // student whether there is genuinely nothing for them or their filters are
+  // simply too narrow.
+  const availableResources = (resources || []).filter(r => {
     if (r.isTeacherOnly) return false;
     if (r.form && r.form !== student?.form) return false;
+    return true;
+  });
+  const resourceFiltersActive = filterSubject !== "all" || filterType !== "all";
+  const clearResourceFilters = () => { setFilterSubject("all"); setFilterType("all"); };
+
+  const filteredResources = availableResources.filter(r => {
     if (filterSubject !== "all" && r.subject !== filterSubject) return false;
     if (filterType !== "all" && r.type !== filterType) return false;
     return true;
-  }) || [];
+  });
 
   const getTypeIcon = (type: string) => {
     switch (type) {
@@ -130,6 +141,10 @@ export default function StudentResources() {
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
+        ) : isError ? (
+          <Card><CardContent className="p-0">
+            <QueryError error={error} what="your resources" role="student" onRetry={() => refetch()} data-testid="resources-load-error" />
+          </CardContent></Card>
         ) : filteredResources.length > 0 ? (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {filteredResources.map((resource) => (
@@ -170,6 +185,19 @@ export default function StudentResources() {
               </Card>
             ))}
           </div>
+        ) : resourceFiltersActive && availableResources.length > 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center" data-testid="resources-no-match">
+              <BookOpen className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="font-semibold mb-2">Nothing matches your filters</h3>
+              <p className="text-muted-foreground mb-4">
+                You have {availableResources.length} resource{availableResources.length === 1 ? "" : "s"} — just not in this subject and type.
+              </p>
+              <Button variant="outline" onClick={clearResourceFilters} data-testid="button-clear-resource-filters">
+                Show all my resources
+              </Button>
+            </CardContent>
+          </Card>
         ) : (
           <Card>
             <CardContent className="py-12 text-center">

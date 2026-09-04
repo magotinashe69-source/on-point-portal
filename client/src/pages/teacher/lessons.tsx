@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -30,15 +30,14 @@ import {
   Mic,
   Trash2,
   Loader2,
-  Play,
   Square,
   Upload,
   Clock,
-  BookOpen,
   Circle,
   ClipboardPaste,
 } from "lucide-react";
 import type { Lesson } from "@shared/schema";
+import { QueryError, describeError } from "@/components/QueryError";
 import logoPath from "@assets/logo.webp";
 
 // Option lists shared by the single-lesson form and the bulk paste dialog.
@@ -145,7 +144,6 @@ type CreateLessonForm = z.infer<typeof createLessonSchema>;
 
 function MediaRecorder_({ onRecordingComplete, type }: { onRecordingComplete: (blob: Blob, duration: string) => void; type: "VIDEO" | "AUDIO" }) {
   const [isRecording, setIsRecording] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
@@ -200,7 +198,6 @@ function MediaRecorder_({ onRecordingComplete, type }: { onRecordingComplete: (b
 
       recorder.start(1000);
       setIsRecording(true);
-      setIsPaused(false);
       setRecordingTime(0);
 
       timerRef.current = setInterval(() => {
@@ -221,7 +218,6 @@ function MediaRecorder_({ onRecordingComplete, type }: { onRecordingComplete: (b
       timerRef.current = null;
     }
     setIsRecording(false);
-    setIsPaused(false);
   }, []);
 
   useEffect(() => {
@@ -309,7 +305,7 @@ export default function TeacherLessons() {
     }
   }, [teacher, setLocation]);
 
-  const { data: lessons, isLoading } = useQuery<Lesson[]>({
+  const { data: lessons, isLoading, isError, error, refetch } = useQuery<Lesson[]>({
     queryKey: ["/api/lessons"],
     enabled: !!teacher,
   });
@@ -346,6 +342,9 @@ export default function TeacherLessons() {
       } else {
         toast({ title: "Error", description: data.message, variant: "destructive" });
       }
+    },
+    onError: (error) => {
+      toast({ title: "Couldn't add lesson", description: describeError(error, "the lesson"), variant: "destructive" });
     },
   });
 
@@ -417,7 +416,12 @@ export default function TeacherLessons() {
       if (data.success) {
         queryClient.invalidateQueries({ queryKey: ["/api/lessons"] });
         toast({ title: "Lesson deleted" });
+      } else {
+        toast({ title: "Couldn't delete lesson", description: data.message, variant: "destructive" });
       }
+    },
+    onError: (error) => {
+      toast({ title: "Couldn't delete lesson", description: describeError(error, "the lesson"), variant: "destructive" });
     },
   });
 
@@ -463,12 +467,19 @@ export default function TeacherLessons() {
     }
   }, [form, toast]);
 
-  const filteredLessons = lessons?.filter(l => {
+  // Kept apart on purpose. "You have no lessons at all" and "your filters hid
+  // them all" need different words and a different button, and the only way to
+  // tell them apart is to know the size of the list before filtering.
+  const allLessons = lessons || [];
+  const lessonFiltersActive = filterForm !== "all" || filterSubject !== "all" || filterType !== "all";
+  const clearLessonFilters = () => { setFilterForm("all"); setFilterSubject("all"); setFilterType("all"); };
+
+  const filteredLessons = allLessons.filter(l => {
     if (filterForm !== "all" && l.form !== filterForm) return false;
     if (filterSubject !== "all" && l.subject !== filterSubject) return false;
     if (filterType !== "all" && l.type !== filterType) return false;
     return true;
-  }) || [];
+  });
 
   if (!teacher) return null;
 
@@ -836,6 +847,10 @@ export default function TeacherLessons() {
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
+        ) : isError ? (
+          <Card><CardContent className="p-0">
+            <QueryError error={error} what="your lessons" onRetry={() => refetch()} data-testid="lessons-load-error" />
+          </CardContent></Card>
         ) : filteredLessons.length > 0 ? (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {filteredLessons.map((lesson) => (
@@ -889,6 +904,19 @@ export default function TeacherLessons() {
               </Card>
             ))}
           </div>
+        ) : lessonFiltersActive && allLessons.length > 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center" data-testid="lessons-no-match">
+              <Video className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="font-semibold mb-2">No lessons match these filters</h3>
+              <p className="text-muted-foreground mb-4">
+                You have {allLessons.length} lesson{allLessons.length === 1 ? "" : "s"} — none of them match this class, subject and type.
+              </p>
+              <Button variant="outline" onClick={clearLessonFilters} data-testid="button-clear-lesson-filters">
+                Clear filters
+              </Button>
+            </CardContent>
+          </Card>
         ) : (
           <Card>
             <CardContent className="py-12 text-center">

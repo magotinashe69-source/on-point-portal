@@ -26,6 +26,7 @@ import { TreasureRewardModal } from "@/components/TreasureRewardModal";
 import { setPendingXp, type XpAward } from "@/lib/xp-handoff";
 import { setPendingResources } from "@/lib/dream-handoff";
 import type { Wallet } from "@shared/dreamworld";
+import { QueryError } from "@/components/QueryError";
 import logoPath from "@assets/logo.webp";
 
 const MIN_ANSWER_LENGTH = 30;
@@ -75,7 +76,7 @@ export default function SubmitAssignment() {
     }
   }, [student, setLocation]);
 
-  const { data: assignment, isLoading: assignmentLoading } = useQuery<Assignment>({
+  const { data: assignment, isLoading: assignmentLoading, isError: assignmentIsError, error: assignmentError, refetch: refetchAssignment } = useQuery<Assignment>({
     queryKey: ["/api/assignments", id],
     enabled: !!student && !!id,
   });
@@ -99,7 +100,6 @@ export default function SubmitAssignment() {
     ? new Date() > new Date(hasExtension.newDueDate)
     : isDeadlinePassed;
 
-  const canEdit = isEditing && !isMarked;
 
   const form = useForm<SubmitForm>({
     resolver: zodResolver(submitFormSchema),
@@ -329,6 +329,8 @@ export default function SubmitAssignment() {
           <div className="flex items-center justify-center py-16">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
+        ) : assignmentIsError ? (
+          <QueryError error={assignmentError} what="this assignment" variant="page" role="student" onRetry={() => refetchAssignment()} data-testid="assignment-load-error" />
         ) : assignment ? (
           <>
             <Card className="mb-6">

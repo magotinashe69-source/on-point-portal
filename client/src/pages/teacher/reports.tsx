@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ArrowLeft, Loader2, BarChart3, TrendingUp, Users, BookOpen, ClipboardList } from "lucide-react";
 import { useState } from "react";
+import { QueryError } from "@/components/QueryError";
 import logoPath from "@assets/logo.webp";
 import {
   ChartContainer,
@@ -15,19 +16,7 @@ import {
   ChartTooltipContent,
   type ChartConfig
 } from "@/components/ui/chart";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  PieChart,
-  Pie,
-  Cell,
-  LineChart,
-  Line,
-  ResponsiveContainer
-} from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 
 interface ReportData {
   studentPerformance: Array<{
@@ -54,23 +43,19 @@ interface ReportData {
   }>;
 }
 
-const CHART_COLORS = [
-  "hsl(224, 65%, 35%)",
-  "hsl(0, 75%, 50%)",
-  "hsl(142, 76%, 36%)",
-  "hsl(38, 92%, 50%)",
-  "hsl(262, 83%, 58%)",
-  "hsl(199, 89%, 48%)",
-];
-
+// Chart colours come from the design tokens (--chart-1 … --chart-5, defined
+// per theme in client/src/index.css). These used to be hardcoded hsl() literals
+// copied from the LIGHT values of those same tokens, which meant the charts
+// stayed light-coloured in dark mode. Reading the variable fixes that and keeps
+// the palette in one place.
 const chartConfig: ChartConfig = {
   averagePercentage: {
     label: "Average %",
-    color: "hsl(224, 65%, 35%)",
+    color: "hsl(var(--chart-1))",
   },
   averageScore: {
     label: "Average Score",
-    color: "hsl(0, 75%, 50%)",
+    color: "hsl(var(--chart-2))",
   },
 };
 
@@ -85,7 +70,7 @@ export default function TeacherReports() {
     }
   }, [teacher, setLocation]);
 
-  const { data: reportResponse, isLoading } = useQuery<{ success: boolean; data: ReportData }>({
+  const { data: reportResponse, isLoading, isError, error, refetch } = useQuery<{ success: boolean; data: ReportData }>({
     queryKey: ["/api/reports"],
     enabled: !!teacher,
   });
@@ -153,6 +138,8 @@ export default function TeacherReports() {
           <div className="flex items-center justify-center py-16">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
+        ) : isError ? (
+          <QueryError error={error} what="the reports" variant="page" onRetry={() => refetch()} data-testid="reports-load-error" />
         ) : reportData ? (
           <div className="space-y-6">
             <div className="flex items-center gap-4">
@@ -231,7 +218,7 @@ export default function TeacherReports() {
                         <XAxis type="number" domain={[0, 100]} />
                         <YAxis dataKey="studentName" type="category" width={80} tick={{ fontSize: 12 }} />
                         <ChartTooltip content={<ChartTooltipContent />} />
-                        <Bar dataKey="averagePercentage" fill="hsl(224, 65%, 35%)" radius={4} />
+                        <Bar dataKey="averagePercentage" fill="hsl(var(--chart-1))" radius={4} />
                       </BarChart>
                     </ChartContainer>
                   ) : (
@@ -253,7 +240,7 @@ export default function TeacherReports() {
                         <XAxis dataKey="subject" tick={{ fontSize: 10 }} angle={-45} textAnchor="end" height={60} />
                         <YAxis domain={[0, 100]} />
                         <ChartTooltip content={<ChartTooltipContent />} />
-                        <Bar dataKey="averageScore" fill="hsl(0, 75%, 50%)" radius={4} />
+                        <Bar dataKey="averageScore" fill="hsl(var(--chart-2))" radius={4} />
                       </BarChart>
                     </ChartContainer>
                   ) : (
@@ -271,7 +258,7 @@ export default function TeacherReports() {
               <CardContent>
                 {reportData.formPerformance && reportData.formPerformance.length > 0 ? (
                   <div className="grid gap-4 md:grid-cols-2">
-                    {reportData.formPerformance.map((form, index) => (
+                    {reportData.formPerformance.map((form) => (
                       <Card key={form.form} className="border-2">
                         <CardHeader className="pb-2">
                           <CardTitle className="text-lg">{form.form}</CardTitle>
