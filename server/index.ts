@@ -33,8 +33,25 @@ if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
 // Pick where login sessions are stored:
 //   * PostgreSQL mode -> store sessions in the database (survives restarts).
 //   * SQLite mode     -> keep sessions in memory (simple, fine for local use).
+//
+// createTableIfMissing is deliberately false. With it on, connect-pg-simple
+// creates the table at boot by reading its own table.sql off disk:
+//
+//     fs.readFile(path.resolve(__dirname, './table.sql'))
+//
+// That works from node_modules, but this server is bundled by esbuild into a
+// single dist/index.cjs (connect-pg-simple is on the bundle allowlist in
+// script/build.ts). In the bundle __dirname is dist/, table.sql was never
+// copied there, and the server dies on Render with:
+//
+//     ENOENT: no such file or directory, open '.../dist/table.sql'
+//
+// So the table is created once, by hand, and the app never runs DDL at boot.
+// The SQL is in docs/DEPLOYMENT-SESSION-TABLE.sql. This is the better shape for
+// production anyway: no schema changes on a cold start, and the app's database
+// user does not need CREATE rights.
 const sessionStore = usePostgres
-  ? new (connectPgSimple(session))({ pool: pgPool as any, createTableIfMissing: true })
+  ? new (connectPgSimple(session))({ pool: pgPool as any, createTableIfMissing: false })
   : new (memorystore(session))({ checkPeriod: 24 * 60 * 60 * 1000 }); // clear expired daily
 
 app.use(

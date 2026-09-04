@@ -30,6 +30,26 @@ After the first deploy with a Postgres DB, create the tables once by running
 `npm run db:push` (Render **Shell** tab), or append it to the Build Command for the
 first deploy: `npm install && npm run build && npm run db:push`.
 
+### Then create the session table (required, once)
+
+`npm run db:push` builds the app's own 14 tables from `shared/schema.ts`. It does
+**not** create the `session` table — that one belongs to `connect-pg-simple`,
+which is not part of the Drizzle schema. Create it by hand:
+
+```
+psql "$DATABASE_URL" -f docs/DEPLOYMENT-SESSION-TABLE.sql
+```
+
+or paste that file into Render's PSQL console. Skipping it does not break the
+boot, but the first login fails with `relation "session" does not exist`.
+
+The app deliberately does **not** create this table itself. `connect-pg-simple`
+would do it at boot with `createTableIfMissing`, but that option makes it read
+its own `table.sql` off disk relative to `__dirname` — and the server is bundled
+by esbuild into a single `dist/index.cjs`, where that asset does not exist. The
+result was a crash on start: `ENOENT ... dist/table.sql`. So the option is off
+(`server/index.ts`) and the table is a one-time manual step.
+
 ## How the app reads its environment (already implemented)
 
 - **Port** — `server/index.ts` reads `process.env.PORT` (defaults to 5000) and
