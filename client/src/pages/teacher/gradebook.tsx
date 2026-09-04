@@ -3,6 +3,8 @@ import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
+import { QueryError } from "@/components/QueryError";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/lib/auth";
 import { PageErrorBoundary } from "@/components/ErrorBoundary";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { ArrowLeft, CheckCircle, XCircle, Download, Printer, Loader2, BookOpen, AlertTriangle } from "lucide-react";
+import { ArrowLeft, CheckCircle, XCircle, Download, Printer, BookOpen, Filter } from "lucide-react";
 import logoPath from "@assets/logo.webp";
 
 interface GradebookRow {
@@ -26,6 +28,18 @@ interface GradebookRow {
   score: number | null;
   status: string;
 }
+
+// The column layout lives in one place so the table and its loading skeleton
+// cannot drift apart - a skeleton whose columns do not line up with the real
+// table is worse than no skeleton, because the page jumps when it loads.
+const COLUMNS = [
+  { key: "learner", label: "Learner", head: "", bar: "w-24" },
+  { key: "class", label: "Class", head: "w-24", bar: "w-12" },
+  { key: "assignment", label: "Assignment", head: "", bar: "w-40" },
+  { key: "handedIn", label: "Handed in", head: "w-40", bar: "w-20" },
+  { key: "mark", label: "Mark", head: "w-24 text-right", bar: "w-10 ml-auto" },
+  { key: "date", label: "Date", head: "w-40", bar: "w-24" },
+] as const;
 
 function GradeBookContent() {
   const [, setLocation] = useLocation();
@@ -49,7 +63,7 @@ function GradeBookContent() {
   if (filterDateFrom) filters.dateFrom = filterDateFrom;
   if (filterDateTo) filters.dateTo = filterDateTo;
 
-  const { data, isLoading, isError } = useQuery<{ success: boolean; rows: GradebookRow[] }>({
+  const { data, isLoading, isError, error, refetch } = useQuery<{ success: boolean; rows: GradebookRow[] }>({
     queryKey: ["/api/gradebook", filters],
     enabled: !!teacher,
   });
@@ -91,6 +105,19 @@ function GradeBookContent() {
   const questionStats: QuestionStat[] = Array.isArray(statsData?.stats)
     ? statsData.stats.filter(s => s && typeof s === "object")
     : [];
+
+  // Every record, ignoring the filters. This already had to be fetched for the
+  // assignment dropdown, so telling "you have nothing yet" apart from "your
+  // filters hid it" costs no extra request.
+  const allRows = toRows(allData?.rows);
+  const filtersActive =
+    filterAssignmentId !== "ALL" || filterStatus !== "ALL" || !!filterDateFrom || !!filterDateTo;
+  const clearFilters = () => {
+    setFilterAssignmentId("ALL");
+    setFilterStatus("ALL");
+    setFilterDateFrom("");
+    setFilterDateTo("");
+  };
 
   const submittedCount = rows.filter(r => r.status && r.status !== "NOT_SUBMITTED").length;
   const notSubmittedCount = rows.filter(r => !r.status || r.status === "NOT_SUBMITTED").length;
@@ -284,17 +311,12 @@ function GradeBookContent() {
               </div>
             </div>
 
-            {(filterAssignmentId !== "ALL" || filterStatus !== "ALL" || filterDateFrom || filterDateTo) && (
+            {filtersActive && (
               <div className="mt-3">
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => {
-                    setFilterAssignmentId("ALL");
-                    setFilterStatus("ALL");
-                    setFilterDateFrom("");
-                    setFilterDateTo("");
-                  }}
+                  onClick={clearFilters}
                   data-testid="button-clear-filters"
                 >
                   Clear filters
@@ -347,26 +369,75 @@ function GradeBookContent() {
             A plain div rather than <Card>, because Card carries shadow-sm and
             rounded-xl: this screen wants no shadow and a single 4px radius. */}
         <div className="overflow-hidden rounded-sm border border-border">
+            {/* Four states, and they are four different things. Loading is not
+                empty, empty is not broken, and "you have nothing yet" is not
+                "your filters hid it". Order matters: a real failure is reported
+                before we start guessing why the list is short. */}
             {isLoading ? (
-              <div className="flex items-center justify-center py-16">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              /* A skeleton rather than a spinner: the table's shape is known
+                 before the data is, so hold the layout instead of collapsing it
+                 and jolting the page when rows arrive. */
+              <div className="overflow-x-auto" data-testid="gradebook-skeleton" aria-busy="true" aria-live="polite">
+                <span className="sr-only">Loading the Grade Book</span>
+                <Table>
+                  <TableHeader>
+                    <TableRow className="h-8 bg-muted/50 hover:bg-muted/50">
+                      {COLUMNS.map(c => (
+                        <TableHead key={c.key} className={`h-8 px-3 text-label-01 ${c.head}`}>{c.label}</TableHead>
+                      ))}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {Array.from({ length: 8 }).map((_, i) => (
+                      <TableRow key={i} className="h-8 hover:bg-transparent">
+                        {COLUMNS.map(c => (
+                          <TableCell key={c.key} className="px-3 py-0">
+                            <Skeleton className={`h-3 ${c.bar} motion-reduce:animate-none`} />
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
             ) : isError ? (
-              // A load that failed is not the same as a class with no records —
-              // say which one it is, so nobody is left staring at an empty table.
-              <div className="flex flex-col items-center justify-center py-16 px-4 text-center" data-testid="gradebook-load-error">
-                <AlertTriangle className="h-10 w-10 mb-3 text-amber-500" />
-                <p className="font-medium">Couldn&apos;t load the Grade Book</p>
-                <p className="text-sm text-muted-foreground mt-1">Check your connection and try again.</p>
-                <Button variant="outline" className="mt-4" onClick={() => window.location.reload()} data-testid="button-gradebook-retry">
-                  Try again
+              /* The shared component, per ONPOINT_UI_SPEC.md 5.3 - it says which
+                 kind of failure this was and offers a retry that refetches
+                 rather than reloading the whole page. */
+              <QueryError
+                error={error}
+                what="the Grade Book"
+                onRetry={() => refetch()}
+                data-testid="gradebook-load-error"
+              />
+            ) : rows.length === 0 && filtersActive && allRows.length > 0 ? (
+              /* Filters hid everything. Say how much is really there, so nobody
+                 concludes the Grade Book is empty. */
+              <div className="flex flex-col items-center justify-center py-16 px-4 text-center" data-testid="gradebook-no-results">
+                <Filter className="h-10 w-10 mb-3 text-muted-foreground opacity-40" />
+                <p className="font-medium">Nothing matches those filters</p>
+                <p className="text-body-01 text-muted-foreground mt-1 max-w-sm">
+                  There {allRows.length === 1 ? "is" : "are"} {allRows.length} record{allRows.length === 1 ? "" : "s"} in
+                  the Grade Book. Try a wider set of dates, or a different class or assignment.
+                </p>
+                <Button variant="outline" size="sm" className="mt-4" onClick={clearFilters} data-testid="button-no-results-clear">
+                  Clear filters
                 </Button>
               </div>
             ) : rows.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-                <BookOpen className="h-10 w-10 mb-3 opacity-40" />
-                <p className="font-medium">No records found</p>
-                <p className="text-sm">Try adjusting your filters</p>
+              /* Genuinely nothing yet. Do not tell a teacher to adjust filters
+                 when there is not a single mark to filter. */
+              <div className="flex flex-col items-center justify-center py-16 px-4 text-center" data-testid="gradebook-empty">
+                <BookOpen className="h-10 w-10 mb-3 text-muted-foreground opacity-40" />
+                <p className="font-medium">No marks yet</p>
+                <p className="text-body-01 text-muted-foreground mt-1 max-w-sm">
+                  Marks appear here once you have set an assignment and your class has started handing it in.
+                </p>
+                <Link href="/teacher/assignments/new">
+                  <Button size="sm" className="mt-4" data-testid="button-empty-create-assignment">
+                    Set an assignment
+                  </Button>
+                </Link>
               </div>
             ) : (
               /* Carbon `sm` density: 32px rows, so 20+ records read at once
@@ -382,12 +453,9 @@ function GradeBookContent() {
                 <Table data-testid="table-gradebook">
                   <TableHeader>
                     <TableRow className="h-8 bg-muted/50 hover:bg-muted/50">
-                      <TableHead className="h-8 px-3 text-label-01">Learner</TableHead>
-                      <TableHead className="h-8 px-3 text-label-01 w-24">Class</TableHead>
-                      <TableHead className="h-8 px-3 text-label-01">Assignment</TableHead>
-                      <TableHead className="h-8 px-3 text-label-01 w-40">Handed in</TableHead>
-                      <TableHead className="h-8 px-3 text-label-01 w-24 text-right">Mark</TableHead>
-                      <TableHead className="h-8 px-3 text-label-01 w-40">Date</TableHead>
+                      {COLUMNS.map(c => (
+                        <TableHead key={c.key} className={`h-8 px-3 text-label-01 ${c.head}`}>{c.label}</TableHead>
+                      ))}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
