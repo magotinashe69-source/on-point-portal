@@ -69,7 +69,7 @@ const SPACING_PRIMITIVES = { "0": "0px", px: "1px" } as const;
    sites rather than by breaking 26 screens in one commit.
 
    Burn-down, largest first:
-     h-5 / w-5            131 uses   20px icons  -> h-6 w-6 (24px, Carbon icon size)
+     h-5 / w-5            136 uses   20px icons  -> h-6 w-6 (24px, Carbon icon size)
      *-1.5                 65 uses    6px        -> 4px (key 1) or 8px (key 2)
      h-3.5 / w-3.5         24 uses   14px        -> 16px (key 4)
      h-9 / w-9 / min-w-9   20 uses   36px        -> 32px (key 8) or 40px (key 10)

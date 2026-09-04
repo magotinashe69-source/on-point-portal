@@ -965,6 +965,6 @@ palette meets WCAG AA or better (tightest: dark-mode primary at 5.63:1).
 4. ~~**F6**~~ — **done in Rev 5.** Follow-up: enable `noUnusedLocals` and `noUnusedParameters` in `tsconfig.json` so it cannot drift back.
 5. ~~**F8**~~ — **done in Rev 6.** Follow-up raised by it: `lateDays` is a stub column, always `0`; computing it server-side would make late submissions visible on `assignment-detail`.
 6. **Legacy spacing burn-down** — 328 uses across 56 class names sit outside the Carbon scale and are quarantined in `LEGACY_SPACING` in `tailwind.config.ts` with a burn-down list. Fixing the call sites is what lets the block be deleted and the scale actually enforced.
-7. **Arbitrary values** — `text-[10px]` / `text-[11px]` in 8 places and `rounded-[2rem]` in `landing.tsx` bypass the new scales entirely; they map onto `text-caption-01` and `rounded-lg`.
+7. **Arbitrary values** — `text-[10px]` / `text-[11px]` / `text-[0.8rem]` in 12 places (10 in pages, 2 in vendored components) and `rounded-[2rem]` in `landing.tsx` bypass the new scales entirely; they map onto `text-caption-01` and `rounded-lg`.
 8. **Retired pages** — decide whether the four Dream World modules stay in the tree; if they do, a header comment on each would stop the next reader auditing them as live.
 9. **Housekeeping** — remove `@tailwindcss/vite` from `package.json` (see Build & theme configuration).
