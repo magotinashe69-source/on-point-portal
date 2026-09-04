@@ -649,14 +649,14 @@ function Pitch({
       {/* A quick shout over the pitch when something happens. */}
       {(scored || keeperSaved) && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <span className="pk-cheer text-3xl font-extrabold text-white drop-shadow-lg" data-testid="cheer">
+          <span className="pk-cheer font-heading text-3xl font-extrabold text-white drop-shadow-lg" data-testid="cheer">
             {scored ? "GOAL! 🎉" : "SAVED! 🧤"}
           </span>
         </div>
       )}
       {(saved || conceded) && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <span className="text-2xl font-extrabold text-white/90 drop-shadow-lg" data-testid="miss">
+          <span className="font-heading text-2xl font-extrabold text-white/90 drop-shadow-lg" data-testid="miss">
             {saved ? "SAVED!" : "GOAL AGAINST"}
           </span>
         </div>

@@ -280,6 +280,8 @@ export default {
         },
       },
       fontFamily: {
+        /* `font-heading` for display text that is not a real <h*> element. */
+        heading: ["var(--font-heading)"],
         sans: ["var(--font-sans)"],
         serif: ["var(--font-serif)"],
         mono: ["var(--font-mono)"],

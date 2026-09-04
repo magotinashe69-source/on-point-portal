@@ -85,6 +85,35 @@ The only sanctioned step values. They all land on Tailwind's native 4px keys, so
 
 ### 1.3 Type — IBM Carbon scale
 
+**Typefaces.** **Sora** for headings and display text, **DM Sans** for body,
+**JetBrains Mono** for the three monospace spots.
+
+| Family | Token | Utility | Applied to |
+|---|---|---|---|
+| Sora | `--font-heading` | `font-heading` | `h1`–`h6` and every `text-heading-*` token, automatically |
+| DM Sans | `--font-sans` | `font-sans` | `body` — i.e. everything else |
+| JetBrains Mono | `--font-mono` | `font-mono` | Pasted input, chart tooltips, the recording timer |
+
+Headings are wired in `@layer base` on **both** routes to a heading — the real
+elements *and* the Carbon heading tokens, since a card title is often a `<div>`
+carrying `text-heading-03` rather than an `<h3>`. Nothing needs a `font-*` class
+to get the right face. Use `font-heading` only for display text that is not a
+heading element (the wordmark, the landing stat numbers, the match shout).
+
+**Weights are loaded, not assumed.** Only these are downloaded:
+
+| Family | Weights | Why those |
+|---|---|---|
+| Sora | 600, 700, 800 | Headings are semibold / bold / extrabold |
+| DM Sans | 400, 500, 600, 700 | 500 is the most-used weight in the app (129 uses) |
+| JetBrains Mono | 400, 500, 700 | The only weights paired with `font-mono` |
+
+Do not add a weight to markup without adding it to the link in
+`client/index.html` — an unloaded weight is silently faked by the browser.
+
+No italic axes are loaded. The app has two italic uses; the browser slants them
+rather than doubling the download.
+
 Every step carries its own line-height *and* letter-spacing. Carbon tightens only
 the small steps: `0.32px` at 12px, `0.16px` at 14px, `0` from 16px up.
 
@@ -431,5 +460,6 @@ Tracked in full in `AUDIT.md`; the parts that affect this spec:
 | SideNav + Dropdown unused, sidebar tokens themed | §3 items 7 and 8 are agreements, not descriptions |
 | 12 arbitrary `text-[…]` uses | Bypass §1.3 |
 | `window.confirm` on 3 screens | Breaks §3.3 |
+| ~~Poppins + Playfair Display fully loaded~~ | Fixed: Playfair was downloaded in full and used zero times. Latin font faces 22 → 10. |
 | `@tailwindcss/vite` installed but inert | Tailwind **3.4.17** builds the CSS; the package is an abandoned v4 migration and should be removed before it misleads someone |
 | `lateDays` always `0` server-side | A stub column; do not render it until it is computed |

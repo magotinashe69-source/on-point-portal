@@ -59,7 +59,7 @@ export function XpRewardBadge({ award }: { award: XpAward }) {
 
       {/* The level-up line. */}
       {award.leveledUp && (
-        <div className="xprb-levelup text-sm font-extrabold" style={{ color: GOLD }} data-testid="text-level-up">
+        <div className="xprb-levelup font-heading text-sm font-extrabold" style={{ color: GOLD }} data-testid="text-level-up">
           🎉 Level {award.level} reached!
         </div>
       )}

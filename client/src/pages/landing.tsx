@@ -131,7 +131,7 @@ export default function Landing() {
         <div className="mx-auto max-w-6xl flex h-16 items-center justify-between gap-4 px-4">
           <Link href="/" className="flex items-center gap-2 shrink-0">
             <img src={logoPath} alt="On Point Education Centre" className="h-9 w-auto" />
-            <span className="font-extrabold hidden sm:block" style={{ color: NAVY }}>On Point</span>
+            <span className="font-heading font-extrabold hidden sm:block" style={{ color: NAVY }}>On Point</span>
           </Link>
 
           {/* Desktop links */}
@@ -363,7 +363,7 @@ export default function Landing() {
         <div className="mx-auto max-w-6xl px-4 grid grid-cols-2 sm:grid-cols-4 gap-6 text-center">
           {STATS.map((s, i) => (
             <div key={s.label} className="op-slide-in" style={{ animationDelay: `${i * 0.08}s` }} data-testid={`stat-${i}`}>
-              <div className="text-3xl sm:text-4xl font-extrabold text-gold-ink">{s.value}</div>
+              <div className="font-heading text-3xl sm:text-4xl font-extrabold text-gold-ink">{s.value}</div>
               <div className="font-semibold mt-1" style={{ color: NAVY }}>{s.label}</div>
             </div>
           ))}
@@ -397,7 +397,7 @@ export default function Landing() {
         <div className="mx-auto max-w-6xl px-4 text-center">
           <div className="flex items-center justify-center gap-2 mb-2">
             <img src={logoPath} alt="On Point" className="h-8 w-auto" />
-            <span className="font-extrabold" style={{ color: NAVY }}>On Point Education Centre</span>
+            <span className="font-heading font-extrabold" style={{ color: NAVY }}>On Point Education Centre</span>
           </div>
           <p className="text-sm text-black/50 mb-4">Quality Beyond Measure</p>
           {/* Teacher access is kept discreet here so staff can still log in. */}
