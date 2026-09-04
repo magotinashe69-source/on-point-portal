@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -123,20 +123,24 @@ function GradeBookContent() {
     });
   };
 
-  const getStatusBadge = (status: string) => {
-    if (status === "NOT_SUBMITTED") {
-      return (
-        <Badge variant="destructive" className="gap-1" data-testid="badge-not-submitted">
-          <XCircle className="h-3 w-3" />
-          Not Submitted
-        </Badge>
-      );
-    }
+  // Handed in / not, as a dot and a word rather than a filled badge. Twenty
+  // saturated badges stacked down a column shout; a dot carries the same
+  // information quietly, which is what the staff skin asks for. The colour is
+  // never the only cue - the word is always there for anyone who cannot
+  // separate the two colours.
+  const handedIn = (status: string) => {
+    const not = status === "NOT_SUBMITTED";
     return (
-      <Badge className="gap-1 bg-green-600 hover:bg-green-700" data-testid="badge-submitted">
-        <CheckCircle className="h-3 w-3" />
-        Submitted
-      </Badge>
+      <span
+        className="inline-flex items-center gap-2 whitespace-nowrap"
+        data-testid={not ? "badge-not-submitted" : "badge-submitted"}
+      >
+        <span
+          aria-hidden="true"
+          className={`h-2 w-2 shrink-0 rounded-full ${not ? "bg-destructive" : "bg-green-600"}`}
+        />
+        {not ? "Not handed in" : "Handed in"}
+      </span>
     );
   };
 
@@ -337,9 +341,12 @@ function GradeBookContent() {
           </Card>
         )}
 
-        {/* Table */}
-        <Card>
-          <CardContent className="p-0">
+        {/* Table.
+            One frame around all four states - loading, failed, empty and the
+            table itself - so the panel keeps its shape whatever is inside it.
+            A plain div rather than <Card>, because Card carries shadow-sm and
+            rounded-xl: this screen wants no shadow and a single 4px radius. */}
+        <div className="overflow-hidden rounded-sm border border-border">
             {isLoading ? (
               <div className="flex items-center justify-center py-16">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -362,59 +369,85 @@ function GradeBookContent() {
                 <p className="text-sm">Try adjusting your filters</p>
               </div>
             ) : (
+              /* Carbon `sm` density: 32px rows, so 20+ records read at once
+                 without scrolling (20 rows + header = 672px, against 840px at
+                 `md`). ONPOINT_UI_SPEC.md 4 reserves 40px+ for rows holding a
+                 button, checkbox or input - the mark below is an inline text
+                 link, not a control, so `sm` is the right size here.
+
+                 No shadow and a single 4px radius on the frame only: rows and
+                 cells are square, so there is exactly one corner treatment in
+                 the whole component. */
               <div className="overflow-x-auto">
-                <table className="w-full text-sm" data-testid="table-gradebook">
-                  <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th className="text-left px-4 py-3 font-medium">Student Name</th>
-                      <th className="text-left px-4 py-3 font-medium">Form</th>
-                      <th className="text-left px-4 py-3 font-medium">Assignment</th>
-                      <th className="text-left px-4 py-3 font-medium">Subject</th>
-                      <th className="text-left px-4 py-3 font-medium">Score</th>
-                      <th className="text-left px-4 py-3 font-medium">Submitted At</th>
-                      <th className="text-left px-4 py-3 font-medium">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                <Table data-testid="table-gradebook">
+                  <TableHeader>
+                    <TableRow className="h-8 bg-muted/50 hover:bg-muted/50">
+                      <TableHead className="h-8 px-3 text-label-01">Learner</TableHead>
+                      <TableHead className="h-8 px-3 text-label-01 w-24">Class</TableHead>
+                      <TableHead className="h-8 px-3 text-label-01">Assignment</TableHead>
+                      <TableHead className="h-8 px-3 text-label-01 w-40">Handed in</TableHead>
+                      <TableHead className="h-8 px-3 text-label-01 w-24 text-right">Mark</TableHead>
+                      <TableHead className="h-8 px-3 text-label-01 w-40">Date</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {rows.map((row, idx) => (
-                      <tr
+                      <TableRow
                         key={`${row.studentId}-${row.assignmentId}-${idx}`}
-                        className={`border-b last:border-0 transition-colors ${idx % 2 === 0 ? "" : "bg-muted/20"} hover:bg-muted/40`}
+                        className="h-8"
                         data-testid={`row-gradebook-${row.studentId}-${row.assignmentId}`}
                       >
-                        <td className="px-4 py-3 font-medium">{row.studentName || "—"}</td>
-                        <td className="px-4 py-3 text-muted-foreground">{row.form || "—"}</td>
-                        <td className="px-4 py-3">{row.assignmentTitle || "—"}</td>
-                        <td className="px-4 py-3 text-muted-foreground">{row.subject || "—"}</td>
-                        <td className="px-4 py-3">
-                          {/* No submission, or no mark yet, is normal — it shows a
-                              dash or "Awaiting mark", never a broken cell. */}
+                        <TableCell className="px-3 py-0 text-body-compact-01 font-medium">
+                          {row.studentName || "\u2014"}
+                        </TableCell>
+                        <TableCell className="px-3 py-0 text-body-compact-01 text-muted-foreground">
+                          {row.form || "\u2014"}
+                        </TableCell>
+                        <TableCell className="px-3 py-0 text-body-compact-01">
+                          {row.assignmentTitle || "\u2014"}
+                        </TableCell>
+                        <TableCell className="px-3 py-0 text-body-compact-01">
+                          {handedIn(row.status || "NOT_SUBMITTED")}
+                        </TableCell>
+                        {/* Right-aligned and tabular so marks line up down the
+                            column and can be compared at a glance. No submission,
+                            or no mark yet, is normal - a dash or "Awaiting",
+                            never a broken cell. */}
+                        <TableCell className="px-3 py-0 text-body-compact-01 text-right tabular-nums">
                           {row.status === "NOT_SUBMITTED" || !row.submissionId ? (
-                            <span className="text-muted-foreground">—</span>
+                            <span className="text-muted-foreground">{"\u2014"}</span>
                           ) : row.score !== null && row.score !== undefined ? (
                             <Link href={`/teacher/submissions/${row.submissionId}`}>
-                              <span className="font-medium text-primary underline underline-offset-2 cursor-pointer hover:opacity-80" data-testid={`link-review-${row.submissionId}`} title="Open this submission">
+                              <span
+                                className="font-medium text-primary underline underline-offset-2 cursor-pointer hover:opacity-80"
+                                data-testid={`link-review-${row.submissionId}`}
+                                title="Open this submission"
+                              >
                                 {row.score}/{row.totalMarks ?? 0}
                               </span>
                             </Link>
                           ) : (
                             <Link href={`/teacher/submissions/${row.submissionId}`}>
-                              <span className="text-primary underline underline-offset-2 cursor-pointer text-xs" data-testid={`link-review-${row.submissionId}`} title="Open this submission">
-                                Awaiting mark
+                              <span
+                                className="text-primary underline underline-offset-2 cursor-pointer"
+                                data-testid={`link-review-${row.submissionId}`}
+                                title="Open this submission"
+                              >
+                                Awaiting
                               </span>
                             </Link>
                           )}
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground text-xs">{formatDate(row.submittedAt ?? null)}</td>
-                        <td className="px-4 py-3">{getStatusBadge(row.status || "NOT_SUBMITTED")}</td>
-                      </tr>
+                        </TableCell>
+                        <TableCell className="px-3 py-0 text-caption-01 text-muted-foreground whitespace-nowrap">
+                          {formatDate(row.submittedAt ?? null)}
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
             )}
-          </CardContent>
-        </Card>
+        </div>
 
         <p className="text-xs text-muted-foreground mt-4 text-right no-print">
           Showing {rows.length} record{rows.length !== 1 ? "s" : ""}
