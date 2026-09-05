@@ -12,7 +12,12 @@
     -->
     <style>
       :root {
-        --navy: #1f3864;
+        /* This page is served with no network, so it cannot load index.css.
+           These literals are the one sanctioned copy of the brand blue --
+           keep them in step with --onpoint-blue / --onpoint-blue-deep there.
+           --navy-deep is the same hue and saturation, lightness only. */
+        --navy: #1F3864;
+        --navy-deep: #142542;
         --red: #c1272d;
       }
       * {
@@ -45,7 +50,7 @@
         max-width: 22rem;
         font-size: 1.05rem;
         line-height: 1.55;
-        color: #44506b;
+        color: var(--navy);
       }
       button {
         margin-top: 0.5rem;
@@ -60,7 +65,7 @@
         cursor: pointer;
       }
       button:active {
-        background: #16294a;
+        background: var(--navy-deep);
       }
       .tagline {
         margin-top: 0.5rem;

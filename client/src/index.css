@@ -26,7 +26,7 @@
   --sidebar-foreground: 0 0% 98%;
   --sidebar-border: 224 45% 25%;
 
-  --sidebar-primary: 0 75% 50%;
+  --sidebar-primary: 355.9 69% 50.6%;
   --sidebar-primary-foreground: 0 0% 100%;
 
   --sidebar-accent: 224 40% 25%;
@@ -38,42 +38,65 @@
   --popover-foreground: 224 50% 15%;
   --popover-border: 224 20% 88%;
 
-  --primary: 224 65% 35%;
+  --primary: 218.3 52.7% 25.7%;
   --primary-foreground: 0 0% 100%;
 
-  --secondary: 0 75% 50%;
+  --secondary: 355.9 69% 50.6%;
   --secondary-foreground: 0 0% 100%;
 
   --muted: 224 15% 94%;
   --muted-foreground: 224 20% 45%;
 
-  --accent: 0 75% 50%;
+  --accent: 355.9 69% 50.6%;
   --accent-foreground: 0 0% 100%;
 
   --destructive: 0 85% 50%;
   --destructive-foreground: 0 0% 100%;
 
   --input: 224 20% 85%;
-  --ring: 224 65% 35%;
+  --ring: 218.3 52.7% 25.7%;
   
-  --chart-1: 224 65% 35%;
-  --chart-2: 0 75% 50%;
-  --chart-3: 224 45% 55%;
-  --chart-4: 0 60% 65%;
-  --chart-5: 224 30% 70%;
+  --chart-1: 218.3 52.7% 25.7%;
+  --chart-2: 355.9 69% 50.6%;
+  --chart-3: 218.3 45% 55%;
+  --chart-4: 355.9 60% 65%;
+  --chart-5: 218.3 30% 70%;
+
+  /* THE brand blue, ready to drop into a plain `background`/`color` where the
+     bare-triplet --primary cannot go. It DERIVES from --primary rather than
+     restating the hex, so there is exactly one place to change the navy.
+     Spec S1, S13.4.
+         --primary       = hsl(218.3, 52.7%, 25.7%) = #1F3864
+
+     --onpoint-blue-deep is the same hue and saturation with lightness alone
+     taken down, so the pair reads as one blue deepening, not two colours:
+         #142542         = hsl(218.3, 52.7%, 16.9%)
+     It exists only to give the hero gradient its second stop (spec S1,
+     S13.10: one gradient in the whole product, in the hero, nowhere else).
+     Do not use it as a surface colour on its own.
+
+     NOTE: --primary lightens in dark mode, so --onpoint-blue follows it there.
+     That is what you want for UI chrome. */
+  --onpoint-blue: hsl(var(--primary));
+  --onpoint-blue-deep: hsl(218.3 52.7% 16.9%);
+
+  /* Two places cannot read a CSS custom property and must repeat #1F3864 as
+     a literal. Change them by hand if the brand blue ever moves:
+       - client/index.html            <meta name="theme-color">
+       - client/public/offline.html   self-contained, never loads this file */
 
   --font-sans: 'Poppins', sans-serif;
   --font-serif: 'Playfair Display', serif;
   --font-mono: 'JetBrains Mono', monospace;
   --radius: .5rem;
-  --shadow-2xs: 0 1px 2px rgba(30, 58, 138, 0.04);
-  --shadow-xs: 0 1px 3px rgba(30, 58, 138, 0.06);
-  --shadow-sm: 0 1px 3px rgba(30, 58, 138, 0.06), 0 1px 2px rgba(30, 58, 138, 0.04);
-  --shadow: 0 2px 4px rgba(30, 58, 138, 0.08), 0 1px 2px rgba(30, 58, 138, 0.04);
-  --shadow-md: 0 4px 6px rgba(30, 58, 138, 0.08), 0 2px 4px rgba(30, 58, 138, 0.04);
-  --shadow-lg: 0 10px 15px rgba(30, 58, 138, 0.1), 0 4px 6px rgba(30, 58, 138, 0.05);
-  --shadow-xl: 0 20px 25px rgba(30, 58, 138, 0.1), 0 8px 10px rgba(30, 58, 138, 0.04);
-  --shadow-2xl: 0 25px 50px rgba(30, 58, 138, 0.15);
+  --shadow-2xs: 0 1px 2px rgba(31, 56, 100, 0.04);
+  --shadow-xs: 0 1px 3px rgba(31, 56, 100, 0.06);
+  --shadow-sm: 0 1px 3px rgba(31, 56, 100, 0.06), 0 1px 2px rgba(31, 56, 100, 0.04);
+  --shadow: 0 2px 4px rgba(31, 56, 100, 0.08), 0 1px 2px rgba(31, 56, 100, 0.04);
+  --shadow-md: 0 4px 6px rgba(31, 56, 100, 0.08), 0 2px 4px rgba(31, 56, 100, 0.04);
+  --shadow-lg: 0 10px 15px rgba(31, 56, 100, 0.1), 0 4px 6px rgba(31, 56, 100, 0.05);
+  --shadow-xl: 0 20px 25px rgba(31, 56, 100, 0.1), 0 8px 10px rgba(31, 56, 100, 0.04);
+  --shadow-2xl: 0 25px 50px rgba(31, 56, 100, 0.15);
   --tracking-normal: 0em;
   --spacing: 0.25rem;
 
@@ -121,7 +144,7 @@
   --sidebar-foreground: 0 0% 95%;
   --sidebar-border: 224 40% 18%;
 
-  --sidebar-primary: 0 70% 55%;
+  --sidebar-primary: 355.9 69% 50.6%;
   --sidebar-primary-foreground: 0 0% 100%;
 
   --sidebar-accent: 224 45% 20%;
@@ -133,29 +156,36 @@
   --popover-foreground: 0 0% 95%;
   --popover-border: 224 30% 22%;
 
-  --primary: 224 55% 50%;
+  --primary: 218.3 52.7% 50%;
   --primary-foreground: 0 0% 100%;
 
-  --secondary: 0 70% 55%;
+  /* The brand red does NOT lighten for dark mode the way the other tokens
+     here do. Lightening it to 55% put white text at 4.40:1, under the 4.5:1
+     AA floor for normal text -- white needs a darker ground, not a lighter
+     one. At full strength it clears white at 4.88:1 and still stands 3.89:1
+     off the dark page background, past the 3:1 floor for non-text UI. So the
+     red is the same value in both themes: --secondary, --accent and
+     --sidebar-primary below all carry it. Spec S12. */
+  --secondary: 355.9 69% 50.6%;
   --secondary-foreground: 0 0% 100%;
 
   --muted: 224 30% 18%;
   --muted-foreground: 224 15% 60%;
 
-  --accent: 0 70% 55%;
+  --accent: 355.9 69% 50.6%;
   --accent-foreground: 0 0% 100%;
 
   --destructive: 0 75% 55%;
   --destructive-foreground: 0 0% 100%;
 
   --input: 224 30% 25%;
-  --ring: 224 55% 50%;
+  --ring: 218.3 52.7% 50%;
   
-  --chart-1: 224 55% 55%;
-  --chart-2: 0 70% 55%;
-  --chart-3: 224 40% 65%;
-  --chart-4: 0 55% 70%;
-  --chart-5: 224 25% 75%;
+  --chart-1: 218.3 52.7% 55%;
+  --chart-2: 355.9 69% 55%;
+  --chart-3: 218.3 40% 65%;
+  --chart-4: 355.9 55% 70%;
+  --chart-5: 218.3 25% 75%;
 
   --shadow-2xs: 0 1px 2px rgba(0, 0, 0, 0.2);
   --shadow-xs: 0 1px 3px rgba(0, 0, 0, 0.25);

@@ -5,7 +5,7 @@
 // extra network call. Brand colours: navy track, gold fill and level chip.
 
 const GOLD = "#BF9000";
-const NAVY = "#1F3864";
+const NAVY = "var(--onpoint-blue)";
 
 interface XpLevelBarProps {
   level: number;

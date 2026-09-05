@@ -18,8 +18,9 @@ export default function ComingSoon({
   return (
     <div
       className="min-h-screen flex flex-col items-center justify-center px-6 text-center text-white"
-      // Lighter navy gradient so the page feels bright and friendly, not dark.
-      style={{ background: "linear-gradient(160deg, #2B4A80 0%, #1F3864 60%, #17284A 100%)" }}
+      // Flat brand blue. This used to be a three-stop navy gradient; the
+      // hero is the only gradient the spec allows (S1, S13.10).
+      style={{ backgroundColor: "var(--onpoint-blue)" }}
     >
       {/* Big bobbing emoji so the page still feels alive while empty. */}
       <div className="text-7xl mb-6 op-bob" aria-hidden="true">
@@ -40,8 +41,8 @@ export default function ComingSoon({
         </Link>
         <Link
           href="/student/login"
-          className="rounded-full px-6 py-3 font-bold text-[#1F3864] transition-transform hover:scale-105"
-          style={{ backgroundColor: "#BF9000" }}
+          className="rounded-full px-6 py-3 font-bold transition-transform hover:scale-105"
+          style={{ color: "var(--onpoint-blue)", backgroundColor: "#BF9000" }}
           data-testid="link-coming-soon-login"
         >
           Let's Start! 🚀

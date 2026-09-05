@@ -11,7 +11,7 @@ import { isPrimaryForm } from "@shared/schema";
 import { ArrowLeft, Printer } from "lucide-react";
 import { AWARDS, type AwardId } from "@shared/dreamworld";
 
-const NAVY = "#1F3864";
+const NAVY = "var(--onpoint-blue)";
 const GOLD = "#BF9000";
 
 export default function Certificate() {

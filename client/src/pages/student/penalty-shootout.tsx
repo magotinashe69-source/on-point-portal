@@ -634,7 +634,7 @@ function Pitch({
         {!isKeeperRound && (
           <g>
             <circle cx="160" cy="176" r="8" fill="#ffd7a8" />
-            <rect x="151" y="185" width="18" height="14" rx="4" fill="#1F3864" />
+            <rect x="151" y="185" width="18" height="14" rx="4" fill="var(--onpoint-blue)" />
           </g>
         )}
       </svg>

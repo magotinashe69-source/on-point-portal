@@ -6,25 +6,9 @@ Version 1, 5 September 2026. This is the file Claude Code must read before writi
 
 ---
 
-## 0. Three things to settle first
+## 0. Two things to settle first
 
-### 0.1 The brand has three colour stories
-
-| Where | Colours |
-|---|---|
-| The logo | Red and navy |
-| The website | Navy and gold |
-| Graduation sashes | Navy and orange |
-
-**Pick one and hold it everywhere.** Inconsistent brand colour is itself a signal that nobody was in charge.
-
-**My recommendation: red and navy**, taken from the logo. Reasons: the logo is the fixed asset, red gives you a stronger accent than gold at small sizes, and gold on white fails contrast checks in body text. Gold survives as a third colour for celebration moments on the student side only.
-
-**Approximate values read from the logo** — verify these with a colour picker on the actual file, do not trust my reading of a JPEG:
-- Navy: around `#1B3A6B`
-- Red: around `#D0021B`
-
-### 0.2 The login is not safe
+### 0.1 The login is not safe
 
 The student login says: *"Enter your name exactly as registered and create a password."*
 
@@ -34,7 +18,7 @@ Student names are not secret. They are on class lists, on WhatsApp groups, on th
 
 **Fix before design work:** teacher issues a one-time code, or the account is pre-created and the teacher hands out a first password. Not "name plus whatever password you type."
 
-### 0.3 Never publish real learner names
+### 0.2 Never publish real learner names
 
 The screenshots contain a real child's name. Fine for our conversation, but do not use these on the public site, in a pitch deck, or in an app store listing. Use fake names for anything public.
 
@@ -42,9 +26,13 @@ The screenshots contain a real child's name. Fine for our conversation, but do n
 
 ## 1. Colour tokens
 
-**Primary — navy.** Headers, primary buttons, headings, links.
-**Accent — red.** Sparingly. One or two things per screen.
+**Primary — navy `#1F3864`.** Headers, primary buttons, headings, links.
+**Accent — red `#D82A36`.** Sparingly. One or two things per screen.
 **Neutrals — Carbon grey ramp.** Everything else.
+
+These two values are settled. They are the palette; there is no second navy
+and no second red. Both live as tokens in `client/src/index.css`, which is the
+token file this document means whenever it says "the token file".
 
 **Four states, four colours, nothing else:**
 
@@ -74,7 +62,7 @@ Arbitrary Tailwind values (`p-[13px]`, `mt-[27px]`) are banned. If a value you n
 
 ## 3. Typography
 
-**Sora** for headings. **DM Sans** for body and tables.
+**Poppins** for headings. **DM Sans** for body and tables.
 
 Each step carries its own line-height. Never a global 1.5.
 
@@ -233,9 +221,7 @@ Replace with: their name, the number of assignments waiting, and one clear actio
 
 ## 15. Still open
 
-- Exact navy and red hex, confirmed with a colour picker on the logo file
 - `tailwind.config.ts` or CSS `@theme` — which builds your CSS
-- Confirmation that Sora actually applied on the deployed site
 
 ---
 

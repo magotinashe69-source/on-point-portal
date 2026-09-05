@@ -3,20 +3,25 @@ import { Link } from "wouter";
 import logoPath from "@assets/logo.webp";
 
 // ---------------------------------------------------------------------------
-// On Point landing page — a playful, kid-focused homepage.
+// On Point landing page.
 //
 // Design notes for future editors:
-//  * Brand colours: navy #1F3864 and gold #BF9000. We use LIGHTER navy
-//    gradients (#2B4A80 / #3A5DA0) so the page feels bright and friendly.
-//  * Everything decorative (stars, planet, backpack, subject tiles, waves)
-//    is CSS or inline SVG — NO image files — so it loads fast on cheap
-//    Android phones. The only picture is the existing brand logo.
+//  * The HERO has been rebuilt to ONPOINT_UI_SPEC.md. Read that file before
+//    touching it. Everything below the hero is still the older playful
+//    treatment and has NOT yet been brought in line with the spec.
+//  * The brand blue now comes from the --onpoint-blue token in index.css.
+//    The NAVY constant below is just that var() in a string, so there is no
+//    blue hex in this file. GOLD is still a literal; the spec wants it
+//    tokenised and retired to student celebration moments only (S1).
+//  * The hero holds the one gradient the spec allows in the whole product
+//    (S1, S13.10). The subjects strip, the photo band and the final CTA used
+//    to carry navy gradients of their own; they are flat token blue now.
 //  * Animations live in index.css under the "op-" prefix and are all turned
 //    off automatically when the phone asks for reduced motion.
 // ---------------------------------------------------------------------------
 
 // Brand colours in one place so they are easy to change later.
-const NAVY = "#1F3864";
+const NAVY = "var(--onpoint-blue)";
 const GOLD = "#BF9000";
 
 // The subjects shown as colourful tiles. Each has a friendly emoji and its
@@ -56,39 +61,6 @@ const NAV_LINKS = [
   { label: "Games", href: "/student/login" },
   { label: "Rewards", href: "/student/login" },
 ];
-
-// A friendly star "study buddy" drawn as SVG so it costs nothing to download
-// and can bob around smoothly. This is our hero mascot.
-function StarMascot() {
-  return (
-    <svg viewBox="0 0 200 200" className="w-full h-full" role="img" aria-label="On Point star mascot">
-      <defs>
-        <linearGradient id="starFill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#F2C94C" />
-          <stop offset="100%" stopColor={GOLD} />
-        </linearGradient>
-      </defs>
-      {/* star body */}
-      <path
-        d="M100 15 l22 46 51 7 -37 36 9 51 -45 -24 -45 24 9 -51 -37 -36 51 -7 Z"
-        fill="url(#starFill)"
-        stroke="#fff"
-        strokeWidth="4"
-        strokeLinejoin="round"
-      />
-      {/* eyes */}
-      <circle cx="86" cy="92" r="8" fill={NAVY} />
-      <circle cx="114" cy="92" r="8" fill={NAVY} />
-      <circle cx="89" cy="89" r="2.5" fill="#fff" />
-      <circle cx="117" cy="89" r="2.5" fill="#fff" />
-      {/* smile */}
-      <path d="M84 108 q16 16 32 0" fill="none" stroke={NAVY} strokeWidth="5" strokeLinecap="round" />
-      {/* rosy cheeks */}
-      <circle cx="74" cy="104" r="5" fill="#EF6F6C" opacity="0.6" />
-      <circle cx="126" cy="104" r="5" fill="#EF6F6C" opacity="0.6" />
-    </svg>
-  );
-}
 
 // A little backpack drawn as SVG — floats over the subjects strip.
 function Backpack() {
@@ -179,83 +151,77 @@ export default function Landing() {
         )}
       </header>
 
-      {/* ================= HERO ================= */}
+      {/* ================= HERO =================
+          Rebuilt to ONPOINT_UI_SPEC.md. What the spec dictates here:
+           * S10 - no mascots, no clipart. The star, the speech bubble, the
+             drifting stars and the planet are gone; the only picture is a
+             real photograph of the school, slotted in below.
+           * S1  - this gradient is the ONE gradient allowed in the product.
+             Both stops are tokens (--onpoint-blue, --onpoint-blue-deep):
+             one hue, lightness only, so no raw hex lives in this file.
+           * S3  - hierarchy from size and weight only. The headline is a
+             single colour; colouring individual words is banned.
+           * S5  - one button, labelled with exactly what it does. No arrow,
+             no emoji, no exclamation mark. */}
       <section
-        className="relative overflow-hidden"
-        style={{ background: "linear-gradient(160deg, #3A5DA0 0%, #2B4A80 55%, #1F3864 100%)" }}
+        className="relative"
+        style={{
+          background:
+            "linear-gradient(170deg, var(--onpoint-blue) 0%, var(--onpoint-blue-deep) 100%)",
+        }}
       >
-        {/* Drifting gold stars — pure CSS, positioned by hand. */}
-        {[
-          { top: "12%", left: "8%", d: "0s", s: 18 },
-          { top: "24%", left: "82%", d: "1.2s", s: 12 },
-          { top: "62%", left: "14%", d: "2.1s", s: 14 },
-          { top: "72%", left: "78%", d: "0.6s", s: 20 },
-          { top: "40%", left: "45%", d: "1.8s", s: 10 },
-        ].map((star, i) => (
-          <span
-            key={i}
-            className="op-drift absolute select-none"
-            style={{ top: star.top, left: star.left, animationDelay: star.d, fontSize: star.s, color: "#F2C94C" }}
-            aria-hidden="true"
-          >
-            ★
-          </span>
-        ))}
-
-        {/* A small planet floating in the background. */}
-        <div className="op-float absolute -right-6 top-10 opacity-70" aria-hidden="true">
-          <svg width="90" height="90" viewBox="0 0 90 90">
-            <circle cx="45" cy="45" r="26" fill="#8FB3E8" />
-            <ellipse cx="45" cy="45" rx="42" ry="12" fill="none" stroke={GOLD} strokeWidth="4" transform="rotate(-20 45 45)" />
-          </svg>
-        </div>
-
-        <div className="relative mx-auto max-w-6xl px-4 py-14 md:py-20 grid md:grid-cols-2 gap-10 items-center">
-          {/* Left: words + buttons */}
+        <div className="mx-auto max-w-6xl px-4 py-16 md:py-24 grid md:grid-cols-2 gap-12 items-center">
+          {/* Left: words and the single call to action. */}
           <div className="op-slide-in text-center md:text-left">
-            <h1 className="font-extrabold leading-tight tracking-tight text-4xl sm:text-5xl lg:text-6xl">
-              <span className="text-white">Homework </span>
-              <span style={{ color: "#F2C94C" }}>Made </span>
-              <span style={{ color: "#9FC0F0" }}>Fun, </span>
-              <br className="hidden sm:block" />
-              <span style={{ color: "#F2C94C" }}>Learning </span>
-              <span className="text-white">Made </span>
-              <span style={{ color: "#9FC0F0" }}>Easy!</span>
+            {/* One colour throughout. The second line steps down in size and
+                weight -- that is the whole hierarchy, per S3. */}
+            <h1 className="font-sans text-white">
+              <span className="block text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight tracking-tight">
+                Homework at On Point
+              </span>
+              <span className="mt-4 block text-lg sm:text-xl font-normal leading-relaxed max-w-lg mx-auto md:mx-0">
+                Set by your teacher, handed in from your phone, marked and
+                returned in one place.
+              </span>
             </h1>
-            <p className="mt-5 text-lg text-white/85 max-w-lg mx-auto md:mx-0">
-              Your fun buddy for homework, practice &amp; success at On Point Education Centre.
-            </p>
-            <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center md:justify-start">
+
+            <div className="mt-8">
               <Link
                 href="/student/login"
-                className="op-lift rounded-full px-7 py-4 font-bold text-lg text-white shadow-lg"
-                style={{ backgroundColor: GOLD }}
+                className="inline-block rounded-lg bg-accent px-8 py-4 font-sans text-lg font-semibold text-accent-foreground transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
                 data-testid="button-student-start"
               >
-                Let's Start! 🚀
+                Log In
               </Link>
             </div>
           </div>
 
-          {/* Right: bobbing mascot with a speech bubble. */}
-          <div className="op-slide-in relative flex justify-center" style={{ animationDelay: "0.15s" }}>
-            <div className="relative w-56 h-56 sm:w-72 sm:h-72">
-              {/* Speech bubble */}
-              <div className="absolute -top-2 -right-2 sm:right-4 bg-white rounded-2xl px-4 py-2 shadow-lg font-bold text-sm z-10" style={{ color: NAVY }}>
-                Let's learn together!
-                <span className="absolute -bottom-1.5 left-6 w-3 h-3 bg-white rotate-45" />
-              </div>
-              <div className="op-bob w-full h-full drop-shadow-xl">
-                <StarMascot />
-              </div>
-            </div>
+          {/* Right: photograph slot.
+              TO ADD THE IMAGE: drop the file in attached_assets, import it at
+              the top of this file (e.g. `import heroPath from
+              "@assets/hero.webp";`) and replace this whole <div> with:
+
+                <img
+                  src={heroPath}
+                  alt="<describe what the photograph shows>"
+                  className="op-slide-in w-full rounded-lg object-cover aspect-video"
+                  loading="lazy"
+                  width={1200}
+                  height={900}
+                />
+
+              S10: a real photograph of On Point, WebP, under 1 MB, and
+              written parental consent first if any child is identifiable. */}
+          <div
+            className="op-slide-in w-full aspect-video rounded-lg border border-white/25 flex items-center justify-center"
+            style={{ animationDelay: "0.15s" }}
+            data-testid="hero-image-placeholder"
+          >
+            <span className="font-sans text-sm text-white/70">
+              Photograph to be supplied
+            </span>
           </div>
         </div>
-
-        {/* Wavy bottom edge (SVG) into the next section. */}
-        <svg className="block w-full" viewBox="0 0 1440 80" preserveAspectRatio="none" style={{ height: 48 }} aria-hidden="true">
-          <path d="M0 40 C240 90 480 0 720 30 C960 60 1200 10 1440 40 L1440 80 L0 80 Z" fill="#F5F8FF" />
-        </svg>
       </section>
 
       {/* ================= FEATURE CARDS ================= */}
@@ -289,7 +255,7 @@ export default function Landing() {
       </section>
 
       {/* ================= SUBJECTS STRIP ================= */}
-      <section id="subjects" className="relative overflow-hidden py-14" style={{ background: "linear-gradient(160deg, #2B4A80 0%, #1F3864 100%)" }}>
+      <section id="subjects" className="relative overflow-hidden py-14" style={{ backgroundColor: NAVY }}>
         {/* Floating backpack decoration. */}
         <div className="op-float absolute right-4 top-4 w-16 h-16 sm:w-24 sm:h-24 opacity-90" aria-hidden="true">
           <Backpack />
@@ -333,7 +299,7 @@ export default function Landing() {
         <div className="op-slide-in rounded-3xl overflow-hidden shadow-md">
           <div
             className="w-full h-48 sm:h-72 flex items-center justify-center text-white text-center px-6"
-            style={{ background: "linear-gradient(120deg, #3A5DA0, #1F3864)" }}
+            style={{ backgroundColor: NAVY }}
           >
             <div>
               <div className="text-5xl mb-2">🏫📸</div>
@@ -360,7 +326,7 @@ export default function Landing() {
       <section className="mx-auto max-w-6xl px-4 py-16">
         <div
           className="op-slide-in relative overflow-hidden rounded-[2rem] px-6 py-14 text-center shadow-xl"
-          style={{ background: "linear-gradient(160deg, #3A5DA0 0%, #1F3864 100%)" }}
+          style={{ backgroundColor: NAVY }}
         >
           {/* A couple of drifting stars for sparkle. */}
           <span className="op-drift absolute top-6 left-10 text-xl" style={{ color: "#F2C94C" }} aria-hidden="true">★</span>
