@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
+import { QueryError } from "@/components/QueryError";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ArrowLeft, PlusCircle, Pencil, Trash2, KeyRound, Loader2, Users, ClipboardPaste } from "lucide-react";
@@ -105,7 +106,7 @@ export default function StudentManagement() {
     }
   }, [teacher, setLocation]);
 
-  const { data: students = [], isLoading } = useQuery<Student[]>({
+  const { data: students = [], isLoading, isError, error, refetch } = useQuery<Student[]>({
     queryKey: ["/api/students"],
   });
 
@@ -471,6 +472,8 @@ export default function StudentManagement() {
               <div className="flex justify-center py-8">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
               </div>
+            ) : isError ? (
+              <QueryError error={error} what="the register" onRetry={() => refetch()} data-testid="students-load-error" />
             ) : filteredStudents.length === 0 ? (
               <p className="text-center text-muted-foreground py-8">No students found</p>
             ) : (

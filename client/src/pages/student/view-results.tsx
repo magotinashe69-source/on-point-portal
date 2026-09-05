@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/lib/auth";
+import { QueryError } from "@/components/QueryError";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ArrowLeft, Loader2, CheckCircle, XCircle, Trophy, MessageSquare, Image as ImageIcon, RotateCcw } from "lucide-react";
 import { Lightbox } from "@/components/Lightbox";
@@ -36,7 +37,7 @@ export default function ViewResults() {
     }
   }, [student, setLocation]);
 
-  const { data: submissionData, isLoading: submissionLoading } = useQuery<Submission & { assignment?: Assignment }>({
+  const { data: submissionData, isLoading: submissionLoading, isError: submissionFailed, error: submissionError, refetch: refetchSubmission } = useQuery<Submission & { assignment?: Assignment }>({
     queryKey: ["/api/submissions", id],
     enabled: !!student && !!id,
   });
@@ -98,6 +99,8 @@ export default function ViewResults() {
           <div className="flex items-center justify-center py-16">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
+        ) : submissionFailed ? (
+          <QueryError error={submissionError} what="your result" role="student" variant="page" onRetry={() => refetchSubmission()} data-testid="result-load-error" />
         ) : submission && assignment && assignment.questions && mark ? (
           <>
             <Card className="mb-6">

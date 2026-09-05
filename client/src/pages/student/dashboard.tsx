@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth";
+import { QueryError } from "@/components/QueryError";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { 
   LogOut, 
@@ -51,12 +52,12 @@ export default function StudentDashboard() {
     }
   }, [student, setLocation]);
 
-  const { data: assignments, isLoading: assignmentsLoading } = useQuery<Assignment[]>({
+  const { data: assignments, isLoading: assignmentsLoading, isError: assignmentsFailed, error: assignmentsError, refetch: refetchAssignments } = useQuery<Assignment[]>({
     queryKey: ["/api/assignments", { form: student?.form, studentId: student?.id }],
     enabled: !!student,
   });
 
-  const { data: submissions, isLoading: submissionsLoading } = useQuery<EnrichedSubmission[]>({
+  const { data: submissions, isLoading: submissionsLoading, isError: submissionsFailed, error: submissionsError, refetch: refetchSubmissions } = useQuery<EnrichedSubmission[]>({
     queryKey: ["/api/submissions", { studentId: student?.id }],
     enabled: !!student,
   });
@@ -390,6 +391,8 @@ export default function StudentDashboard() {
                     </Link>
                   ))}
                 </div>
+              ) : assignmentsFailed ? (
+                <QueryError error={assignmentsError} what="your homework" role="student" onRetry={() => refetchAssignments()} data-testid="assignments-load-error" />
               ) : (
                 <div className="text-center py-8">
                   <CheckCircle className="h-12 w-12 mx-auto text-primary mb-4" />
@@ -453,6 +456,8 @@ export default function StudentDashboard() {
                     </Link>
                   ))}
                 </div>
+              ) : submissionsFailed ? (
+                <QueryError error={submissionsError} what="your results" role="student" onRetry={() => refetchSubmissions()} data-testid="results-load-error" />
               ) : (
                 <div className="text-center py-8">
                   <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />

@@ -18,6 +18,7 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
+import { QueryError } from "@/components/QueryError";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { SimpleUploader } from "@/components/SimpleUploader";
@@ -137,7 +138,7 @@ export default function TeacherResources() {
     }
   }, [teacher, setLocation]);
 
-  const { data: resources, isLoading } = useQuery<Resource[]>({
+  const { data: resources, isLoading, isError, error, refetch } = useQuery<Resource[]>({
     queryKey: ["/api/resources", { teacherOnly: true }],
     enabled: !!teacher,
   });
@@ -635,6 +636,8 @@ export default function TeacherResources() {
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
+        ) : isError ? (
+          <QueryError error={error} what="your resources" onRetry={() => refetch()} data-testid="resources-load-error" />
         ) : filteredResources.length > 0 ? (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {filteredResources.map((resource) => (

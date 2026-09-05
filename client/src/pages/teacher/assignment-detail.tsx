@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth";
+import { QueryError } from "@/components/QueryError";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
   ArrowLeft, FileText, Clock, CheckCircle, AlertCircle, Loader2, Calendar,
@@ -58,7 +59,7 @@ export default function AssignmentDetail() {
     }
   }, [teacher, setLocation]);
 
-  const { data: assignment, isLoading: assignmentLoading } = useQuery<Assignment>({
+  const { data: assignment, isLoading: assignmentLoading, isError: assignmentFailed, error: assignmentError, refetch: refetchAssignment } = useQuery<Assignment>({
     queryKey: ["/api/assignments", id],
     enabled: !!teacher && !!id,
     refetchInterval: 30000,
@@ -219,6 +220,8 @@ export default function AssignmentDetail() {
           <div className="flex items-center justify-center py-16">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
+        ) : assignmentFailed ? (
+          <QueryError error={assignmentError} what="this assignment" variant="page" onRetry={() => refetchAssignment()} data-testid="assignment-load-error" />
         ) : assignment ? (
           <>
             {/* Header */}

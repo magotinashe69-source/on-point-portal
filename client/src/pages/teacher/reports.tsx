@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth";
+import { QueryError } from "@/components/QueryError";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ArrowLeft, Loader2, BarChart3, TrendingUp, Users, BookOpen, ClipboardList } from "lucide-react";
 import { useState } from "react";
@@ -85,7 +86,7 @@ export default function TeacherReports() {
     }
   }, [teacher, setLocation]);
 
-  const { data: reportResponse, isLoading } = useQuery<{ success: boolean; data: ReportData }>({
+  const { data: reportResponse, isLoading, isError, error, refetch } = useQuery<{ success: boolean; data: ReportData }>({
     queryKey: ["/api/reports"],
     enabled: !!teacher,
   });
@@ -153,6 +154,8 @@ export default function TeacherReports() {
           <div className="flex items-center justify-center py-16">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
+        ) : isError ? (
+          <QueryError error={error} what="the report" variant="page" onRetry={() => refetch()} data-testid="reports-load-error" />
         ) : reportData ? (
           <div className="space-y-6">
             <div className="flex items-center gap-4">

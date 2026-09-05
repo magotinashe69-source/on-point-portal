@@ -14,6 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
+import { QueryError } from "@/components/QueryError";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ArrowLeft, Loader2, Send, Calendar, BookOpen, Edit, AlertTriangle, ImagePlus, X, FileText, Paperclip, Circle, CheckCircle2 } from "lucide-react";
@@ -75,7 +76,7 @@ export default function SubmitAssignment() {
     }
   }, [student, setLocation]);
 
-  const { data: assignment, isLoading: assignmentLoading } = useQuery<Assignment>({
+  const { data: assignment, isLoading: assignmentLoading, isError: assignmentFailed, error: assignmentError, refetch: refetchAssignment } = useQuery<Assignment>({
     queryKey: ["/api/assignments", id],
     enabled: !!student && !!id,
   });
@@ -329,6 +330,8 @@ export default function SubmitAssignment() {
           <div className="flex items-center justify-center py-16">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
+        ) : assignmentFailed ? (
+          <QueryError error={assignmentError} what="this homework" role="student" variant="page" onRetry={() => refetchAssignment()} data-testid="assignment-load-error" />
         ) : assignment ? (
           <>
             <Card className="mb-6">

@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth";
+import { QueryError } from "@/components/QueryError";
 import { PageErrorBoundary } from "@/components/ErrorBoundary";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ArrowLeft, CheckCircle, XCircle, Download, Printer, Loader2, BookOpen, AlertTriangle } from "lucide-react";
@@ -49,7 +50,7 @@ function GradeBookContent() {
   if (filterDateFrom) filters.dateFrom = filterDateFrom;
   if (filterDateTo) filters.dateTo = filterDateTo;
 
-  const { data, isLoading, isError } = useQuery<{ success: boolean; rows: GradebookRow[] }>({
+  const { data, isLoading, isError, error, refetch } = useQuery<{ success: boolean; rows: GradebookRow[] }>({
     queryKey: ["/api/gradebook", filters],
     enabled: !!teacher,
   });
@@ -347,14 +348,9 @@ function GradeBookContent() {
             ) : isError ? (
               // A load that failed is not the same as a class with no records —
               // say which one it is, so nobody is left staring at an empty table.
-              <div className="flex flex-col items-center justify-center py-16 px-4 text-center" data-testid="gradebook-load-error">
-                <AlertTriangle className="h-10 w-10 mb-3 text-amber-500" />
-                <p className="font-medium">Couldn&apos;t load the Grade Book</p>
-                <p className="text-sm text-muted-foreground mt-1">Check your connection and try again.</p>
-                <Button variant="outline" className="mt-4" onClick={() => window.location.reload()} data-testid="button-gradebook-retry">
-                  Try again
-                </Button>
-              </div>
+              // refetch() rather than a page reload: S8 asks for a retry that
+              // does not throw away the filters the teacher has set.
+              <QueryError error={error} what="the Grade Book" variant="page" onRetry={() => refetch()} data-testid="gradebook-load-error" />
             ) : rows.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
                 <BookOpen className="h-10 w-10 mb-3 opacity-40" />

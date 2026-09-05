@@ -18,6 +18,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
+import { QueryError } from "@/components/QueryError";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { SimpleUploader } from "@/components/SimpleUploader";
@@ -309,7 +310,7 @@ export default function TeacherLessons() {
     }
   }, [teacher, setLocation]);
 
-  const { data: lessons, isLoading } = useQuery<Lesson[]>({
+  const { data: lessons, isLoading, isError, error, refetch } = useQuery<Lesson[]>({
     queryKey: ["/api/lessons"],
     enabled: !!teacher,
   });
@@ -836,6 +837,8 @@ export default function TeacherLessons() {
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
+        ) : isError ? (
+          <QueryError error={error} what="your lessons" onRetry={() => refetch()} data-testid="lessons-load-error" />
         ) : filteredLessons.length > 0 ? (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {filteredLessons.map((lesson) => (

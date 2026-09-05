@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth";
+import { QueryError } from "@/components/QueryError";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
   ArrowLeft,
@@ -30,7 +31,7 @@ export default function StudentLessons() {
     }
   }, [student, setLocation]);
 
-  const { data: lessons, isLoading } = useQuery<Lesson[]>({
+  const { data: lessons, isLoading, isError, error, refetch } = useQuery<Lesson[]>({
     queryKey: ["/api/lessons", { form: student?.form }],
     enabled: !!student,
   });
@@ -107,6 +108,8 @@ export default function StudentLessons() {
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
+        ) : isError ? (
+          <QueryError error={error} what="your lessons" role="student" onRetry={() => refetch()} data-testid="lessons-load-error" />
         ) : filteredLessons.length > 0 ? (
           <div className="grid gap-6 md:grid-cols-2">
             {filteredLessons.map((lesson) => (

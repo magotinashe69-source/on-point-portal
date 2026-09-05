@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth";
+import { QueryError } from "@/components/QueryError";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { 
   ArrowLeft, 
@@ -32,7 +33,7 @@ export default function StudentResources() {
     }
   }, [student, setLocation]);
 
-  const { data: resources, isLoading } = useQuery<Resource[]>({
+  const { data: resources, isLoading, isError, error, refetch } = useQuery<Resource[]>({
     queryKey: ["/api/resources", { form: student?.form }],
     enabled: !!student,
   });
@@ -130,6 +131,8 @@ export default function StudentResources() {
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
+        ) : isError ? (
+          <QueryError error={error} what="your resources" role="student" onRetry={() => refetch()} data-testid="resources-load-error" />
         ) : filteredResources.length > 0 ? (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {filteredResources.map((resource) => (

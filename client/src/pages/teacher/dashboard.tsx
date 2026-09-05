@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { PublishAssignmentButton } from "@/components/PublishAssignmentButton";
 import { useAuth } from "@/lib/auth";
+import { QueryError } from "@/components/QueryError";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { 
   PlusCircle, 
@@ -63,7 +64,7 @@ export default function TeacherDashboard() {
 
   // The teacher's list is the one place that also shows drafts. The server only
   // honours includeDrafts for a logged-in teacher, so students never get them.
-  const { data: assignments, isLoading: assignmentsLoading } = useQuery<Assignment[]>({
+  const { data: assignments, isLoading: assignmentsLoading, isError: assignmentsFailed, error: assignmentsError, refetch: refetchAssignments } = useQuery<Assignment[]>({
     queryKey: ["/api/assignments", { includeDrafts: true }],
     enabled: !!teacher,
     refetchInterval: 30000,
@@ -75,7 +76,7 @@ export default function TeacherDashboard() {
     refetchInterval: 30000,
   });
 
-  const { data: submissions, isLoading: submissionsLoading } = useQuery<EnrichedSubmission[]>({
+  const { data: submissions, isLoading: submissionsLoading, isError: submissionsFailed, error: submissionsError, refetch: refetchSubmissions } = useQuery<EnrichedSubmission[]>({
     queryKey: ["/api/submissions"],
     enabled: !!teacher,
     refetchInterval: 30000,
@@ -802,6 +803,8 @@ export default function TeacherDashboard() {
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
+              ) : assignmentsFailed ? (
+                <QueryError error={assignmentsError} what="your assignments" onRetry={() => refetchAssignments()} data-testid="assignments-load-error" />
               ) : filteredAssignments.length > 0 ? (
                 <div className="space-y-5 max-h-[600px] overflow-y-auto pr-1">
                   {/* Drafts first — these are the ones waiting for a tap. */}
@@ -861,6 +864,8 @@ export default function TeacherDashboard() {
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
+              ) : submissionsFailed ? (
+                <QueryError error={submissionsError} what="pending submissions" onRetry={() => refetchSubmissions()} data-testid="submissions-load-error" />
               ) : filteredPendingSubmissions.length > 0 ? (
                 <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
                   {filteredPendingSubmissions.map((submission) => (
