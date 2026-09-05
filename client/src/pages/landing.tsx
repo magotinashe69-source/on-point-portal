@@ -189,30 +189,34 @@ export default function Landing() {
             </div>
           </div>
 
-          {/* Right: photograph slot.
-              TO ADD THE IMAGE: drop the file in attached_assets, import it at
-              the top of this file (e.g. `import heroPath from
-              "@assets/hero.webp";`) and replace this whole <div> with:
+          {/* Right: a screenshot of the product (S10 allows these).
+              TEMPORARY. assignment.jpeg was taken before the copy pass, so its
+              question badges still read "1 marks" — the plural bug fixed in
+              S11.2. Re-shoot against the current build and swap the src.
 
-                <img
-                  src={heroPath}
-                  alt="<describe what the photograph shows>"
-                  className="op-slide-in w-full rounded-lg object-cover aspect-video"
-                  loading="lazy"
-                  width={1200}
-                  height={900}
-                />
+              Files in client/public are served from the site root, so this
+              needs no import. The image is a portrait phone screenshot
+              (725x1280), so it keeps its own shape rather than being cropped
+              into a landscape box: w-full lets it shrink on a narrow screen,
+              h-auto keeps the ratio, and max-w-xs stops it towering over the
+              text column on a desktop. width/height are the real pixel
+              dimensions so the browser reserves the space before the file
+              arrives — it is the largest thing in the hero, and on a phone in
+              Tete it may arrive slowly.
 
-              S10: a real photograph of On Point, WebP, under 1 MB, and
-              written parental consent first if any child is identifiable. */}
-          <div
-            className="op-slide-in w-full aspect-video rounded-lg border border-white/25 flex items-center justify-center"
-            style={{ animationDelay: "0.15s" }}
-            data-testid="hero-image-placeholder"
-          >
-            <span className="font-sans text-sm text-white/70">
-              Photograph to be supplied
-            </span>
+              It loads eagerly on purpose: S10 says lazy-load BELOW the fold,
+              and this sits above it. */}
+          <div className="op-slide-in flex justify-center" style={{ animationDelay: "0.15s" }}>
+            <img
+              src="/assignment.jpeg"
+              alt="The assignment screen on a phone: a list of maths questions, each in its own card with the marks available beside it — place value, number sequences, the faces of a cube, multiplication and addition."
+              className="w-full h-auto max-w-xs rounded-lg border border-white/25"
+              width={725}
+              height={1280}
+              loading="eager"
+              decoding="async"
+              data-testid="hero-image"
+            />
           </div>
         </div>
       </section>
