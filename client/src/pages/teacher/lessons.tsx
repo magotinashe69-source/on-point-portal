@@ -344,7 +344,7 @@ export default function TeacherLessons() {
         setRecordedBlob(null);
         setRecordedDuration("");
       } else {
-        toast({ title: "Error", description: data.message, variant: "destructive" });
+        toast({ title: "Lesson not added", description: data.message, variant: "destructive" });
       }
     },
   });

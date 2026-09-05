@@ -110,6 +110,14 @@ const ASSIGNMENTS_ADDED_COLUMNS: { name: string; type: string }[] = [
   { name: "published", type: "BOOLEAN NOT NULL DEFAULT true" },
 ];
 
+// Columns added to students after it first shipped. qr_code links a pupil to
+// the Master Student Database ID on their attendance QR card. No NOT NULL and
+// no default: an unlinked pupil is legitimately null, and UNIQUE in both
+// engines ignores nulls, so any number of rows can sit unlinked.
+const STUDENTS_ADDED_COLUMNS: { name: string; type: string }[] = [
+  { name: "qr_code", type: "TEXT" },
+];
+
 // Filled in below depending on which database we use.
 let activeDb: unknown;
 let pgPoolInstance: pg.Pool | undefined;
@@ -139,6 +147,13 @@ if (usePostgres) {
     for (const col of ASSIGNMENTS_ADDED_COLUMNS) {
       await pgPoolInstance!.query(`ALTER TABLE assignments ADD COLUMN IF NOT EXISTS ${col.name} ${col.type}`);
     }
+    for (const col of STUDENTS_ADDED_COLUMNS) {
+      await pgPoolInstance!.query(`ALTER TABLE students ADD COLUMN IF NOT EXISTS ${col.name} ${col.type}`);
+    }
+    // The unique index is separate: ADD COLUMN cannot carry UNIQUE in Postgres.
+    await pgPoolInstance!.query(
+      `CREATE UNIQUE INDEX IF NOT EXISTS students_qr_code_key ON students (qr_code)`
+    );
   };
 
   console.log("[db] Using PostgreSQL (DATABASE_URL is set)");
@@ -170,6 +185,15 @@ if (usePostgres) {
       try { await client.execute(`ALTER TABLE assignments ADD COLUMN ${col.name} ${type}`); }
       catch { /* column already present */ }
     }
+    for (const col of STUDENTS_ADDED_COLUMNS) {
+      try { await client.execute(`ALTER TABLE students ADD COLUMN ${col.name} ${col.type}`); }
+      catch { /* column already present */ }
+    }
+    try {
+      await client.execute(
+        `CREATE UNIQUE INDEX IF NOT EXISTS students_qr_code_key ON students (qr_code)`
+      );
+    } catch { /* index already present */ }
   };
 
   console.log(`[db] Using local SQLite database at ${dbFile}`);

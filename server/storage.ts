@@ -33,6 +33,7 @@ export interface IStorage {
   // Students
   getStudent(id: number): Promise<Student | undefined>;
   getStudentByStudentId(studentId: string): Promise<Student | undefined>;
+  getStudentByQrCode(qrCode: string): Promise<Student | undefined>;
   getStudentByName(name: string): Promise<Student | undefined>;
   getAllStudents(): Promise<Student[]>;
   getStudentsByForm(form: string): Promise<Student[]>;
@@ -137,6 +138,16 @@ export class DatabaseStorage implements IStorage {
 
   async getStudentByStudentId(studentId: string): Promise<Student | undefined> {
     const [student] = await db.select().from(students).where(eq(students.studentId, studentId));
+    return student || undefined;
+  }
+
+  // Look a pupil up by the Master Student Database ID on their QR card.
+  // Codes are printed in upper case; normalise so a scan that arrives lower
+  // case still matches.
+  async getStudentByQrCode(qrCode: string): Promise<Student | undefined> {
+    const code = qrCode.trim().toUpperCase();
+    if (!code) return undefined;
+    const [student] = await db.select().from(students).where(eq(students.qrCode, code));
     return student || undefined;
   }
 

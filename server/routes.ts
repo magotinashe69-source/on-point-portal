@@ -336,6 +336,39 @@ export async function registerRoutes(
   });
 
   // Get single student
+  // Look up a pupil by the Master Student Database ID on their attendance QR
+  // card, e.g. GET /api/students/by-code/G3-001
+  //
+  // This IDENTIFIES a pupil for a teacher who is already logged in. It does
+  // NOT authenticate anyone: a printed card is easy to photograph, so a scan
+  // must never stand in for a login (spec S0.1). Teacher session required.
+  //
+  // Declared above /api/students/:id so "by-code" is never read as an id.
+  app.get("/api/students/by-code/:code", async (req, res) => {
+    try {
+      if (!(await requireTeacherAuth(req, res))) return;
+
+      const code = (req.params.code || "").trim();
+      if (!code) {
+        return res.status(400).json({ success: false, message: "Scan a card, or type the code from it." });
+      }
+
+      const student = await storage.getStudentByQrCode(code);
+      if (!student) {
+        return res.status(404).json({
+          success: false,
+          message: "No pupil is linked to that card yet. Link it on the Students screen.",
+        });
+      }
+
+      // Never return the password column, even to a teacher.
+      const { password, ...safe } = student;
+      res.json({ success: true, student: safe });
+    } catch (error) {
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
+    }
+  });
+
   app.get("/api/students/:id", async (req, res) => {
     try {
       const student = await storage.getStudent(parseInt(req.params.id));
@@ -349,8 +382,18 @@ export async function registerRoutes(
   });
 
   // Create student
+  // Normalise a card code: trim, upper case, and treat blank as "no card".
+  // Codes are printed in upper case, so a scan or a typo in lower case still
+  // has to match the stored value.
+  function normaliseQrCode(raw: unknown): string | null {
+    if (typeof raw !== "string") return null;
+    const code = raw.trim().toUpperCase();
+    return code === "" ? null : code;
+  }
+
   const createStudentSchema = z.object({
     studentId: z.string().min(1),
+    qrCode: z.string().nullish(),
     fullName: z.string().min(1),
     gender: z.enum(["Male", "Female"]),
     form: z.enum(["Stage 3", "Stage 4", "Stage 5", "Stage 6", "Form 1", "Form 2"]),
@@ -370,8 +413,20 @@ export async function registerRoutes(
         return res.json({ success: false, message: "Student ID already exists" });
       }
       
+      const qrCode = normaliseQrCode(validation.data.qrCode);
+      if (qrCode) {
+        const cardTaken = await storage.getStudentByQrCode(qrCode);
+        if (cardTaken) {
+          return res.json({
+            success: false,
+            message: `That card is already linked to ${cardTaken.fullName}.`,
+          });
+        }
+      }
+
       const student = await storage.createStudent({
         ...validation.data,
+        qrCode,
         role: validation.data.role || "student",
       });
       res.json({ success: true, student });
@@ -401,6 +456,21 @@ export async function registerRoutes(
         updateData.form = req.body.form;
       }
       if (req.body.studentId) updateData.studentId = req.body.studentId;
+      // Tested against undefined, not truthiness: an empty string is how the
+      // form says "unlink this card", and a truthiness test would ignore it.
+      if (req.body.qrCode !== undefined) {
+        const qrCode = normaliseQrCode(req.body.qrCode);
+        if (qrCode) {
+          const cardTaken = await storage.getStudentByQrCode(qrCode);
+          if (cardTaken && cardTaken.id !== id) {
+            return res.status(409).json({
+              success: false,
+              message: `That card is already linked to ${cardTaken.fullName}.`,
+            });
+          }
+        }
+        updateData.qrCode = qrCode;
+      }
       
       const updated = await storage.updateStudent(id, updateData);
       res.json({ success: true, student: updated });

@@ -56,6 +56,12 @@ export type Role = z.infer<typeof roleEnum>;
 export const students = pgTable("students", {
   id: serial("id").primaryKey(),
   studentId: text("student_id").notNull().unique(), // e.g., F1-001
+  // The Master Student Database ID printed on the attendance QR card, e.g.
+  // G3-001. Deliberately a SEPARATE column from studentId: the two ids are
+  // issued by different systems on different schedules, so sharing one column
+  // would break the day either side renumbers. Nullable, so students can be
+  // linked to their card gradually rather than all at once.
+  qrCode: text("qr_code").unique(),
   fullName: text("full_name").notNull(),
   gender: text("gender").notNull(), // Male/Female
   form: text("form").notNull(), // Form 1, Form 2

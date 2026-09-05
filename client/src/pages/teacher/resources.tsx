@@ -171,7 +171,7 @@ export default function TeacherResources() {
         setIsDialogOpen(false);
         form.reset();
       } else {
-        toast({ title: "Error", description: data.message, variant: "destructive" });
+        toast({ title: "Resource not added", description: data.message, variant: "destructive" });
       }
     },
   });
@@ -246,7 +246,7 @@ export default function TeacherResources() {
         queryClient.invalidateQueries({ queryKey: ["/api/resources"] });
         toast({ title: "Resource deleted" });
       } else {
-        toast({ title: "Error", description: data.message, variant: "destructive" });
+        toast({ title: "Resource not deleted", description: data.message, variant: "destructive" });
       }
     },
   });

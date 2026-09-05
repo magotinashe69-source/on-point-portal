@@ -62,7 +62,7 @@ export default function StudentLoginPage() {
       }
     } catch (error) {
       toast({
-        title: "Error",
+        title: "Login failed",
         description: "Check your name and password, then try again.",
         variant: "destructive",
       });

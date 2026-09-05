@@ -182,15 +182,15 @@ export default function SubmitAssignment() {
         setLocation("/student/dashboard");
       } else {
         toast({
-          title: "Error",
-          description: data.message || "Failed to submit",
+          title: "Not handed in",
+          description: data.message || "Check the form and try again.",
           variant: "destructive",
         });
       }
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to submit. Please try again.",
+        title: "Not handed in",
+        description: "Check your connection and try again.",
         variant: "destructive",
       });
     } finally {

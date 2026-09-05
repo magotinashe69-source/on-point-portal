@@ -84,6 +84,7 @@ export default function StudentManagement() {
   
   const [newStudent, setNewStudent] = useState({
     studentId: "",
+    qrCode: "",
     fullName: "",
     gender: "Male" as "Male" | "Female",
     form: "Form 1" as "Stage 3" | "Stage 4" | "Stage 5" | "Stage 6" | "Form 1" | "Form 2",
@@ -118,9 +119,9 @@ export default function StudentManagement() {
         queryClient.invalidateQueries({ queryKey: ["/api/students"] });
         toast({ title: "Student added" });
         setIsAddDialogOpen(false);
-        setNewStudent({ studentId: "", fullName: "", gender: "Male", form: "Form 1" });
+        setNewStudent({ studentId: "", qrCode: "", fullName: "", gender: "Male", form: "Form 1" });
       } else {
-        toast({ title: "Error", description: data.message, variant: "destructive" });
+        toast({ title: "Student not added", description: data.message, variant: "destructive" });
       }
     },
   });
@@ -137,7 +138,7 @@ export default function StudentManagement() {
         setIsEditDialogOpen(false);
         setEditingStudent(null);
       } else {
-        toast({ title: "Error", description: data.message, variant: "destructive" });
+        toast({ title: "Student not updated", description: data.message, variant: "destructive" });
       }
     },
   });
@@ -163,7 +164,7 @@ export default function StudentManagement() {
         queryClient.invalidateQueries({ queryKey: ["/api/students"] });
         toast({ title: "Password reset", description: "The student sets a new password next time they log in." });
       } else {
-        toast({ title: "Error", description: data.message, variant: "destructive" });
+        toast({ title: "Password not reset", description: data.message, variant: "destructive" });
       }
     },
   });
@@ -396,6 +397,19 @@ export default function StudentManagement() {
                       </div>
                     </div>
                     <div className="space-y-2">
+                      <Label htmlFor="input-student-qr">QR card code</Label>
+                      <Input
+                        id="input-student-qr"
+                        value={newStudent.qrCode}
+                        onChange={(e) => setNewStudent({ ...newStudent, qrCode: e.target.value.toUpperCase() })}
+                        placeholder="e.g., G3-001"
+                        data-testid="input-student-qr"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        The ID on the attendance card, from the Master Student Database. Leave blank if the pupil has no card yet.
+                      </p>
+                    </div>
+                    <div className="space-y-2">
                       <Label>Full Name</Label>
                       <Input
                         value={newStudent.fullName}
@@ -541,6 +555,19 @@ export default function StudentManagement() {
                   />
                 </div>
                 <div className="space-y-2">
+                  <Label htmlFor="input-edit-student-qr">QR card code</Label>
+                  <Input
+                    id="input-edit-student-qr"
+                    value={editingStudent.qrCode ?? ""}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, qrCode: e.target.value.toUpperCase() })}
+                    placeholder="e.g., G3-001"
+                    data-testid="input-edit-student-qr"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    The ID on the attendance card, from the Master Student Database.
+                  </p>
+                </div>
+                <div className="space-y-2">
                   <Label>Full Name</Label>
                   <Input
                     value={editingStudent.fullName}
@@ -592,6 +619,8 @@ export default function StudentManagement() {
                       id: editingStudent.id,
                       data: {
                         studentId: editingStudent.studentId,
+                        // Blank means "no card", which the column stores as null.
+                        qrCode: editingStudent.qrCode?.trim() || null,
                         fullName: editingStudent.fullName,
                         form: editingStudent.form,
                         gender: editingStudent.gender,

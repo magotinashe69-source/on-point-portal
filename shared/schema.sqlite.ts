@@ -28,6 +28,7 @@ export const teachers = sqliteTable("teachers", {
 export const students = sqliteTable("students", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   studentId: text("student_id").notNull().unique(),
+  qrCode: text("qr_code").unique(),   // Master Student Database ID, e.g. G3-001
   fullName: text("full_name").notNull(),
   gender: text("gender").notNull(),
   form: text("form").notNull(),
@@ -258,6 +259,7 @@ CREATE TABLE IF NOT EXISTS teachers (
 CREATE TABLE IF NOT EXISTS students (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   student_id TEXT NOT NULL UNIQUE,
+  qr_code TEXT UNIQUE,
   full_name TEXT NOT NULL,
   gender TEXT NOT NULL,
   form TEXT NOT NULL,
