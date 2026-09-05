@@ -187,11 +187,11 @@ export function buildShotOptions(
 // How the child's score reads on the results screen. Judged as a share of the
 // game, since games can be different lengths.
 export function scoreLine(score: number, outOf: number): string {
-  if (outOf <= 0) return "Have a go!";
-  if (score === outOf) return "Perfect! Every single one! 🏆";
+  if (outOf <= 0) return "Have a go.";
+  if (score === outOf) return "Perfect score. Every one correct!";
   const share = score / outOf;
-  if (share >= 0.8) return "Brilliant shooting! ⚽";
-  if (share >= 0.6) return "Good game — keep practising!";
-  if (share >= 0.4) return "Nice try — you'll beat that next time!";
-  return "Every champion starts somewhere. Try again!";
+  if (share >= 0.8) return "Strong shooting!";
+  if (share >= 0.6) return "Good game. Keep practising.";
+  if (share >= 0.4) return "Close. Try again to beat that score.";
+  return "Try again to build your score.";
 }

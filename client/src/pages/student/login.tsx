@@ -46,10 +46,10 @@ export default function StudentLoginPage() {
         // Clear any stale teacher session before setting student
         logout();
         const message = data.isFirstLogin 
-          ? "Your password has been set. Remember it for next time!"
+          ? "Your password is set. Use it next time you log in."
           : `Welcome back, ${data.student.fullName}!`;
         toast({
-          title: "Welcome!",
+          title: "Logged in",
           description: message,
         });
         setStudent(data.student);
@@ -63,7 +63,7 @@ export default function StudentLoginPage() {
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to login. Please try again.",
+        description: "Check your name and password, then try again.",
         variant: "destructive",
       });
     } finally {

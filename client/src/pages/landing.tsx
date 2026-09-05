@@ -14,8 +14,10 @@ import logoPath from "@assets/logo.webp";
 //    blue hex in this file. GOLD is still a literal; the spec wants it
 //    tokenised and retired to student celebration moments only (S1).
 //  * The hero holds the one gradient the spec allows in the whole product
-//    (S1, S13.10). The subjects strip, the photo band and the final CTA used
-//    to carry navy gradients of their own; they are flat token blue now.
+//    (S1, S13.10). The subjects strip and the final CTA used to carry navy
+//    gradients of their own; they are flat token blue now.
+//  * Copy on this page follows S11: no exclamation marks, no "adventure" /
+//    "buddy" / "journey", and every button names what pressing it does.
 //  * Animations live in index.css under the "op-" prefix and are all turned
 //    off automatically when the phone asks for reduced motion.
 // ---------------------------------------------------------------------------
@@ -24,32 +26,31 @@ import logoPath from "@assets/logo.webp";
 const NAVY = "var(--onpoint-blue)";
 const GOLD = "#BF9000";
 
-// The subjects shown as colourful tiles. Each has a friendly emoji and its
-// own bright colour. "More" hints there are others (the app has 12 subjects).
+// The subjects shown as tiles, each with its own colour. "More subjects"
+// points at the rest.
 const SUBJECTS = [
-  { name: "Maths", emoji: "➗", color: "#EF6F6C" },
-  { name: "English", emoji: "📚", color: "#5B8DEF" },
-  { name: "Science", emoji: "🔬", color: "#3DB47E" },
-  { name: "Business", emoji: "💼", color: "#E0A106" },
-  { name: "Computer Science", emoji: "💻", color: "#9B6DDF" },
-  { name: "More…", emoji: "✨", color: "#EF8FB4" },
+  { name: "Maths", color: "#EF6F6C" },
+  { name: "English", color: "#5B8DEF" },
+  { name: "Science", color: "#3DB47E" },
+  { name: "Business", color: "#E0A106" },
+  { name: "Computer Science", color: "#9B6DDF" },
+  { name: "More subjects", color: "#EF8FB4" },
 ];
 
-// The four feature cards. Pastel backgrounds keep them light and playful.
+// The four feature cards. Pastel backgrounds keep them light.
 // Features that aren't built yet carry a "Coming soon" ribbon.
 const FEATURES = [
-  { title: "Homework Help", emoji: "📝", bg: "#E3F2FD", desc: "See your tasks and hand in your work.", href: "/student/login", soon: false },
-  { title: "Practice Quizzes", emoji: "🧠", bg: "#E8F5E9", desc: "Get an instant score the moment you finish.", href: "/student/login", soon: false },
-  { title: "Earn Rewards", emoji: "🏆", bg: "#FFF3E0", desc: "Collect treasures for finishing your work.", href: "/student/login", soon: false },
-  { title: "Fun Games", emoji: "🎮", bg: "#F3E8FF", desc: "Learn while you play — battles and more.", href: "/student/login", soon: false },
+  { title: "Homework", bg: "#E3F2FD", desc: "See your assignments and hand in your work.", href: "/student/login", soon: false },
+  { title: "Practice Quizzes", bg: "#E8F5E9", desc: "Get an instant score the moment you finish.", href: "/student/login", soon: false },
+  { title: "Earn Rewards", bg: "#FFF3E0", desc: "Earn XP and awards for work you hand in.", href: "/student/login", soon: false },
+  { title: "Games", bg: "#F3E8FF", desc: "Practise by playing — penalty shootout, treasure island and dream world.", href: "/student/login", soon: false },
 ];
 
 // Honest facts about the app (checked against the code — no exaggeration).
+// Stage 3-6 plus Form 1-2 is six. Nothing else here was verifiable, so
+// nothing else is claimed.
 const STATS = [
-  { value: "6", label: "Year Groups" },
-  { value: "12", label: "Subjects" },
-  { value: "⚡", label: "Instant Marking" },
-  { value: "📸", label: "Photo Answers" },
+  { value: "6", label: "Year groups" },
 ];
 
 // Nav links. "#" links scroll to a section on this page; Games and Rewards go
@@ -105,23 +106,15 @@ export default function Landing() {
           </nav>
 
           <div className="flex items-center gap-2">
-            <Link href="/student/login" className="hidden sm:inline font-semibold px-3 py-2 rounded-full hover:bg-black/5 transition-colors" style={{ color: NAVY }} data-testid="link-login">
+            <Link href="/student/login" className="font-semibold px-3 py-2 rounded-full hover:bg-black/5 transition-colors" style={{ color: NAVY }} data-testid="link-login">
               Log In
-            </Link>
-            <Link
-              href="/student/login"
-              className="font-bold px-5 py-2 rounded-full text-white shadow-sm transition-transform hover:scale-105"
-              style={{ backgroundColor: GOLD }}
-              data-testid="link-signup"
-            >
-              Sign Up
             </Link>
             {/* Mobile menu button */}
             <button
               className="md:hidden p-2 rounded-lg"
               style={{ color: NAVY }}
               onClick={() => setMenuOpen((o) => !o)}
-              aria-label="Toggle menu"
+              aria-label={menuOpen ? "Close menu" : "Open menu"}
               aria-expanded={menuOpen}
               data-testid="button-menu"
             >
@@ -246,7 +239,6 @@ export default function Landing() {
                   Coming soon
                 </span>
               )}
-              <div className="op-bob text-4xl sm:text-5xl mb-3" style={{ animationDelay: `${i * 0.3}s` }}>{f.emoji}</div>
               <h3 className="font-extrabold text-base sm:text-lg mb-1" style={{ color: NAVY }}>{f.title}</h3>
               <p className="text-xs sm:text-sm text-black/60">{f.desc}</p>
             </Link>
@@ -262,7 +254,7 @@ export default function Landing() {
         </div>
         <div className="mx-auto max-w-6xl px-4">
           <h2 className="text-center text-2xl sm:text-3xl font-extrabold text-white mb-8">
-            All Your Subjects, All in One Place!
+            All your subjects in one place
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             {SUBJECTS.map((s, i) => (
@@ -273,11 +265,10 @@ export default function Landing() {
                 data-testid={`tile-subject-${i}`}
               >
                 <span
-                  className="op-bob flex items-center justify-center rounded-xl text-2xl shrink-0"
-                  style={{ width: 48, height: 48, backgroundColor: s.color + "22", animationDelay: `${i * 0.2}s` }}
-                >
-                  {s.emoji}
-                </span>
+                  className="rounded-xl shrink-0"
+                  style={{ width: 48, height: 48, backgroundColor: s.color }}
+                  aria-hidden="true"
+                />
                 <span className="font-bold" style={{ color: NAVY }}>{s.name}</span>
               </div>
             ))}
@@ -285,34 +276,9 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* =========== SCHOOL PHOTO SLOT ===========
-          A place for ONE compressed WebP photo of the school. It is optional:
-          right now it shows a friendly gradient placeholder so nothing breaks.
-          To add your real photo later:
-            1. Save a compressed .webp (aim for < 80 KB, ~1000px wide) as
-               attached_assets/school.webp
-            2. At the top of this file add:  import schoolPhoto from "@assets/school.webp";
-            3. Replace the <div> below with:
-               <img src={schoolPhoto} alt="Students at On Point" className="w-full h-full object-cover" />
-      */}
-      <section className="mx-auto max-w-6xl px-4 py-14">
-        <div className="op-slide-in rounded-3xl overflow-hidden shadow-md">
-          <div
-            className="w-full h-48 sm:h-72 flex items-center justify-center text-white text-center px-6"
-            style={{ backgroundColor: NAVY }}
-          >
-            <div>
-              <div className="text-5xl mb-2">🏫📸</div>
-              <p className="font-bold text-lg">Your school photo goes here</p>
-              <p className="text-white/70 text-sm">(add attached_assets/school.webp — see the note in landing.tsx)</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* ================= STATS BAR ================= */}
       <section className="py-10" style={{ backgroundColor: "#FFF7E6" }}>
-        <div className="mx-auto max-w-6xl px-4 grid grid-cols-2 sm:grid-cols-4 gap-6 text-center">
+        <div className="mx-auto max-w-6xl px-4 flex flex-wrap justify-center gap-12 text-center">
           {STATS.map((s, i) => (
             <div key={s.label} className="op-slide-in" style={{ animationDelay: `${i * 0.08}s` }} data-testid={`stat-${i}`}>
               <div className="text-3xl sm:text-4xl font-extrabold" style={{ color: GOLD }}>{s.value}</div>
@@ -328,11 +294,8 @@ export default function Landing() {
           className="op-slide-in relative overflow-hidden rounded-[2rem] px-6 py-14 text-center shadow-xl"
           style={{ backgroundColor: NAVY }}
         >
-          {/* A couple of drifting stars for sparkle. */}
-          <span className="op-drift absolute top-6 left-10 text-xl" style={{ color: "#F2C94C" }} aria-hidden="true">★</span>
-          <span className="op-drift absolute bottom-8 right-12 text-lg" style={{ color: "#F2C94C", animationDelay: "1.5s" }} aria-hidden="true">★</span>
           <h2 className="text-2xl sm:text-4xl font-extrabold text-white mb-6">
-            Start your learning adventure today!
+            See what your teacher has set
           </h2>
           <Link
             href="/student/login"
@@ -340,7 +303,7 @@ export default function Landing() {
             style={{ backgroundColor: GOLD }}
             data-testid="button-final-cta"
           >
-            Let's Go! →
+            Log In
           </Link>
         </div>
       </section>
@@ -349,7 +312,7 @@ export default function Landing() {
       <footer className="border-t border-black/5 py-8" style={{ backgroundColor: "#F5F8FF" }}>
         <div className="mx-auto max-w-6xl px-4 text-center">
           <div className="flex items-center justify-center gap-2 mb-2">
-            <img src={logoPath} alt="On Point" className="h-8 w-auto" />
+            <img src={logoPath} alt="On Point Education Centre" className="h-8 w-auto" />
             <span className="font-extrabold" style={{ color: NAVY }}>On Point Education Centre</span>
           </div>
           <p className="text-sm text-black/50 mb-4">Quality Beyond Measure</p>

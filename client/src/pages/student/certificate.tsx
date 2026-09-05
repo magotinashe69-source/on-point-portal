@@ -60,7 +60,7 @@ export default function Certificate() {
 
       {!award ? (
         <p className="text-center text-sm text-muted-foreground py-16" data-testid="no-award">
-          No award yet — ask your teacher to run the Term Awards! 🏆
+          No award yet. Your teacher runs the term awards at the end of term.
         </p>
       ) : (
         <div
@@ -73,7 +73,6 @@ export default function Certificate() {
           </div>
           <div style={{ color: GOLD, fontStyle: "italic", fontSize: "0.8rem", marginTop: "0.15rem" }}>Quality Beyond Measure</div>
 
-          <div style={{ margin: "1.75rem 0 0.25rem", fontSize: "2rem" }}>{award.emoji}</div>
           <h1 style={{ color: NAVY, fontSize: "1.9rem", fontWeight: 800, margin: "0.25rem 0" }}>Certificate of Achievement</h1>
           <div style={{ height: 3, width: 120, background: GOLD, margin: "0.5rem auto 1.5rem" }} />
 

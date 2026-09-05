@@ -116,7 +116,7 @@ export default function StudentManagement() {
     onSuccess: (data) => {
       if (data.success) {
         queryClient.invalidateQueries({ queryKey: ["/api/students"] });
-        toast({ title: "Student added successfully!" });
+        toast({ title: "Student added" });
         setIsAddDialogOpen(false);
         setNewStudent({ studentId: "", fullName: "", gender: "Male", form: "Form 1" });
       } else {
@@ -133,7 +133,7 @@ export default function StudentManagement() {
     onSuccess: (data) => {
       if (data.success) {
         queryClient.invalidateQueries({ queryKey: ["/api/students"] });
-        toast({ title: "Student updated successfully!" });
+        toast({ title: "Student updated" });
         setIsEditDialogOpen(false);
         setEditingStudent(null);
       } else {
@@ -149,7 +149,7 @@ export default function StudentManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/students"] });
-      toast({ title: "Student removed successfully!" });
+      toast({ title: "Student removed" });
     },
   });
 
@@ -161,7 +161,7 @@ export default function StudentManagement() {
     onSuccess: (data) => {
       if (data.success) {
         queryClient.invalidateQueries({ queryKey: ["/api/students"] });
-        toast({ title: "Password reset!", description: "Student will set a new password on next login." });
+        toast({ title: "Password reset", description: "The student sets a new password next time they log in." });
       } else {
         toast({ title: "Error", description: data.message, variant: "destructive" });
       }
@@ -347,7 +347,7 @@ export default function StudentManagement() {
                 <DialogTrigger asChild>
                   <Button data-testid="button-add-student">
                     <PlusCircle className="h-4 w-4 mr-2" />
-                    Add Student
+                    Add student
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
@@ -391,7 +391,7 @@ export default function StudentManagement() {
                           variant="outline"
                           onClick={() => setNewStudent({ ...newStudent, studentId: generateStudentId() })}
                         >
-                          Auto
+                          Generate ID
                         </Button>
                       </div>
                     </div>
@@ -427,7 +427,7 @@ export default function StudentManagement() {
                       data-testid="button-save-student"
                     >
                       {createMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                      Add Student
+                      Add student
                     </Button>
                   </DialogFooter>
                 </DialogContent>

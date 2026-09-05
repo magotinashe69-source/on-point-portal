@@ -35,19 +35,19 @@ export function PublishAssignmentButton({
     },
     onSuccess: (data) => {
       if (!data.success) {
-        toast({ title: "Couldn't publish", description: data.message || "Please try again.", variant: "destructive" });
+        toast({ title: "Assignment not published", description: data.message || "Check your connection and try again.", variant: "destructive" });
         return;
       }
       setIsConfirmOpen(false);
       toast({
-        title: "Published!",
+        title: "Published",
         description: `"${assignment.title}" is now visible to ${assignment.form}.`,
       });
       // Refresh every list that shows assignments (teacher's and students').
       queryClient.invalidateQueries({ queryKey: ["/api/assignments"] });
     },
     onError: () => {
-      toast({ title: "Couldn't publish", description: "Please try again.", variant: "destructive" });
+      toast({ title: "Assignment not published", description: "Check your connection and try again.", variant: "destructive" });
     },
   });
 

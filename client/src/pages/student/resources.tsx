@@ -154,7 +154,7 @@ export default function StudentResources() {
                     <a href={resource.url} target="_blank" rel="noopener noreferrer">
                       <Button variant="default" size="sm" className="w-full">
                         <ExternalLink className="h-4 w-4 mr-2" />
-                        Watch Video
+                        Watch video
                       </Button>
                     </a>
                   )}

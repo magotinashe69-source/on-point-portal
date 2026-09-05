@@ -5,7 +5,7 @@
 
 import { Button } from "@/components/ui/button";
 import { COLLECTIBLES } from "@shared/collectibles";
-import { collectibleEmoji } from "@/lib/collectible-emoji";
+import { collectibleIcon } from "@/lib/collectible-icon";
 import { XpRewardBadge } from "@/components/XpRewardBadge";
 import { ResourcePayout } from "@/components/ResourcePayout";
 import type { XpAward } from "@/lib/xp-handoff";
@@ -20,7 +20,7 @@ interface TreasureRewardModalProps {
 }
 
 export function TreasureRewardModal({ rewardName, xp, resources, onClose, onViewMap }: TreasureRewardModalProps) {
-  const emoji = collectibleEmoji(rewardName);
+  const Treasure = collectibleIcon(rewardName);
   const description = COLLECTIBLES.find((c) => c.name === rewardName)?.description ?? "";
 
   return (
@@ -111,16 +111,12 @@ export function TreasureRewardModal({ rewardName, xp, resources, onClose, onView
 
           {/* The treasure you found, rising out of the chest. */}
           <g className="trm-treasure">
-            <text x="120" y="116" textAnchor="middle" dominantBaseline="central" fontSize="48">{emoji}</text>
+            <Treasure x={96} y={92} width={48} height={48} stroke="#6b4f2a" strokeWidth={1.6} fill="none" />
           </g>
 
-          {/* A few twinkling sparkles. */}
-          <text className="trm-sparkle" x="74" y="86" textAnchor="middle" dominantBaseline="central" fontSize="18">✨</text>
-          <text className="trm-sparkle trm-sparkle-2" x="168" y="98" textAnchor="middle" dominantBaseline="central" fontSize="16">✨</text>
-          <text className="trm-sparkle trm-sparkle-3" x="150" y="66" textAnchor="middle" dominantBaseline="central" fontSize="14">✨</text>
         </svg>
 
-        <p className="text-sm font-semibold uppercase tracking-wide text-primary mt-2">Treasure Found!</p>
+        <p className="text-sm font-semibold uppercase tracking-wide text-primary mt-2">Treasure found!</p>
         <h2 className="text-2xl font-bold mt-1" data-testid="text-reward-name">{rewardName}</h2>
         {description && <p className="text-sm text-muted-foreground mt-1">{description}</p>}
 
@@ -138,7 +134,7 @@ export function TreasureRewardModal({ rewardName, xp, resources, onClose, onView
           </div>
         )}
 
-        <p className="text-xs text-muted-foreground mt-3">Added to your Treasure Island collection 🏝️</p>
+        <p className="text-xs text-muted-foreground mt-3">Added to your Treasure Island collection.</p>
 
         <div className="mt-5 flex flex-col sm:flex-row gap-2">
           <Button variant="outline" className="flex-1" onClick={onViewMap} data-testid="button-view-treasure-map">

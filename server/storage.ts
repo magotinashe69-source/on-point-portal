@@ -611,16 +611,21 @@ export class DatabaseStorage implements IStorage {
       password: "onpoint123",
     });
 
-    // Import students from CSV data
+    // Example students used to seed a fresh database.
+    //
+    // These names are INVENTED. Spec S0.2: never ship a real learner's name --
+    // it would end up in this repository, in screenshots and in any demo. When
+    // the school's real roll is loaded, it goes in through the Students screen
+    // or a CSV import at runtime, never into this file.
     const studentsData = [
-      { studentId: "F1-001", fullName: "Nathaniel", gender: "Male", form: "Form 1" },
-      { studentId: "F1-002", fullName: "Ruvarashe", gender: "Female", form: "Form 1" },
-      { studentId: "F1-003", fullName: "Chiedza Mago", gender: "Female", form: "Form 1" },
-      { studentId: "F1-004", fullName: "Anesu Ndlovu", gender: "Male", form: "Form 1" },
-      { studentId: "F2-001", fullName: "Blessing Mago", gender: "Female", form: "Form 2" },
-      { studentId: "F2-002", fullName: "Trish Dzvambo", gender: "Female", form: "Form 2" },
-      { studentId: "F2-003", fullName: "Blessed Chidavaenzi", gender: "Male", form: "Form 2" },
-      { studentId: "F2-004", fullName: "Brilliant Malungissa", gender: "Male", form: "Form 2" },
+      { studentId: "F1-001", fullName: "Tendai Moyo", gender: "Male", form: "Form 1" },
+      { studentId: "F1-002", fullName: "Rufaro Sibanda", gender: "Female", form: "Form 1" },
+      { studentId: "F1-003", fullName: "Nyasha Dube", gender: "Female", form: "Form 1" },
+      { studentId: "F1-004", fullName: "Farai Ncube", gender: "Male", form: "Form 1" },
+      { studentId: "F2-001", fullName: "Tapiwa Banda", gender: "Female", form: "Form 2" },
+      { studentId: "F2-002", fullName: "Chipo Phiri", gender: "Female", form: "Form 2" },
+      { studentId: "F2-003", fullName: "Takudzwa Nyoni", gender: "Male", form: "Form 2" },
+      { studentId: "F2-004", fullName: "Simba Chirwa", gender: "Male", form: "Form 2" },
     ];
 
     for (const studentData of studentsData) {

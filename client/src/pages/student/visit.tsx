@@ -47,21 +47,20 @@ export default function VisitTowns() {
 
       <main className="container mx-auto px-4 py-6 max-w-xl">
         <div className="text-center mb-4">
-          <h1 className="text-2xl font-bold">Visit Towns 🏘️</h1>
+          <h1 className="text-2xl font-bold">Visit towns</h1>
           <p className="text-muted-foreground text-sm mt-1">Look around towns built by your classmates in {student.form}.</p>
         </div>
 
         {isLoading ? (
           <div className="flex items-center justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
         ) : neighbours.length === 0 ? (
-          <p className="text-center text-sm text-muted-foreground py-10">No classmates have started a town yet — be the first to show yours off!</p>
+          <p className="text-center text-sm text-muted-foreground py-10">No one in your class has started a town yet. Build yours and classmates will be able to visit it.</p>
         ) : (
           <div className="grid gap-2" data-testid="neighbour-list">
             {neighbours.map((n) => (
               <Link key={n.studentId} href={`/student/town/${n.studentId}`}>
                 <div className="flex items-center gap-3 rounded-xl border bg-card px-4 py-3 hover-elevate cursor-pointer" data-testid={`neighbour-${n.studentId}`}>
-                  <div className="p-2 rounded-md bg-primary/10 text-xl leading-none">🏙️</div>
-                  <div className="flex-1 min-w-0">
+                      <div className="flex-1 min-w-0">
                     <div className="font-semibold truncate">{n.townName || `${n.firstName}'s town`}</div>
                     <div className="text-xs text-muted-foreground">Mayor {n.firstName} • {n.buildingCount} building{n.buildingCount === 1 ? "" : "s"}</div>
                   </div>

@@ -9,7 +9,8 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { ArrowLeft, Loader2, Lock, CheckCircle } from "lucide-react";
 import { COLLECTIBLES, TREASURE_HUNT_TOTAL } from "@shared/collectibles";
 import { isPrimaryForm, type StudentReward } from "@shared/schema";
-import { collectibleEmoji } from "@/lib/collectible-emoji";
+import { collectibleIcon } from "@/lib/collectible-icon";
+import { HelpCircle, type LucideIcon } from "lucide-react";
 import logoPath from "@assets/logo.webp";
 
 // Where each of the 12 treasures sits on the island. The order matches
@@ -67,7 +68,7 @@ type SpotState = "open" | "next" | "locked";
 // map can just drop it at a spot's position. Beginner note: a chest is only a
 // few shapes — a body, a lid, a metal band and a lock — and we change their
 // colours (and lift the lid) depending on the state.
-function TreasureSpot({ state, emoji, name }: { state: SpotState; emoji: string; name: string }) {
+function TreasureSpot({ state, Icon, name }: { state: SpotState; Icon: LucideIcon; name: string }) {
   const isLocked = state === "locked";
 
   // Warm wooden chest normally; drained to grey when still locked.
@@ -105,9 +106,8 @@ function TreasureSpot({ state, emoji, name }: { state: SpotState; emoji: string;
             strokeWidth="1.5"
             transform="translate(0 -13) rotate(-10)"
           />
-          {/* The treasure you found, popping out with a little sparkle. */}
-          <text x="0" y="-26" textAnchor="middle" dominantBaseline="central" fontSize="20">{emoji}</text>
-          <text x="14" y="-32" textAnchor="middle" dominantBaseline="central" fontSize="12">✨</text>
+          {/* The treasure you found, popping out of the open chest. */}
+          <Icon x={-10} y={-36} width={20} height={20} stroke="#2e1c0e" strokeWidth={2} fill="none" />
         </>
       ) : (
         <>
@@ -133,7 +133,7 @@ function TreasureSpot({ state, emoji, name }: { state: SpotState; emoji: string;
           <circle cx="0" cy="2.5" r="1.2" fill={outline} />
           {/* A padlock badge makes a locked chest unmistakable. */}
           {isLocked && (
-            <text x="0" y="-25" textAnchor="middle" dominantBaseline="central" fontSize="15">🔒</text>
+            <Lock x={-7} y={-32} width={14} height={14} stroke={outline} strokeWidth={2} fill="none" />
           )}
         </>
       )}
@@ -142,8 +142,8 @@ function TreasureSpot({ state, emoji, name }: { state: SpotState; emoji: string;
         {state === "open"
           ? name
           : state === "next"
-            ? "Your next treasure — finish an assignment to open it!"
-            : "Locked treasure — keep going!"}
+            ? "Your next treasure. Finish an assignment to open it."
+            : "Locked. Finish more assignments to reach this one."}
       </title>
     </g>
   );
@@ -198,9 +198,6 @@ function IslandMap({ earnedNames }: { earnedNames: Set<string> }) {
         />
 
         {/* Decorations — just for fun. */}
-        <text x="120" y="230" fontSize="26" textAnchor="middle">🌴</text>
-        <text x="290" y="420" fontSize="26" textAnchor="middle">🌴</text>
-        <text x="355" y="720" fontSize="22" textAnchor="middle">🧭</text>
 
         {/* The winding trail: a soft wide road with a dashed line on top. */}
         <path d={TRAIL_PATH} fill="none" stroke="#8a6d3b" strokeWidth="6" strokeLinecap="round" opacity="0.3" />
@@ -216,7 +213,7 @@ function IslandMap({ earnedNames }: { earnedNames: Set<string> }) {
               : "locked";
           return (
             <g key={c.name} transform={`translate(${p.x} ${p.y})`}>
-              <TreasureSpot state={state} emoji={collectibleEmoji(c.name)} name={c.name} />
+              <TreasureSpot state={state} Icon={collectibleIcon(c.name)} name={c.name} />
             </g>
           );
         })}
@@ -281,10 +278,9 @@ export default function TreasureIsland() {
       <main className="container mx-auto px-4 py-8 max-w-4xl">
         {/* Island banner — warm gold on navy to match the school colours. */}
         <div className="rounded-xl border bg-gradient-to-br from-primary to-primary/80 text-primary-foreground p-6 mb-6 text-center shadow-sm">
-          <div className="text-4xl mb-2">🏴‍☠️ 🏝️</div>
           <h1 className="text-2xl font-bold">Treasure Island</h1>
           <p className="text-primary-foreground/80 mt-1">
-            Finish assignments to collect all {TREASURE_HUNT_TOTAL} treasures!
+            Finish assignments to collect all {TREASURE_HUNT_TOTAL} treasures.
           </p>
         </div>
 
@@ -332,8 +328,10 @@ export default function TreasureIsland() {
                 >
                   <CardContent className="p-4 text-center flex flex-col items-center gap-2 h-full">
                     {/* Earned treasures show their picture; locked ones stay a mystery. */}
-                    <div className={`text-4xl ${earned ? "" : "grayscale opacity-40"}`}>
-                      {earned ? collectibleEmoji(collectible.name) : "❓"}
+                    <div className={earned ? "text-primary" : "opacity-40"}>
+                      {earned
+                        ? (() => { const I = collectibleIcon(collectible.name); return <I className="h-9 w-9" />; })()
+                        : <HelpCircle className="h-9 w-9" />}
                     </div>
                     {earned ? (
                       <>
@@ -349,7 +347,7 @@ export default function TreasureIsland() {
                           <Lock className="h-4 w-4 shrink-0" />
                           Locked
                         </div>
-                        <p className="text-xs text-muted-foreground">Keep going to unlock this treasure!</p>
+                        <p className="text-xs text-muted-foreground">Finish another assignment to unlock this treasure.</p>
                       </>
                     )}
                   </CardContent>

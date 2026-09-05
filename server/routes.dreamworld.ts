@@ -59,7 +59,7 @@ export function registerDreamWorldRoutes(app: Express, { requireTeacherAuth, req
   async function blockedByOverdue(student: Student, res: Response): Promise<boolean> {
     const overdue = await computeOverdue(student);
     if (overdue) {
-      res.status(403).json({ success: false, message: "Finish your overdue homework first, then come back to build!" });
+      res.status(403).json({ success: false, message: "Finish your overdue homework before you build." });
       return true;
     }
     return false;

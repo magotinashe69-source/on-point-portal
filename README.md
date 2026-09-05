@@ -38,7 +38,7 @@ To stop the app, press **Ctrl + C** in the terminal.
 - Password: `onpoint123`
 
 **Student**
-- Type your name exactly as registered (first name is also accepted, e.g. `Nathaniel`).
+- Type your name exactly as registered (first name is also accepted, e.g. `Tendai`).
 - Choose a password (at least 6 characters) the first time — it's saved for next time.
 
 > A master password also exists for admin access. See the project notes for details.

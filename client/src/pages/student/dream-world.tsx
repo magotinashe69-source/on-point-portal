@@ -11,10 +11,10 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { ArrowLeft, Loader2, Lock, Pencil, Users, ArrowUpCircle, Trash2, Maximize2 } from "lucide-react";
+import { ArrowLeft, Loader2, Lock, Pencil, Users, ArrowUpCircle, Trash2, Maximize2, Star } from "lucide-react";
 import { isPrimaryForm } from "@shared/schema";
 import {
-  RESOURCE_ICON, CATEGORY_ORDER, CATEGORY_META, EMPTY_PROGRESS, AWARDS, TOWN_NAME_MAX,
+  resourceLabel, CATEGORY_ORDER, CATEGORY_META, EMPTY_PROGRESS, AWARDS, TOWN_NAME_MAX,
   buildingById, buildingsInCategory, canAfford, canBuildAnything, cleanTownName, footprint,
   inBounds, isUnlocked, occupiedCells, remainingToUnlock, unlockHint,
   townValue, levelOf, maxLevelOf, isUpgradable, upgradeCost, canExpand, EXPAND_COST,
@@ -150,11 +150,11 @@ export default function DreamWorld() {
   }
 
   function handleTileTap(x: number, y: number) {
-    if (locked) { setMessage("Finish your homework first, then come back to build!"); return; }
+    if (locked) { setMessage("Finish your homework first, then come back to build."); return; }
     const here = occupied.get(`${x},${y}`);
     if (here) { setActioning({ x: here.x, y: here.y }); return; } // open upgrade/remove
     if (selected) placeAt(x, y);
-    else setMessage("Pick something to build first!");
+    else setMessage("Pick something to build.");
   }
 
   async function upgradeAt(x: number, y: number) {
@@ -175,7 +175,7 @@ export default function DreamWorld() {
     try {
       const res = await apiRequest("POST", `/api/students/${student!.id}/dreamworld/expand`, {});
       const body = await res.json();
-      if (body.success) { setWallet(body.wallet); setGridSize(body.gridSize); setMessage("Your plot is bigger now! 🎉"); }
+      if (body.success) { setWallet(body.wallet); setGridSize(body.gridSize); setMessage("Your plot is bigger now."); }
       else setMessage(body.message || "Couldn't expand the plot.");
     } catch { setMessage("Couldn't expand — try again."); }
     finally { setBusy(false); }
@@ -244,12 +244,12 @@ export default function DreamWorld() {
           ) : (
             <div className="flex items-center justify-center gap-2 flex-wrap">
               <span className="font-bold" data-testid="text-town-banner">
-                🏙️ {town.name || "My Town"}
+                {town.name || "My Town"}
                 {town.mayor && <span className="text-muted-foreground font-normal"> • Mayor {town.mayor}</span>}
                 {foundedDate && <span className="text-muted-foreground font-normal"> • Founded {foundedDate}</span>}
               </span>
               <span className="inline-flex items-center gap-1 rounded-full bg-[#BF9000]/15 px-2 py-0.5 text-xs font-bold text-[#8a6a00] dark:text-[#E0B93A] tabular-nums" data-testid="town-value">
-                ⭐ {value}
+                <Star className="inline h-3.5 w-3.5" aria-hidden="true" /> {value}
               </span>
               {town.canRename && (
                 <button
@@ -268,9 +268,9 @@ export default function DreamWorld() {
         {award && (
           <Link href="/student/certificate">
             <div className="mb-3 rounded-xl border-2 border-[#BF9000]/50 bg-[#BF9000]/10 px-4 py-3 text-center cursor-pointer" data-testid="award-banner">
-              <span className="font-bold">{award.emoji} {award.name}</span>
+              <span className="font-bold">{award.name}</span>
               {town.term && <span className="text-muted-foreground"> • {town.term}</span>}
-              <span className="block text-xs text-primary mt-0.5">View &amp; print your certificate →</span>
+              <span className="block text-xs text-primary mt-0.5">View and print your certificate</span>
             </div>
           </Link>
         )}
@@ -279,13 +279,12 @@ export default function DreamWorld() {
         <div className="flex items-center justify-center gap-2 sm:gap-3 mb-3 flex-wrap" data-testid="wallet-strip">
           {(["coins", "bricks", "wood", "gems"] as const).map((k) => (
             <div key={k} className="flex items-center gap-1.5 rounded-full border bg-card px-3 py-1.5 text-sm font-bold tabular-nums">
-              <span aria-hidden="true">{RESOURCE_ICON[k]}</span>
-              <span data-testid={`wallet-${k}`}>{wallet[k]}</span>
+              <span data-testid={`wallet-${k}`}>{wallet[k]}</span> {resourceLabel(k, wallet[k])}
             </div>
           ))}
           <Link href="/student/visit">
             <div className="flex items-center gap-1.5 rounded-full border bg-card px-3 py-1.5 text-sm font-semibold hover-elevate cursor-pointer" data-testid="button-visit-towns">
-              <Users className="h-4 w-4" /> Visit Towns 🏘️
+              <Users className="h-4 w-4" /> Visit towns
             </div>
           </Link>
         </div>
@@ -293,7 +292,7 @@ export default function DreamWorld() {
         {showNudge && (
           <Link href="/student/dashboard">
             <div className="mb-3 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-center text-sm font-medium text-primary cursor-pointer" data-testid="empty-wallet-nudge">
-              Complete an assignment to earn more resources! →
+              Finish an assignment to earn more resources.
             </div>
           </Link>
         )}
@@ -318,15 +317,15 @@ export default function DreamWorld() {
             data-testid="button-expand-plot"
           >
             <Maximize2 className="inline h-4 w-4 mr-1.5" />
-            Expand your plot to 10×10 — {(["coins", "bricks", "wood", "gems"] as const).filter((k) => EXPAND_COST[k] > 0).map((k) => `${RESOURCE_ICON[k]}${EXPAND_COST[k]}`).join(" ")}
+            Expand your plot to 10×10 — {(["coins", "bricks", "wood", "gems"] as const).filter((k) => EXPAND_COST[k] > 0).map((k) => `${EXPAND_COST[k]} ${resourceLabel(k, EXPAND_COST[k])}`).join(", ")}
           </button>
         )}
 
         {overdue && (
           <Link href={`/student/submit/${overdue.id}`}>
             <div className="mt-4 rounded-xl border border-orange-400/50 bg-orange-500/10 px-4 py-3 text-sm cursor-pointer" data-testid="overdue-lock">
-              <span className="font-semibold">📚 Homework first!</span>{" "}
-              You have an assignment due: <span className="font-semibold">“{overdue.title}”</span>. Finish it to unlock building again. →
+              <span className="font-semibold">Homework first</span>{" "}
+              You have an assignment due: <span className="font-semibold">“{overdue.title}”</span>. Finish it to unlock building again.
             </div>
           </Link>
         )}
@@ -342,7 +341,6 @@ export default function DreamWorld() {
             return (
               <div key={cat} className="mb-4">
                 <div className="flex items-center gap-2 mb-1.5">
-                  <span aria-hidden="true">{meta.emoji}</span>
                   <span className="text-xs font-bold uppercase tracking-wide">{meta.label}</span>
                   {showCount && <span className="text-[11px] text-muted-foreground tabular-nums">{count} completed</span>}
                 </div>
@@ -408,10 +406,10 @@ export default function DreamWorld() {
                     data-testid="button-upgrade"
                   >
                     <ArrowUpCircle className="h-4 w-4" />
-                    Upgrade to Level {level + 1} — {(["coins", "bricks", "wood", "gems"] as const).filter((k) => (up![k] ?? 0) > 0).map((k) => `${RESOURCE_ICON[k]}${up![k]}`).join(" ")}
+                    Upgrade to Level {level + 1} — {(["coins", "bricks", "wood", "gems"] as const).filter((k) => (up![k] ?? 0) > 0).map((k) => `${up![k]} ${resourceLabel(k, up![k] ?? 0)}`).join(", ")}
                   </button>
                 ) : isUpgradable(def) ? (
-                  <div className="rounded-lg bg-muted px-4 py-2 text-center text-sm font-medium">⭐ Max level reached!</div>
+                  <div className="rounded-lg bg-muted px-4 py-2 text-center text-sm font-medium">Highest level reached</div>
                 ) : null}
 
                 <button
@@ -432,7 +430,6 @@ export default function DreamWorld() {
       {celebrate && celebrate.length > 0 && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" role="dialog" aria-modal="true" onClick={() => setCelebrate(null)} data-testid="unlock-celebration">
           <div className="dw-modal w-full max-w-xs rounded-2xl border bg-card p-6 text-center shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <div className="text-3xl mb-1"><span className="dw-twinkle inline-block">🎉</span></div>
             <p className="text-sm font-semibold uppercase tracking-wide text-primary">New building unlocked!</p>
             <div className="mt-3 flex flex-wrap items-center justify-center gap-3">
               {celebrate.map((id) => {
@@ -449,7 +446,7 @@ export default function DreamWorld() {
                 );
               })}
             </div>
-            <button className="mt-5 w-full rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground" onClick={() => setCelebrate(null)} data-testid="celebration-continue">Let’s build!</button>
+            <button className="mt-5 w-full rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground" onClick={() => setCelebrate(null)} data-testid="celebration-continue">Start building</button>
           </div>
         </div>
       )}
@@ -485,8 +482,8 @@ function BuildingTile({ def, unlocked, affordable, active, remaining, onPick }: 
           <div className="text-[11px] text-muted-foreground tabular-nums">
             {(["coins", "bricks", "wood", "gems"] as const)
               .filter((k) => (def.cost[k] ?? 0) > 0)
-              .map((k) => `${RESOURCE_ICON[k]}${def.cost[k]}`)
-              .join(" ")}
+              .map((k) => `${def.cost[k]} ${resourceLabel(k, def.cost[k] ?? 0)}`)
+              .join(", ")}
           </div>
         ) : (
           <div className="text-[11px] text-muted-foreground" data-testid={`hint-${def.id}`}>{remaining} more to unlock</div>

@@ -1,7 +1,9 @@
-// A small flame + day-count chip for the student dashboard, shown next to the
+// A small flame icon + day-count chip for the student dashboard, next to the
 // XP bar. The data comes from the dashboard's existing stats request, so this
 // adds no extra network call. Any freezes the student is holding show as tiny
 // snowflakes, so they know they are protected against missing a day.
+
+import { Flame, Snowflake } from "lucide-react";
 
 const GOLD = "#BF9000";
 
@@ -21,13 +23,15 @@ export function StreakFlame({ current, freezes, maxFreezes }: StreakFlameProps) 
       title={
         hasStreak
           ? `${current}-day streak${freezes > 0 ? ` — ${freezes}/${maxFreezes} freezes held` : ""}`
-          : "Complete an assignment today to start a streak!"
+          : "Hand in a piece of homework today to start a streak."
       }
     >
       {/* A bright flame while the streak is alive; a dim one at zero. */}
-      <span className={`text-xl ${hasStreak ? "" : "grayscale opacity-50"}`} aria-hidden="true">
-        🔥
-      </span>
+      <Flame
+        className={`h-5 w-5 shrink-0 ${hasStreak ? "" : "opacity-40"}`}
+        style={{ color: hasStreak ? GOLD : undefined }}
+        aria-hidden="true"
+      />
 
       <div className="leading-tight">
         <div className="text-sm font-bold tabular-nums" style={{ color: hasStreak ? GOLD : undefined }}>
@@ -35,8 +39,9 @@ export function StreakFlame({ current, freezes, maxFreezes }: StreakFlameProps) 
         </div>
         <div className="text-[11px] text-muted-foreground">
           {freezes > 0 ? (
-            <span data-testid="text-streak-freezes">
-              {"❄️".repeat(freezes)} {freezes} freeze{freezes === 1 ? "" : "s"}
+            <span className="inline-flex items-center gap-1" data-testid="text-streak-freezes">
+              <Snowflake className="h-3 w-3" aria-hidden="true" />
+              {freezes} freeze{freezes === 1 ? "" : "s"}
             </span>
           ) : (
             "day streak"

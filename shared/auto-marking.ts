@@ -140,7 +140,7 @@ export function markSubmission(
 // Correct → a tick message; wrong → the right answer plus the explanation.
 export function buildFeedback(result: QuestionResult): string {
   if (result.correct) {
-    return result.explanation ? `Correct! ${result.explanation}` : "Correct!";
+    return result.explanation ? `Correct. ${result.explanation}` : "Correct";
   }
   const parts: string[] = [];
   if (result.correctAnswerDisplay) {

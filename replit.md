@@ -78,18 +78,18 @@ shared/
 
 ## Registered Students (login by name)
 ### Form 1
-- Nathaniel
-- Ruvarashe
-- Chiedza Mago
-- Anesu Ndlovu
+- Tendai Moyo
+- Rufaro Sibanda
+- Nyasha Dube
+- Farai Ncube
 
 ### Form 2
-- Blessing Mago
-- Trish Dzvambo
-- Blessed Chidavaenzi
-- Brilliant Malungissa
+- Tapiwa Banda
+- Chipo Phiri
+- Takudzwa Nyoni
+- Simba Chirwa
 
-Note: Students log in using their name (exactly as registered) and password. First names are also accepted (e.g., "Nathaniel" or "Chiedza").
+Note: Students log in using their name (exactly as registered) and password. First names are also accepted (e.g., "Tendai" or "Nyasha"). These are invented example names, not real learners (spec S0.2).
 
 ## Color Scheme (from logo)
 - Primary (Navy Blue): HSL 224 65% 35%

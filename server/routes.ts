@@ -224,11 +224,11 @@ export async function registerRoutes(
       const teacher = await storage.getTeacherByEmail(email);
       
       if (!teacher) {
-        return res.json({ success: false, message: "Invalid email or password" });
+        return res.json({ success: false, message: "That email and password do not match. Check both and try again." });
       }
       
       if (teacher.password !== password) {
-        return res.json({ success: false, message: "Invalid email or password" });
+        return res.json({ success: false, message: "That email and password do not match. Check both and try again." });
       }
 
       // Establish server-side session
@@ -238,7 +238,7 @@ export async function registerRoutes(
       res.json({ success: true, teacher: safeTeacher });
     } catch (error) {
       console.error("Teacher login error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -250,11 +250,11 @@ export async function registerRoutes(
   app.get("/api/auth/teacher/me", async (req, res) => {
     const teacherId = req.session?.teacherId;
     if (!teacherId) {
-      return res.status(401).json({ success: false, message: "Not logged in" });
+      return res.status(401).json({ success: false, message: "You are not logged in. Log in and try again." });
     }
     const teacher = await storage.getTeacher(teacherId);
     if (!teacher) {
-      return res.status(401).json({ success: false, message: "Session invalid" });
+      return res.status(401).json({ success: false, message: "You are not logged in. Log in and try again." });
     }
     const { password: _, ...safeTeacher } = teacher;
     res.json({ success: true, teacher: safeTeacher });
@@ -281,7 +281,7 @@ export async function registerRoutes(
       const student = await storage.getStudentByName(fullName);
       
       if (!student) {
-        return res.json({ success: false, message: "Name not found. Only registered students can log in. Please enter your name exactly as registered." });
+        return res.json({ success: false, message: "That name is not on the class list. Enter your name exactly as your teacher registered it." });
       }
       
       // Never send the stored password back to the client (matches the
@@ -309,13 +309,13 @@ export async function registerRoutes(
 
       // Validate password
       if (student.password !== password) {
-        return res.json({ success: false, message: "Invalid password. Please try again." });
+        return res.json({ success: false, message: "That password is not correct. Check it and try again." });
       }
 
       res.json({ success: true, student: safe(student) });
     } catch (error) {
       console.error("Student login error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -331,7 +331,7 @@ export async function registerRoutes(
         res.json(students);
       }
     } catch (error) {
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -344,7 +344,7 @@ export async function registerRoutes(
       }
       res.json(student);
     } catch (error) {
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -377,7 +377,7 @@ export async function registerRoutes(
       res.json({ success: true, student });
     } catch (error) {
       console.error("Create student error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -406,7 +406,7 @@ export async function registerRoutes(
       res.json({ success: true, student: updated });
     } catch (error) {
       console.error("Update student error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -423,7 +423,7 @@ export async function registerRoutes(
       res.json({ success: true });
     } catch (error) {
       console.error("Delete student error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -440,7 +440,7 @@ export async function registerRoutes(
       res.json({ success: true, message: "Password reset. Student will set a new password on next login." });
     } catch (error) {
       console.error("Reset password error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -471,7 +471,7 @@ export async function registerRoutes(
       const assignments = await storage.getAssignments(validForm, studentId, archived, includeDrafts);
       res.json(assignments);
     } catch (error) {
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -488,7 +488,7 @@ export async function registerRoutes(
       }
       res.json(assignment);
     } catch (error) {
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -542,7 +542,7 @@ export async function registerRoutes(
       
       const teacher = await storage.getTeacher(validation.data.createdById);
       if (!teacher) {
-        return res.status(403).json({ success: false, message: "Unauthorized: Invalid teacher ID" });
+        return res.status(403).json({ success: false, message: "That teacher ID was not recognised." });
       }
       
       const assignment = await storage.createAssignment({
@@ -555,7 +555,7 @@ export async function registerRoutes(
       res.json({ success: true, assignment });
     } catch (error) {
       console.error("Create assignment error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -638,7 +638,7 @@ export async function registerRoutes(
       res.json({ success: true, assignment: updated });
     } catch (error) {
       console.error("Update assignment error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -702,7 +702,7 @@ export async function registerRoutes(
       res.json({ success: true, affected });
     } catch (error) {
       console.error("Re-mark error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -797,7 +797,7 @@ export async function registerRoutes(
       });
     } catch (error) {
       console.error("Submission review error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -817,7 +817,7 @@ export async function registerRoutes(
       if (!question) return res.status(404).json({ success: false, message: "Question not found" });
 
       const raw = Number(req.body?.score);
-      if (!Number.isFinite(raw)) return res.status(400).json({ success: false, message: "A numeric score is required." });
+      if (!Number.isFinite(raw)) return res.status(400).json({ success: false, message: "Enter the score as a number." });
       const newScore = Math.max(0, Math.min(question.maxScore, Math.round(raw)));
 
       const mark = await storage.getMark(submissionId);
@@ -852,7 +852,7 @@ export async function registerRoutes(
       res.json({ success: true, score: newScore, totalScore: newTotal });
     } catch (error) {
       console.error("Override mark error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -894,7 +894,7 @@ export async function registerRoutes(
       res.json({ success: true, totalMarked, stats });
     } catch (error) {
       console.error("Question stats error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -905,7 +905,7 @@ export async function registerRoutes(
       const { studentId, newDueDate, reason } = req.body;
       
       if (!studentId || !newDueDate) {
-        return res.json({ success: false, message: "Student ID and new due date are required" });
+        return res.json({ success: false, message: "Choose a student and a new due date." });
       }
       
       const assignment = await storage.getAssignment(id);
@@ -917,7 +917,7 @@ export async function registerRoutes(
       res.json({ success: true, message: "Deadline extended successfully" });
     } catch (error) {
       console.error("Extend deadline error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -940,7 +940,7 @@ export async function registerRoutes(
       res.json({ success: true, assignment: updated });
     } catch (error) {
       console.error("Publish assignment error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -957,7 +957,7 @@ export async function registerRoutes(
       res.json({ success: true, assignment: updated });
     } catch (error) {
       console.error("Archive assignment error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -974,7 +974,7 @@ export async function registerRoutes(
       res.json({ success: true });
     } catch (error) {
       console.error("Delete assignment error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -1002,7 +1002,7 @@ export async function registerRoutes(
       
       res.json(enrichedSubmissions);
     } catch (error) {
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -1022,7 +1022,7 @@ export async function registerRoutes(
         assignment,
       });
     } catch (error) {
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -1047,7 +1047,7 @@ export async function registerRoutes(
       
       const student = await storage.getStudent(studentId);
       if (!student) {
-        return res.status(403).json({ success: false, message: "Unauthorized: Invalid student ID" });
+        return res.status(403).json({ success: false, message: "That student ID was not recognised." });
       }
       
       const assignment = await storage.getAssignment(assignmentId);
@@ -1061,12 +1061,12 @@ export async function registerRoutes(
       }
 
       if (assignment.form !== student.form) {
-        return res.status(403).json({ success: false, message: "Unauthorized: Assignment is not for your form" });
+        return res.status(403).json({ success: false, message: "This assignment is not set for your class." });
       }
       
       const existingSubmissions = await storage.getSubmissions({ assignmentId, studentId });
       if (existingSubmissions.length > 0) {
-        return res.json({ success: false, message: "You have already submitted this assignment" });
+        return res.json({ success: false, message: "You have already handed this in." });
       }
       
       const submission = await storage.createSubmission({
@@ -1140,7 +1140,7 @@ export async function registerRoutes(
       res.json({ success: true, submission, mark: mark ?? undefined, reward, xp });
     } catch (error) {
       console.error("Create submission error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -1176,7 +1176,7 @@ export async function registerRoutes(
       // Validate answers
       const { answers } = req.body;
       if (!answers || !Array.isArray(answers)) {
-        return res.status(400).json({ success: false, message: "Answers are required" });
+        return res.status(400).json({ success: false, message: "Answer at least one question before you hand in." });
       }
 
       // Update the submission
@@ -1226,7 +1226,7 @@ export async function registerRoutes(
       res.json({ success: true, submission: updatedSubmission, mark: mark ?? undefined, xp });
     } catch (error) {
       console.error("Update submission error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -1239,7 +1239,7 @@ export async function registerRoutes(
       }
       res.json(mark);
     } catch (error) {
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -1267,7 +1267,7 @@ export async function registerRoutes(
       
       const teacher = await storage.getTeacher(markedById);
       if (!teacher) {
-        return res.status(403).json({ success: false, message: "Unauthorized: Only teachers can mark submissions" });
+        return res.status(403).json({ success: false, message: "Only teachers can mark submissions." });
       }
       
       const submission = await storage.getSubmission(submissionId);
@@ -1292,7 +1292,7 @@ export async function registerRoutes(
       res.json({ success: true, mark });
     } catch (error) {
       console.error("Create mark error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -1326,7 +1326,7 @@ export async function registerRoutes(
       res.json({ success: true, rewards });
     } catch (error) {
       console.error("Get student rewards error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -1345,7 +1345,7 @@ export async function registerRoutes(
       res.json({ success: true, subjects: await listPenaltySubjects(student) });
     } catch (error) {
       console.error("Penalty subjects error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -1363,13 +1363,13 @@ export async function registerRoutes(
         // Say why, rather than "no questions" when there are simply too few.
         return res.status(400).json({
           success: false,
-          message: `This subject needs ${PENALTY_MIN_QUESTIONS} quiz questions before you can play a shootout. Ask your teacher to set a few more!`,
+          message: `This subject needs ${PENALTY_MIN_QUESTIONS} quiz questions before you can play. Ask your teacher to set more.`,
         });
       }
       res.json({ success: true, ...game });
     } catch (error) {
       console.error("Penalty start error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -1387,7 +1387,7 @@ export async function registerRoutes(
       res.json({ success: true, ...result });
     } catch (error) {
       console.error("Penalty answer error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -1405,7 +1405,7 @@ export async function registerRoutes(
       res.json({ success: true, ...result });
     } catch (error) {
       console.error("Penalty finish error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -1479,7 +1479,7 @@ export async function registerRoutes(
       });
     } catch (error) {
       console.error("Get student stats error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -1496,7 +1496,7 @@ export async function registerRoutes(
     app.post("/api/dev/streak/sim-date", (req, res) => {
       const { date } = req.body ?? {};
       if (date !== null && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-        return res.status(400).json({ success: false, message: "date must be YYYY-MM-DD or null" });
+        return res.status(400).json({ success: false, message: "Enter the date as YYYY-MM-DD." });
       }
       setSimulatedToday(date ?? null);
       res.json({ success: true, simulatedDate: getSimulatedToday(), today: streakToday() });
@@ -1512,7 +1512,7 @@ export async function registerRoutes(
     app.post("/api/dev/streak/activity", async (req, res) => {
       const studentId = parseInt(req.body?.studentId);
       if (Number.isNaN(studentId)) {
-        return res.status(400).json({ success: false, message: "studentId is required" });
+        return res.status(400).json({ success: false, message: "Choose a student first." });
       }
       await recordActivity(studentId);
       const streak = await refreshStreak(studentId);
@@ -1523,7 +1523,7 @@ export async function registerRoutes(
     app.post("/api/dev/streak/freeze", async (req, res) => {
       const studentId = parseInt(req.body?.studentId);
       if (Number.isNaN(studentId)) {
-        return res.status(400).json({ success: false, message: "studentId is required" });
+        return res.status(400).json({ success: false, message: "Choose a student first." });
       }
       await grantFreezeForLevelUp(studentId);
       const streak = await refreshStreak(studentId);
@@ -1534,7 +1534,7 @@ export async function registerRoutes(
     app.post("/api/dev/streak/reset", async (req, res) => {
       const studentId = parseInt(req.body?.studentId);
       if (Number.isNaN(studentId)) {
-        return res.status(400).json({ success: false, message: "studentId is required" });
+        return res.status(400).json({ success: false, message: "Choose a student first." });
       }
       await resetStreak(studentId);
       res.json({ success: true });
@@ -1585,7 +1585,7 @@ export async function registerRoutes(
       });
       res.json(resources);
     } catch (error) {
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -1597,7 +1597,7 @@ export async function registerRoutes(
       }
       res.json(resource);
     } catch (error) {
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -1622,14 +1622,14 @@ export async function registerRoutes(
       
       const teacher = await storage.getTeacher(validation.data.createdById);
       if (!teacher) {
-        return res.status(403).json({ success: false, message: "Unauthorized: Only teachers can add resources" });
+        return res.status(403).json({ success: false, message: "Only teachers can add resources." });
       }
       
       const resource = await storage.createResource(validation.data);
       res.json({ success: true, resource });
     } catch (error) {
       console.error("Create resource error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -1638,7 +1638,7 @@ export async function registerRoutes(
       await storage.deleteResource(parseInt(req.params.id));
       res.json({ success: true });
     } catch (error) {
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -1649,7 +1649,7 @@ export async function registerRoutes(
       const announcements = await storage.getAnnouncements(form !== 'undefined' ? form : undefined);
       res.json(announcements);
     } catch (error) {
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -1671,7 +1671,7 @@ export async function registerRoutes(
       
       const teacher = await storage.getTeacher(validation.data.createdById);
       if (!teacher) {
-        return res.status(403).json({ success: false, message: "Unauthorized: Only teachers can post announcements" });
+        return res.status(403).json({ success: false, message: "Only teachers can post announcements." });
       }
       
       const announcement = await storage.createAnnouncement({
@@ -1681,7 +1681,7 @@ export async function registerRoutes(
       res.json({ success: true, announcement });
     } catch (error) {
       console.error("Create announcement error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -1690,7 +1690,7 @@ export async function registerRoutes(
       await storage.deleteAnnouncement(parseInt(req.params.id));
       res.json({ success: true });
     } catch (error) {
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -1708,7 +1708,7 @@ export async function registerRoutes(
       });
       res.json(lessons);
     } catch (error) {
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -1732,14 +1732,14 @@ export async function registerRoutes(
       
       const teacher = await storage.getTeacher(validation.data.createdById);
       if (!teacher) {
-        return res.status(403).json({ success: false, message: "Unauthorized: Only teachers can add lessons" });
+        return res.status(403).json({ success: false, message: "Only teachers can add lessons." });
       }
       
       const lesson = await storage.createLesson(validation.data);
       res.json({ success: true, lesson });
     } catch (error) {
       console.error("Create lesson error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -1751,12 +1751,12 @@ export async function registerRoutes(
       }
       const teacher = await storage.getTeacher(lesson.createdById);
       if (!teacher) {
-        return res.status(403).json({ success: false, message: "Unauthorized" });
+        return res.status(403).json({ success: false, message: "You are not logged in. Log in and try again." });
       }
       await storage.deleteLesson(lesson.id);
       res.json({ success: true });
     } catch (error) {
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -1890,7 +1890,7 @@ export async function registerRoutes(
       });
     } catch (error) {
       console.error("Reports API error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -1910,7 +1910,7 @@ export async function registerRoutes(
       const dateTo = date || qDateTo;
 
       if (!form || !dateFrom || !dateTo) {
-        return res.status(400).json({ success: false, message: "form and date (or dateFrom+dateTo) are required" });
+        return res.status(400).json({ success: false, message: "Choose a class and a date before running the report." });
       }
 
       // Get all students in this form
@@ -1985,7 +1985,7 @@ export async function registerRoutes(
       });
     } catch (error) {
       console.error("Daily report error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -2086,7 +2086,7 @@ export async function registerRoutes(
       res.json({ success: true, rows });
     } catch (error) {
       console.error("Gradebook API error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -2184,7 +2184,7 @@ export async function registerRoutes(
       res.send(csvContent);
     } catch (error) {
       console.error("Export grades error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -2296,7 +2296,7 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Data science export error:", error);
       if (!res.headersSent) {
-        res.status(500).json({ success: false, message: "Server error" });
+        res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
       }
     }
   });
@@ -2307,12 +2307,12 @@ export async function registerRoutes(
   async function requireTeacherAuth(req: Request, res: Response): Promise<string | null> {
     const teacherId = req.session?.teacherId;
     if (!teacherId) {
-      res.status(401).json({ success: false, message: "Unauthorized. Teacher login required.", redirect: "/teacher/login" });
+      res.status(401).json({ success: false, message: "You are not logged in as a teacher. Log in and try again.", redirect: "/teacher/login" });
       return null;
     }
     const teacher = await storage.getTeacher(teacherId);
     if (!teacher) {
-      res.status(401).json({ success: false, message: "Unauthorized. Session invalid.", redirect: "/teacher/login" });
+      res.status(401).json({ success: false, message: "You are not logged in. Log in and try again.", redirect: "/teacher/login" });
       return null;
     }
     return teacher.email; // return verified email for audit log
@@ -2460,7 +2460,7 @@ export async function registerRoutes(
       });
     } catch (error) {
       console.error("Export preview error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 
@@ -2659,7 +2659,7 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Master export error:", error);
       if (!res.headersSent) {
-        res.status(500).json({ success: false, message: "Server error" });
+        res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
       }
     }
   });
@@ -2674,7 +2674,7 @@ export async function registerRoutes(
       res.json(logs);
     } catch (error) {
       console.error("Export logs error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
 

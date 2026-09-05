@@ -141,7 +141,7 @@ export async function setTownName(
   if (!cleaned.ok) return { ok: false, message: cleaned.message };
   const row = await loadOrCreate(student.id);
   if (row.townNamedAt && Date.now() - Date.parse(row.townNamedAt) < RENAME_COOLDOWN_MS) {
-    return { ok: false, message: "You can rename your town once a week — try again in a few days!" };
+    return { ok: false, message: "You can rename your town once a week. Try again in a few days." };
   }
   await storage.updateDreamWorld(student.id, { townName: cleaned.value, townNamedAt: new Date().toISOString() });
   return { ok: true, townName: cleaned.value };
@@ -327,7 +327,7 @@ export async function upgradeBuilding(
   if (!def || !isUpgradable(def)) return { ok: false, message: "This one can't be upgraded." };
 
   const level = levelOf(target);
-  if (level >= maxLevelOf(def)) return { ok: false, message: "Already at the highest level!" };
+  if (level >= maxLevelOf(def)) return { ok: false, message: "This is already at the highest level." };
 
   const cost = upgradeCost(def, level);
   const wallet = walletOf(row);
@@ -351,7 +351,7 @@ export async function expandPlot(
   studentId: number,
 ): Promise<{ ok: true; wallet: Wallet; gridSize: number } | { ok: false; message: string }> {
   const row = await loadOrCreate(studentId);
-  if (!canExpand(row.gridSize)) return { ok: false, message: "Your plot is already as big as it gets!" };
+  if (!canExpand(row.gridSize)) return { ok: false, message: "Your plot is already the largest size." };
   const wallet = walletOf(row);
   if (!canAfford(wallet, EXPAND_COST)) return { ok: false, message: "Not enough resources to expand the plot yet." };
 

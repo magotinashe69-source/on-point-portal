@@ -116,7 +116,7 @@ export default function TeacherDashboard() {
     },
     onSuccess: () => {
       toast({
-        title: "Assignment Deleted",
+        title: "Assignment deleted",
         description: "The assignment has been removed successfully.",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/assignments"] });
@@ -125,8 +125,8 @@ export default function TeacherDashboard() {
     },
     onError: () => {
       toast({
-        title: "Error",
-        description: "Failed to delete assignment. Please try again.",
+        title: "Assignment not deleted",
+        description: "Check your connection and try again.",
         variant: "destructive",
       });
       setDeletingId(null);
@@ -148,8 +148,8 @@ export default function TeacherDashboard() {
     },
     onError: () => {
       toast({
-        title: "Error",
-        description: "Failed to update assignment. Please try again.",
+        title: "Assignment not updated",
+        description: "Check your connection and try again.",
         variant: "destructive",
       });
       setArchivingId(null);
@@ -181,7 +181,7 @@ export default function TeacherDashboard() {
       return response.json();
     },
     onSuccess: () => {
-      toast({ title: "Announcement Posted", description: "Your announcement has been sent to students." });
+      toast({ title: "Announcement posted", description: "Students can now see it." });
       queryClient.invalidateQueries({ queryKey: ["/api/announcements"] });
       setIsAnnouncementDialogOpen(false);
       setAnnouncementTitle("");
@@ -190,7 +190,7 @@ export default function TeacherDashboard() {
       setAnnouncementPriority("normal");
     },
     onError: () => {
-      toast({ title: "Error", description: "Failed to post announcement.", variant: "destructive" });
+      toast({ title: "Announcement not posted", description: "Check your connection and try again.", variant: "destructive" });
     },
   });
 
@@ -200,14 +200,14 @@ export default function TeacherDashboard() {
       return response.json();
     },
     onSuccess: () => {
-      toast({ title: "Announcement Deleted" });
+      toast({ title: "Announcement deleted" });
       queryClient.invalidateQueries({ queryKey: ["/api/announcements"] });
     },
   });
 
   const handlePostAnnouncement = () => {
     if (!announcementTitle.trim() || !announcementContent.trim()) {
-      toast({ title: "Error", description: "Title and content are required.", variant: "destructive" });
+      toast({ title: "Announcement not posted", description: "Add a title and content before posting.", variant: "destructive" });
       return;
     }
     createAnnouncementMutation.mutate({
@@ -236,7 +236,7 @@ export default function TeacherDashboard() {
     if (targetStudents.length <= 2) {
       return targetStudents.map(s => s.fullName.split(' ')[0]).join(', ');
     }
-    return `${targetStudents.length} students`;
+    return `${targetStudents.length} ${targetStudents.length === 1 ? "student" : "students"}`;
   };
 
   const handleLogout = () => {
@@ -310,7 +310,7 @@ export default function TeacherDashboard() {
               <Users className="h-3 w-3 mr-1" />
               {getAssignmentTargetLabel(assignment)}
             </Badge>
-            <Badge variant="outline">{assignment.totalMarks} marks</Badge>
+            <Badge variant="outline">{assignment.totalMarks} {assignment.totalMarks === 1 ? "mark" : "marks"}</Badge>
           </>
         )}
         <Link href={`/teacher/assignments/${assignment.id}/edit`}>
@@ -394,7 +394,7 @@ export default function TeacherDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold" data-testid="text-total-students">
-                {studentsLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : `${students?.length || 0} students`}
+                {studentsLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : `${students?.length || 0} ${(students?.length || 0) === 1 ? "student" : "students"}`}
               </div>
             </CardContent>
           </Card>
@@ -628,7 +628,7 @@ export default function TeacherDashboard() {
                     <Megaphone className="h-6 w-6 text-secondary" />
                   </div>
                   <div>
-                    <h3 className="font-semibold">Post Announcement</h3>
+                    <h3 className="font-semibold">Post announcement</h3>
                     <p className="text-sm text-muted-foreground">Send notices to students</p>
                   </div>
                 </CardContent>
@@ -636,7 +636,7 @@ export default function TeacherDashboard() {
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Post Announcement</DialogTitle>
+                <DialogTitle>Post announcement</DialogTitle>
                 <DialogDescription>Send a notice to all students or a specific form</DialogDescription>
               </DialogHeader>
               <div className="space-y-4 pt-4">
@@ -698,7 +698,7 @@ export default function TeacherDashboard() {
                   data-testid="button-post-announcement"
                 >
                   {createAnnouncementMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Megaphone className="h-4 w-4 mr-2" />}
-                  Post Announcement
+                  Post announcement
                 </Button>
               </div>
             </DialogContent>
@@ -792,7 +792,7 @@ export default function TeacherDashboard() {
                 <Link href="/teacher/assignments/new">
                   <Button size="sm" data-testid="button-create-assignment">
                     <PlusCircle className="h-4 w-4 mr-2" />
-                    Create New
+                    Create assignment
                   </Button>
                 </Link>
               </div>
@@ -842,7 +842,7 @@ export default function TeacherDashboard() {
                     {activeClassFilter === "all" ? "No assignments yet" : `No assignments for ${activeClassFilter}`}
                   </p>
                   <Link href="/teacher/assignments/new">
-                    <Button size="sm">Create your first assignment</Button>
+                    <Button size="sm">Create an assignment</Button>
                   </Link>
                 </div>
               )}
@@ -884,7 +884,7 @@ export default function TeacherDashboard() {
                 <div className="text-center py-8">
                   <CheckCircle className="h-12 w-12 mx-auto text-primary mb-4" />
                   <p className="text-muted-foreground">
-                    {activeClassFilter === "all" ? "All caught up! No pending submissions." : `No pending submissions for ${activeClassFilter}.`}
+                    {activeClassFilter === "all" ? "Nothing waiting to be marked." : `Nothing waiting to be marked for ${activeClassFilter}.`}
                   </p>
                 </div>
               )}
@@ -927,7 +927,7 @@ export default function TeacherDashboard() {
                           </div>
                         </Link>
                         <div className="flex items-center gap-2">
-                          <Badge variant="outline">{assignment.totalMarks} marks</Badge>
+                          <Badge variant="outline">{assignment.totalMarks} {assignment.totalMarks === 1 ? "mark" : "marks"}</Badge>
                           <Button
                             variant="ghost"
                             size="icon"

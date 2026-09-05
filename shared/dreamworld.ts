@@ -25,12 +25,17 @@ export interface Wallet {
   gems: number;
 }
 
-export const RESOURCE_ICON: Record<ResourceKey, string> = {
-  coins: "🪙",
-  bricks: "🧱",
-  wood: "🪵",
-  gems: "💎",
+export const RESOURCE_LABEL: Record<ResourceKey, { one: string; many: string }> = {
+  coins:  { one: "coin",  many: "coins" },
+  bricks: { one: "brick", many: "bricks" },
+  wood:   { one: "wood",  many: "wood" },
+  gems:   { one: "gem",   many: "gems" },
 };
+
+// Name a resource so it agrees with the number in front of it.
+export function resourceLabel(key: ResourceKey, n: number): string {
+  return n === 1 ? RESOURCE_LABEL[key].one : RESOURCE_LABEL[key].many;
+}
 
 // ---------------------------------------------------------------------------
 // Payouts — earned when a primary student completes an auto-marked assignment.
@@ -72,16 +77,16 @@ export const TIER1_REQUIRED = 3;   // completions in a subject to unlock its Tie
 export const TIER2_REQUIRED = 8;   // ... and its Tier 2 building
 export const SCHOOL_REQUIRED = 15; // total completions (any subject) to unlock the School
 
-// Display label + a themed emoji for each category (used in unlock hints and
-// the shop's group headers).
-export const CATEGORY_META: Record<Category, { label: string; emoji: string }> = {
-  starter:   { label: "Starter Kit",   emoji: "🏠" },
-  maths:     { label: "Maths",         emoji: "🏦" },
-  english:   { label: "English",       emoji: "📚" },
-  science:   { label: "Science",       emoji: "🔬" },
-  computing: { label: "Computing",     emoji: "🤖" },
-  universal: { label: "School",        emoji: "🏫" },
-  decor:     { label: "Decorations",   emoji: "🌷" },
+// Display label for each category (used in unlock hints and the shop's
+// group headers).
+export const CATEGORY_META: Record<Category, { label: string }> = {
+  starter:   { label: "Starter Kit" },
+  maths:     { label: "Maths" },
+  english:   { label: "English" },
+  science:   { label: "Science" },
+  computing: { label: "Computing" },
+  universal: { label: "School" },
+  decor:     { label: "Decorations" },
 };
 
 // The display order of the shop's groups.
@@ -190,16 +195,16 @@ export function remainingToUnlock(def: BuildingDef, p: Progress): number {
   return Math.max(0, requirementFor(def) - countFor(def, p));
 }
 
-// The friendly hint shown under a locked building, e.g.
-// "Complete 2 more Science assignments to unlock the Laboratory! 🔬".
+// The hint shown under a locked building, e.g.
+// "Complete 2 more Science assignments to unlock the Laboratory."
 export function unlockHint(def: BuildingDef, p: Progress): string {
   const remaining = remainingToUnlock(def, p);
   const plural = remaining === 1 ? "assignment" : "assignments";
   if (def.category === "universal") {
-    return `Complete ${remaining} more ${plural} to unlock the ${def.name}! ${CATEGORY_META.universal.emoji}`;
+    return `Complete ${remaining} more ${plural} to unlock the ${def.name}.`;
   }
   const label = CATEGORY_META[def.category].label;
-  return `Complete ${remaining} more ${label} ${plural} to unlock the ${def.name}! ${CATEGORY_META[def.category].emoji}`;
+  return `Complete ${remaining} more ${label} ${plural} to unlock the ${def.name}.`;
 }
 
 // The ids of every currently-unlocked building that requires an unlock (used to
@@ -368,7 +373,7 @@ export function cleanTownName(raw: string): { ok: true; value: string } | { ok: 
   if (trimmed.length > TOWN_NAME_MAX) return { ok: false, message: `Keep it to ${TOWN_NAME_MAX} characters or fewer.` };
   if (!/^[A-Za-z0-9 ]+$/.test(trimmed)) return { ok: false, message: "Use letters, numbers and spaces only." };
   const squashed = trimmed.toLowerCase().replace(/\s+/g, "");
-  if (BLOCKED_WORDS.some((w) => squashed.includes(w))) return { ok: false, message: "Let's pick a friendlier name!" };
+  if (BLOCKED_WORDS.some((w) => squashed.includes(w))) return { ok: false, message: "That name cannot be used. Try another one." };
   return { ok: true, value: trimmed };
 }
 
@@ -385,17 +390,16 @@ export type AwardId = "grandest" | "greenest" | "planned" | "scholar" | "rising"
 export interface AwardDef {
   id: AwardId;
   name: string;
-  emoji: string;
   blurb: string; // shown on the certificate, e.g. "for the most buildings of all"
 }
 
 export const AWARDS: Record<AwardId, AwardDef> = {
-  grandest: { id: "grandest", name: "Grandest Town",      emoji: "🏛️", blurb: "for building the grandest town of all" },
-  greenest: { id: "greenest", name: "Greenest Town",      emoji: "🌳", blurb: "for the most trees and flowers" },
-  planned:  { id: "planned",  name: "Best Planned Town",  emoji: "🛣️", blurb: "for the tidiest, best-planned roads" },
-  scholar:  { id: "scholar",  name: "Scholar's City",     emoji: "🎓", blurb: "for building a grand School" },
-  rising:   { id: "rising",   name: "Rising Town",        emoji: "🚀", blurb: "for growing the fastest this month" },
-  happy:    { id: "happy",    name: "Happy Town",         emoji: "😊", blurb: "for being a wonderful place to live" },
+  grandest: { id: "grandest", name: "Grandest Town",     blurb: "for building the grandest town of all" },
+  greenest: { id: "greenest", name: "Greenest Town",     blurb: "for the most trees and flowers" },
+  planned:  { id: "planned",  name: "Best Planned Town", blurb: "for the tidiest, best-planned roads" },
+  scholar:  { id: "scholar",  name: "Scholar's City",    blurb: "for building a grand School" },
+  rising:   { id: "rising",   name: "Rising Town",       blurb: "for growing the fastest this month" },
+  happy:    { id: "happy",    name: "Happy Town",        blurb: "for being a wonderful place to live" },
 };
 
 export interface TownMetrics {

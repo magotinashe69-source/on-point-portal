@@ -167,7 +167,7 @@ export default function TeacherResources() {
     onSuccess: (data) => {
       if (data.success) {
         queryClient.invalidateQueries({ queryKey: ["/api/resources"] });
-        toast({ title: "Resource added successfully" });
+        toast({ title: "Resource added" });
         setIsDialogOpen(false);
         form.reset();
       } else {
@@ -389,7 +389,7 @@ export default function TeacherResources() {
             <DialogTrigger asChild>
               <Button data-testid="button-add-resource">
                 <PlusCircle className="h-4 w-4 mr-2" />
-                Add Resource
+                Add resource
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
@@ -567,7 +567,7 @@ export default function TeacherResources() {
 
                   <Button type="submit" className="w-full" disabled={createMutation.isPending}>
                     {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                    Add Resource
+                    Add resource
                   </Button>
                 </form>
               </Form>
@@ -680,7 +680,7 @@ export default function TeacherResources() {
                     <a href={resource.url} target="_blank" rel="noopener noreferrer">
                       <Button variant="outline" size="sm" className="w-full">
                         <ExternalLink className="h-4 w-4 mr-2" />
-                        Open Link
+                        Open link
                       </Button>
                     </a>
                   )}
@@ -704,7 +704,7 @@ export default function TeacherResources() {
               <p className="text-muted-foreground mb-4">Add your first learning resource to get started</p>
               <Button onClick={() => setIsDialogOpen(true)}>
                 <PlusCircle className="h-4 w-4 mr-2" />
-                Add Resource
+                Add resource
               </Button>
             </CardContent>
           </Card>

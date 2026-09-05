@@ -106,7 +106,7 @@ export default function TeacherReports() {
   };
 
   const getPerformanceBadge = (pct: number) => {
-    if (pct >= 80) return <Badge className="bg-green-600">Excellent</Badge>;
+    if (pct >= 80) return <Badge className="bg-green-600">80% and above</Badge>;
     if (pct >= 60) return <Badge>Good</Badge>;
     if (pct >= 40) return <Badge variant="secondary">Average</Badge>;
     return <Badge variant="destructive">Needs Help</Badge>;
@@ -275,7 +275,7 @@ export default function TeacherReports() {
                       <Card key={form.form} className="border-2">
                         <CardHeader className="pb-2">
                           <CardTitle className="text-lg">{form.form}</CardTitle>
-                          <CardDescription>{form.studentCount} students</CardDescription>
+                          <CardDescription>{form.studentCount} {form.studentCount === 1 ? "student" : "students"}</CardDescription>
                         </CardHeader>
                         <CardContent>
                           <div className={`text-3xl font-bold ${getPerformanceColor(form.averageScore)}`}>
@@ -304,7 +304,7 @@ export default function TeacherReports() {
                       <tr className="border-b">
                         <th className="text-left py-2 px-2">Student</th>
                         <th className="text-left py-2 px-2">Form</th>
-                        <th className="text-center py-2 px-2">Submitted</th>
+                        <th className="text-center py-2 px-2">Handed in</th>
                         <th className="text-center py-2 px-2">Marked</th>
                         <th className="text-center py-2 px-2">Score</th>
                         <th className="text-center py-2 px-2">Average</th>

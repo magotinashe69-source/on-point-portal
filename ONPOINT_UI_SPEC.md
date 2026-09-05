@@ -168,13 +168,24 @@ Replace with: their name, the number of assignments waiting, and one clear actio
 
 ## 11. Copy
 
+### 11.1 Voice
+
+The platform's writing style is **plain and professional, modelled on Khan Academy**. It explains; it does not perform. A parent or a teacher reading over a child's shoulder should recognise every word.
+
+- **No emoji.** Anywhere. Use a Lucide icon where a picture carries meaning.
+- **No exclamation marks**, with one exception: a genuine achievement inside the student reward features — a level up, a building unlock, a personal best, a treasure found, a goal scored, a correct answer in play. Never on a teacher screen, never in a system message, and never on an instruction, a refusal, an empty state or an error, wherever it appears.
+- **No hype words** — amazing, awesome, super, brilliant, epic, adventure, buddy, journey.
+- **Short sentences.** One idea each. Cut the second clause if the first already said it.
+- **Buttons state the action.** The label names what pressing it does.
+
+### 11.2 Rules
+
 - Say what happens. No "adventure", "buddy", "journey"
-- No exclamation marks unless something is genuinely worth celebrating
 - An action keeps its name through the flow: "Hand in" produces "Handed in"
 - Errors explain and instruct; they do not apologise
 - Empty screens invite an action
 - Match the age — Stage 3 and Form 2 need different words
-- **Singular and plural must agree.** "1 marks" is currently wrong on the question screen
+- **Singular and plural must agree.** Never "1 marks", "1 students", "1 coins"
 
 ---
 

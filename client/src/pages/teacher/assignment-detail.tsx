@@ -262,12 +262,12 @@ export default function AssignmentDetail() {
                     <DialogTrigger asChild>
                       <Button variant="outline" size="sm" data-testid="button-extend-deadline">
                         <UserPlus className="h-4 w-4 mr-1" />
-                        Extend Deadline
+                        Extend deadline
                       </Button>
                     </DialogTrigger>
                     <DialogContent>
                       <DialogHeader>
-                        <DialogTitle>Extend Deadline for Student</DialogTitle>
+                        <DialogTitle>Extend deadline for a student</DialogTitle>
                         <DialogDescription>Give a specific student more time</DialogDescription>
                       </DialogHeader>
                       <div className="space-y-4">
@@ -296,7 +296,7 @@ export default function AssignmentDetail() {
                         </div>
                         <Button onClick={handleExtendDeadline} disabled={extendDeadlineMutation.isPending || !extensionStudentId || !extensionNewDate} className="w-full" data-testid="button-save-extension">
                           {extendDeadlineMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                          Extend Deadline
+                          Extend deadline
                         </Button>
                       </div>
                       {assignment.extendedDeadlines && assignment.extendedDeadlines.length > 0 && (
@@ -328,7 +328,7 @@ export default function AssignmentDetail() {
                 </span>
                 <span className="flex items-center gap-1">
                   <BookOpen className="h-4 w-4" />
-                  {assignment.totalMarks} marks
+                  {assignment.totalMarks} {assignment.totalMarks === 1 ? "mark" : "marks"}
                 </span>
                 <span className="flex items-center gap-1 text-xs text-muted-foreground">
                   <RefreshCw className="h-3 w-3" />
@@ -418,7 +418,7 @@ export default function AssignmentDetail() {
                     <div key={q.id} className="p-4 border rounded-md">
                       <div className="flex items-center justify-between mb-2">
                         <span className="font-medium">Question {index + 1}</span>
-                        <Badge variant="outline">{q.maxScore} marks</Badge>
+                        <Badge variant="outline">{q.maxScore} {q.maxScore === 1 ? "mark" : "marks"}</Badge>
                       </div>
                       <p className="whitespace-pre-line">{q.questionText}</p>
                     </div>
@@ -532,7 +532,7 @@ export default function AssignmentDetail() {
                   ) : notSubmittedList.length === 0 ? (
                     <div className="text-center py-8 text-green-600 dark:text-green-400">
                       <CheckCircle className="h-8 w-8 mx-auto mb-2" />
-                      <p className="text-sm font-medium">All students have submitted!</p>
+                      <p className="text-sm font-medium">Everyone has handed in.</p>
                     </div>
                   ) : (
                     <div className="space-y-2 max-h-96 overflow-y-auto pr-1">

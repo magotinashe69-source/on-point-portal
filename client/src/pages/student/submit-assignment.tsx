@@ -176,8 +176,8 @@ export default function SubmitAssignment() {
 
         // Hand-marked submissions have no instant score or XP — keep it simple.
         toast({
-          title: isEditing ? "Updated successfully!" : "Submitted successfully!",
-          description: isEditing ? "Your changes have been saved." : "Your work has been submitted for review.",
+          title: isEditing ? "Answers updated" : "Handed in",
+          description: isEditing ? "Your changes have been saved." : "Your teacher can now see your work.",
         });
         setLocation("/student/dashboard");
       } else {
@@ -344,7 +344,7 @@ export default function SubmitAssignment() {
                   </span>
                   <span className="flex items-center gap-1">
                     <BookOpen className="h-4 w-4" />
-                    {assignment.totalMarks} marks
+                    {assignment.totalMarks} {assignment.totalMarks === 1 ? "mark" : "marks"}
                   </span>
                 </CardDescription>
               </CardHeader>
@@ -372,7 +372,7 @@ export default function SubmitAssignment() {
                     <CardHeader>
                       <div className="flex items-center justify-between flex-wrap gap-2">
                         <CardTitle className="text-lg">Question {index + 1}</CardTitle>
-                        <Badge variant="secondary">{question.maxScore} marks</Badge>
+                        <Badge variant="secondary">{question.maxScore} {question.maxScore === 1 ? "mark" : "marks"}</Badge>
                       </div>
                       <CardDescription className="text-base text-foreground whitespace-pre-line">
                         {question.questionText}
@@ -618,10 +618,10 @@ export default function SubmitAssignment() {
                     <Edit className="h-4 w-4" />
                     <AlertDescription>
                       {isAutoMarked && isMarked
-                        ? "You've already had a go at this quiz. Change your answers and submit again for a fresh instant score."
+                        ? "You have already had a go at this quiz. Change your answers and hand in again for a fresh instant score."
                         : isMarked
                         ? "This assignment has been marked. You can no longer make changes."
-                        : "You've already submitted this assignment. You can update your answers until your teacher marks it."}
+                        : "You have handed this in. You can change your answers until your teacher marks it."}
                     </AlertDescription>
                   </Alert>
                 )}
@@ -641,10 +641,10 @@ export default function SubmitAssignment() {
                     <Send className="h-4 w-4 mr-2" />
                   )}
                   {isAutoMarked && isMarked
-                    ? "Submit New Attempt"
+                    ? "Hand in again"
                     : isEditing
-                    ? "Update Submission"
-                    : "Submit Assignment"}
+                    ? "Update answers"
+                    : "Hand in"}
                 </Button>
               </form>
             </Form>

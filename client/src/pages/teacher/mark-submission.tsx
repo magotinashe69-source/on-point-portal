@@ -134,21 +134,21 @@ export default function MarkSubmission() {
         queryClient.invalidateQueries({ queryKey: ["/api/submissions"] });
         queryClient.invalidateQueries({ queryKey: ["/api/marks"] });
         toast({
-          title: "Marked successfully!",
-          description: "The submission has been marked and sent to the student.",
+          title: "Submission marked",
+          description: "The student can now see the mark.",
         });
         setLocation(`/teacher/assignments/${submission.assignmentId}`);
       } else {
         toast({
-          title: "Error",
-          description: data.message || "Failed to mark submission",
+          title: "Mark not saved",
+          description: data.message || "Check the form and try again.",
           variant: "destructive",
         });
       }
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to mark submission. Please try again.",
+        title: "Mark not saved",
+        description: "Check your connection and try again.",
         variant: "destructive",
       });
     } finally {
@@ -237,7 +237,7 @@ export default function MarkSubmission() {
                       <CardHeader>
                         <div className="flex items-center justify-between flex-wrap gap-2">
                           <CardTitle className="text-lg">Question {index + 1}</CardTitle>
-                          <Badge variant="outline">{question.maxScore} marks</Badge>
+                          <Badge variant="outline">{question.maxScore} {question.maxScore === 1 ? "mark" : "marks"}</Badge>
                         </div>
                         <CardDescription className="whitespace-pre-line">{question.questionText}</CardDescription>
                         {question.imageUrls && question.imageUrls.length > 0 && (
@@ -462,7 +462,7 @@ export default function MarkSubmission() {
                   ) : (
                     <CheckCircle className="h-4 w-4 mr-2" />
                   )}
-                  {submission.status === "MARKED" ? "Update Mark" : "Submit Mark"}
+                  {submission.status === "MARKED" ? "Update Mark" : "Save mark"}
                 </Button>
               </form>
             </Form>

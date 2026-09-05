@@ -38,8 +38,8 @@ function Router() {
     <Switch>
       <Route path="/" component={Landing} />
       {/* Placeholder pages for features that are not built yet. */}
-      <Route path="/games">{() => <ComingSoon title="Fun Games" emoji="🎮" message="Boss Battles and Quiz Battles are on the way!" />}</Route>
-      <Route path="/rewards">{() => <ComingSoon title="Rewards" emoji="🏆" message="Collect treasures and climb the ranks — almost ready!" />}</Route>
+      <Route path="/games">{() => <ComingSoon title="Games" message="Boss Battles and Quiz Battles are not ready yet." />}</Route>
+      <Route path="/rewards">{() => <ComingSoon title="Rewards" message="Treasures and ranks are not ready yet." />}</Route>
       <Route path="/teacher/login" component={TeacherLogin} />
       <Route path="/teacher/dashboard" component={TeacherDashboard} />
       <Route path="/teacher/assignments/new" component={CreateAssignment} />

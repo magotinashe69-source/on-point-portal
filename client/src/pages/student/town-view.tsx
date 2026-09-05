@@ -8,6 +8,7 @@ import { useLocation, Link, useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { isPrimaryForm } from "@shared/schema";
+import { Star } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { AWARDS, type AwardId, type Placed } from "@shared/dreamworld";
@@ -73,19 +74,19 @@ export default function TownViewPage() {
           <>
             <div className="rounded-xl border bg-gradient-to-br from-primary/10 to-transparent px-4 py-3 mb-3 text-center">
               <div className="font-bold" data-testid="town-view-banner">
-                🏙️ {town.townName || `${town.mayorFirstName}'s town`}
+                {town.townName || `${town.mayorFirstName}'s town`}
                 <span className="text-muted-foreground font-normal"> • Mayor {town.mayorFirstName}</span>
                 {foundedDate && <span className="text-muted-foreground font-normal"> • Founded {foundedDate}</span>}
               </div>
               <div className="text-xs text-muted-foreground mt-0.5">
-                {town.buildingCount} building{town.buildingCount === 1 ? "" : "s"} • ⭐ {town.townValue}
-                {award && <span> • {award.emoji} {award.name}</span>}
+                {town.buildingCount} building{town.buildingCount === 1 ? "" : "s"} • <Star className="inline h-3 w-3" aria-hidden="true" /> {town.townValue}
+                {award && <span> • {award.name}</span>}
               </div>
             </div>
 
             <TownPlot layout={town.layout} interactive={false} gridSize={town.gridSize} />
 
-            <p className="text-center text-xs text-muted-foreground mt-3">You're just visiting — this town is view-only. 👀</p>
+            <p className="text-center text-xs text-muted-foreground mt-3">You are visiting. You cannot change this town.</p>
           </>
         )}
       </main>

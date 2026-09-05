@@ -20,7 +20,8 @@ import {
   TrendingUp,
   Bell,
   Video,
-  Map
+  Map,
+  CircleDot,
 } from "lucide-react";
 import type { Assignment, Announcement } from "@shared/schema";
 import { isPrimaryForm } from "@shared/schema";
@@ -194,7 +195,7 @@ export default function StudentDashboard() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-              <CardTitle className="text-sm font-medium">Submitted</CardTitle>
+              <CardTitle className="text-sm font-medium">Handed in</CardTitle>
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -269,14 +270,13 @@ export default function StudentDashboard() {
           <Link href="/student/treasure">
             <Card className="hover-elevate cursor-pointer mb-6 border-primary/30 bg-gradient-to-br from-primary/10 to-transparent">
               <CardContent className="flex items-center gap-4 py-6">
-                <div className="p-3 rounded-md bg-primary/15 text-2xl leading-none">🏝️</div>
                 <div className="flex-1">
                   <h3 className="font-semibold flex items-center gap-2">
                     <Map className="h-5 w-5 text-primary" />
                     Treasure Island
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    Collect all 12 treasures by finishing your assignments!
+                    Collect all 12 treasures by finishing your homework.
                   </p>
                 </div>
                 <ArrowRight className="h-5 w-5 text-primary" />
@@ -294,11 +294,11 @@ export default function StudentDashboard() {
           <Link href="/student/penalty">
             <Card className="hover-elevate cursor-pointer mb-6 border-primary/30 bg-gradient-to-br from-primary/10 to-transparent">
               <CardContent className="flex items-center gap-4 py-6">
-                <div className="p-3 rounded-md bg-primary/15 text-2xl leading-none">⚽</div>
+                <div className="p-3 rounded-md bg-primary/15"><CircleDot className="h-6 w-6 text-primary" /></div>
                 <div className="flex-1">
                   <h3 className="font-semibold">Penalty Shootout</h3>
                   <p className="text-sm text-muted-foreground">
-                    Take your penalties and save theirs — answer correctly to score!
+                    Answer correctly to score a penalty and to save one.
                   </p>
                 </div>
                 <ArrowRight className="h-5 w-5 text-primary" />
@@ -383,7 +383,7 @@ export default function StudentDashboard() {
                           {isDueSoon(assignment.dueDate) && !isOverdue(assignment.dueDate) && (
                             <Badge className="bg-orange-500">Due Soon</Badge>
                           )}
-                          <Badge variant="outline">{assignment.totalMarks} marks</Badge>
+                          <Badge variant="outline">{assignment.totalMarks} {assignment.totalMarks === 1 ? "mark" : "marks"}</Badge>
                           <ArrowRight className="h-4 w-4 text-muted-foreground" />
                         </div>
                       </div>
@@ -393,7 +393,7 @@ export default function StudentDashboard() {
               ) : (
                 <div className="text-center py-8">
                   <CheckCircle className="h-12 w-12 mx-auto text-primary mb-4" />
-                  <p className="text-muted-foreground">All caught up! No pending assignments.</p>
+                  <p className="text-muted-foreground">No homework due right now.</p>
                 </div>
               )}
             </CardContent>
@@ -456,7 +456,7 @@ export default function StudentDashboard() {
               ) : (
                 <div className="text-center py-8">
                   <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">No results yet. Complete some assignments!</p>
+                  <p className="text-muted-foreground">No results yet. Hand in a piece of homework to see your first mark.</p>
                 </div>
               )}
             </CardContent>

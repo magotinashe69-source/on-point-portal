@@ -1,15 +1,15 @@
-// The "You earned 🪙30 🧱20 🪵20 💎1" line shown on the results screen and the
-// reward pop-up after a primary student completes an assignment. Resources with
-// a zero amount (usually gems on a lower score) are hidden.
+// The "You earned 30 coins, 20 bricks, 20 wood, 1 gem" line shown on the results
+// screen and the reward pop-up after a primary student completes an assignment.
+// Resources with a zero amount (usually gems on a lower score) are hidden.
 
-import { RESOURCE_ICON, type Wallet } from "@shared/dreamworld";
+import { resourceLabel, type Wallet } from "@shared/dreamworld";
 
 export function ResourcePayout({ payout }: { payout: Wallet }) {
   const parts = [
-    { icon: RESOURCE_ICON.coins, n: payout.coins },
-    { icon: RESOURCE_ICON.bricks, n: payout.bricks },
-    { icon: RESOURCE_ICON.wood, n: payout.wood },
-    { icon: RESOURCE_ICON.gems, n: payout.gems },
+    { key: "coins" as const, n: payout.coins },
+    { key: "bricks" as const, n: payout.bricks },
+    { key: "wood" as const, n: payout.wood },
+    { key: "gems" as const, n: payout.gems },
   ].filter((p) => p.n > 0);
 
   if (parts.length === 0) return null;
@@ -22,8 +22,7 @@ export function ResourcePayout({ payout }: { payout: Wallet }) {
       <span className="text-muted-foreground">You earned</span>
       {parts.map((p, i) => (
         <span key={i} className="font-bold tabular-nums">
-          <span aria-hidden="true">{p.icon}</span>
-          {p.n}
+          {p.n} {resourceLabel(p.key, p.n)}
         </span>
       ))}
     </div>

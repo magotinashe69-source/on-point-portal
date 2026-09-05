@@ -150,10 +150,10 @@ export default function TeacherExport() {
       URL.revokeObjectURL(objectUrl);
 
       setLastDownload({ filename, count: preview?.totalRows ?? 0 });
-      toast({ title: "Export Complete", description: `Downloaded ${filename}` });
+      toast({ title: "Export complete", description: `Downloaded ${filename}` });
       refetchLogs();
     } catch {
-      toast({ title: "Export Failed", description: "Please try again.", variant: "destructive" });
+      toast({ title: "Export did not finish", description: "Check your connection and try again.", variant: "destructive" });
     } finally {
       setIsDownloading(false);
     }
@@ -165,7 +165,7 @@ export default function TeacherExport() {
     {
       type: "full",
       label: "Full Master Export",
-      description: "All students, all assignments, all subjects — nothing filtered out",
+      description: "Every student, every assignment, every subject.",
       icon: <Database className="h-5 w-5" />,
     },
     {
@@ -226,7 +226,7 @@ export default function TeacherExport() {
           <Link href="/teacher/dashboard">
             <Button variant="ghost" size="sm" data-testid="button-back-dashboard">
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Dashboard
+              Back to dashboard
             </Button>
           </Link>
         </div>
@@ -418,7 +418,7 @@ export default function TeacherExport() {
 
                 {preview.dateRange && (
                   <p className="text-xs text-muted-foreground">
-                    Date range: {preview.dateRange.from} → {preview.dateRange.to}
+                    Date range: {preview.dateRange.from} to {preview.dateRange.to}
                   </p>
                 )}
               </div>

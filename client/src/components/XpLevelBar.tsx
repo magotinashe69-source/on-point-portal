@@ -4,6 +4,8 @@
 // The data comes from the dashboard's existing stats request, so this adds no
 // extra network call. Brand colours: navy track, gold fill and level chip.
 
+import { Star } from "lucide-react";
+
 const GOLD = "#BF9000";
 const NAVY = "var(--onpoint-blue)";
 
@@ -28,7 +30,7 @@ export function XpLevelBar({ level, xpIntoLevel, xpForNextLevel, progressPercent
         className="flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold shrink-0"
         style={{ backgroundColor: GOLD, color: "#fff" }}
       >
-        <span aria-hidden="true">⭐</span>
+        <Star className="h-3 w-3" aria-hidden="true" />
         <span data-testid="text-xp-level">Level {level}</span>
       </div>
 

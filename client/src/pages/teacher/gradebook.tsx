@@ -184,7 +184,7 @@ function GradeBookContent() {
             </Button>
             <Button variant="outline" onClick={handlePrint} data-testid="button-print">
               <Printer className="h-4 w-4 mr-2" />
-              Print / PDF
+              Print
             </Button>
           </div>
         </div>
@@ -203,7 +203,7 @@ function GradeBookContent() {
               </div>
               <div>
                 <p className="text-3xl font-bold text-green-600">{submittedCount}</p>
-                <p className="text-sm text-muted-foreground">Submitted</p>
+                <p className="text-sm text-muted-foreground">Handed in</p>
               </div>
             </CardContent>
           </Card>
@@ -214,7 +214,7 @@ function GradeBookContent() {
               </div>
               <div>
                 <p className="text-3xl font-bold text-destructive">{notSubmittedCount}</p>
-                <p className="text-sm text-muted-foreground">Not Submitted</p>
+                <p className="text-sm text-muted-foreground">Not handed in</p>
               </div>
             </CardContent>
           </Card>
@@ -252,7 +252,7 @@ function GradeBookContent() {
                     <SelectItem value="ALL">All Statuses</SelectItem>
                     <SelectItem value="SUBMITTED">Submitted (not yet marked)</SelectItem>
                     <SelectItem value="MARKED">Marked</SelectItem>
-                    <SelectItem value="NOT_SUBMITTED">Not Submitted</SelectItem>
+                    <SelectItem value="NOT_SUBMITTED">Not handed in</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

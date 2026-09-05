@@ -68,9 +68,9 @@ type Phase =
   | "results";
 
 const CORNER_LABEL: Record<Corner, string> = {
-  left: "◀ Left",
-  middle: "▲ Middle",
-  right: "Right ▶",
+  left: "Left",
+  middle: "Middle",
+  right: "Right",
 };
 
 // Where the ball ends up for each corner, as a nudge from the penalty spot.
@@ -304,10 +304,9 @@ function PenaltyShootoutContent() {
         {phase === "subject" && (
           <>
             <div className="text-center mb-6">
-              <div className="text-5xl mb-2">⚽</div>
-              <h1 className="text-2xl font-bold">Penalty Shootout</h1>
+                  <h1 className="text-2xl font-bold">Penalty Shootout</h1>
               <p className="text-sm text-muted-foreground mt-1">
-                Take {SHOTS_PER_ROUND} penalties, then save {SHOTS_PER_ROUND}. Answer correctly to score!
+                Take {SHOTS_PER_ROUND} penalties, then save {SHOTS_PER_ROUND}. Answer correctly to score.
               </p>
             </div>
 
@@ -321,7 +320,7 @@ function PenaltyShootoutContent() {
                     A shootout needs {MIN_QUESTIONS} quiz questions in a subject — that's a different
                     question for each of your {SHOTS_PER_ROUND} penalties and {SHOTS_PER_ROUND} saves.
                   </p>
-                  <p className="mt-2">Ask your teacher to set a few more, then come back!</p>
+                  <p className="mt-2">Ask your teacher to set a few more quiz questions in this subject.</p>
                 </CardContent>
               </Card>
             ) : (
@@ -350,7 +349,7 @@ function PenaltyShootoutContent() {
                             <div className="text-[10px] text-muted-foreground">your best</div>
                           </>
                         ) : (
-                          <Badge variant="secondary" className="text-[10px]">New!</Badge>
+                          <Badge variant="secondary" className="text-[10px]">New</Badge>
                         )}
                       </div>
                     </div>
@@ -367,7 +366,7 @@ function PenaltyShootoutContent() {
             <div className="flex items-center justify-between mb-3">
               <div>
                 <div className="font-semibold">
-                  {isKeeperRound ? "🧤 Keeper Round" : "⚽ Striker Round"}
+                  {isKeeperRound ? "Keeper round" : "Striker round"}
                 </div>
                 <div className="text-xs text-muted-foreground">
                   {isKeeperRound ? "Save" : "Shot"} {shot.index + 1} of {SHOTS_PER_ROUND} · {subject}
@@ -412,7 +411,7 @@ function PenaltyShootoutContent() {
             {phase === "aiming" && (
               <Card className="mt-4 border-green-500/40">
                 <CardContent className="pt-5">
-                  <p className="text-base font-semibold text-green-700 dark:text-green-400 mb-1">Correct! ⚽</p>
+                  <p className="text-base font-semibold text-green-700 dark:text-green-400 mb-1">Correct!</p>
                   <p className="text-sm text-muted-foreground mb-4">Now pick your corner:</p>
                   <div className="grid grid-cols-3 gap-2">
                     {CORNERS.map((c) => (
@@ -435,7 +434,7 @@ function PenaltyShootoutContent() {
               <Card className="mt-4 border-amber-500/50" data-testid="answer-reveal">
                 <CardContent className="pt-5 text-center">
                   <p className="text-base font-semibold text-amber-700 dark:text-amber-400">
-                    {isKeeperRound ? "Goal conceded!" : "Saved!"}
+                    {isKeeperRound ? "Goal conceded" : "Saved by the keeper"}
                   </p>
                   <p className="text-sm text-muted-foreground mt-2">The correct answer was</p>
                   <p className="text-xl font-bold mt-1">{correctAnswerText || "—"}</p>
@@ -450,7 +449,7 @@ function PenaltyShootoutContent() {
             {phase === "shooting" && (
               <p className="mt-4 text-center text-sm text-muted-foreground">
                 {lastCorrect
-                  ? (isKeeperRound ? "Great save! 🧤" : "What a strike! ⚽")
+                  ? (isKeeperRound ? "Great save!" : "Good strike!")
                   : "…"}
               </p>
             )}
@@ -462,12 +461,12 @@ function PenaltyShootoutContent() {
           <div className="text-center py-4" data-testid="results">
             {result?.newRecord && (
               <div className="pk-pop mb-4 rounded-xl border-2 border-amber-400 bg-amber-50 dark:bg-amber-950/40 px-4 py-3" data-testid="new-record">
-                <div className="text-3xl mb-1">🏆</div>
+                <Trophy className="mx-auto mb-1 h-7 w-7" aria-hidden="true" />
                 <p className="font-bold text-amber-800 dark:text-amber-200">New personal best!</p>
                 <p className="text-sm text-amber-700 dark:text-amber-300">
                   {result.previousOutOf > 0
                     ? `You beat your old record of ${result.previousBest}/${result.previousOutOf} in ${subject}.`
-                    : `Your first record in ${subject} — now try to beat it!`}
+                    : `Your first record in ${subject}. Try to beat it next time.`}
                 </p>
               </div>
             )}
@@ -480,22 +479,21 @@ function PenaltyShootoutContent() {
             </p>
 
             <div className="pk-crowd text-2xl mt-3" aria-hidden="true">
-              <span>🎉</span><span>👏</span><span>🎊</span><span>👏</span><span>🎉</span>
-            </div>
+              </div>
 
             <Card className="mt-5 text-left">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">How you did</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
-                <Row label="⚽ Penalties scored" value={`${result?.strikerScore ?? 0} / ${SHOTS_PER_ROUND}`} />
-                <Row label="🧤 Saves made" value={`${result?.keeperScore ?? 0} / ${SHOTS_PER_ROUND}`} />
+                <Row label="Penalties scored" value={`${result?.strikerScore ?? 0} / ${SHOTS_PER_ROUND}`} />
+                <Row label="Saves made" value={`${result?.keeperScore ?? 0} / ${SHOTS_PER_ROUND}`} />
                 <Row
                   label={<span className="flex items-center gap-1"><Trophy className="h-3.5 w-3.5" /> Your best in {subject}</span>}
                   value={`${result?.bestScore ?? 0} / ${result?.bestOutOf || TOTAL_SHOTS}`}
                 />
                 {result?.xp && result.xp.awarded > 0 && (
-                  <Row label="⭐ XP earned" value={`+${result.xp.awarded}${result.xp.dailyCapped ? " (daily cap reached)" : ""}`} />
+                  <Row label="XP earned" value={`+${result.xp.awarded}${result.xp.dailyCapped ? " (daily cap reached)" : ""}`} />
                 )}
               </CardContent>
             </Card>
@@ -643,14 +641,14 @@ function Pitch({
       {(scored || keeperSaved) && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <span className="pk-cheer text-3xl font-extrabold text-white drop-shadow-lg" data-testid="cheer">
-            {scored ? "GOAL! 🎉" : "SAVED! 🧤"}
+            {scored ? "GOAL!" : "SAVED!"}
           </span>
         </div>
       )}
       {(saved || conceded) && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <span className="text-2xl font-extrabold text-white/90 drop-shadow-lg" data-testid="miss">
-            {saved ? "SAVED!" : "GOAL AGAINST"}
+            {saved ? "SAVED!" : "Goal against"}
           </span>
         </div>
       )}

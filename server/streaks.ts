@@ -130,7 +130,7 @@ function settle(state: StreakState, today: string): { state: StreakState; notice
     // is measured from here. Freeze days do not add to the count.
     return {
       state: { ...state, freezes: state.freezes - missed, lastActiveDate: addDays(today, -1) },
-      notice: { type: "freeze", message: "Your streak freeze saved you! 🔥" },
+      notice: { type: "freeze", message: "Your streak freeze kept your streak going." },
     };
   }
 
@@ -202,7 +202,7 @@ export async function recordActivity(studentId: number): Promise<void> {
         type: "milestone",
         day: milestone.day,
         bonusXp: milestone.bonus,
-        message: `🔥 ${milestone.day}-day streak! +${milestone.bonus} XP`,
+        message: `${milestone.day}-day streak! +${milestone.bonus} XP`,
       };
     }
   }

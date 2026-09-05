@@ -1,18 +1,16 @@
 import { Link } from "wouter";
 
-// A friendly placeholder page used for features that are not built yet
-// (Games, Rewards, Parents). It keeps the playful On Point look so a child
-// who taps the link still lands somewhere warm — never a dead end.
+// A placeholder page used for features that are not built yet (Games,
+// Rewards, Parents), so a child who taps the link still lands somewhere
+// that explains itself rather than on a dead end.
 //
-// Each route passes in its own title and emoji, so this one small component
-// serves all the "coming soon" pages.
+// Each route passes in its own title, so this one small component serves
+// all the "coming soon" pages.
 export default function ComingSoon({
   title,
-  emoji = "✨",
-  message = "We're building something fun here. Check back soon!",
+  message = "This part of the app is not ready yet. Check back later.",
 }: {
   title: string;
-  emoji?: string;
   message?: string;
 }) {
   return (
@@ -22,13 +20,8 @@ export default function ComingSoon({
       // hero is the only gradient the spec allows (S1, S13.10).
       style={{ backgroundColor: "var(--onpoint-blue)" }}
     >
-      {/* Big bobbing emoji so the page still feels alive while empty. */}
-      <div className="text-7xl mb-6 op-bob" aria-hidden="true">
-        {emoji}
-      </div>
-
       <h1 className="text-3xl sm:text-4xl font-extrabold mb-3">{title}</h1>
-      <p className="text-lg text-white/80 max-w-md mb-2">Coming soon {emoji}</p>
+      <p className="text-lg text-white/80 max-w-md mb-2">Coming soon</p>
       <p className="text-white/70 max-w-md mb-8">{message}</p>
 
       <div className="flex flex-col sm:flex-row gap-3">
@@ -37,7 +30,7 @@ export default function ComingSoon({
           className="rounded-full bg-white/15 hover:bg-white/25 px-6 py-3 font-semibold transition-colors"
           data-testid="link-coming-soon-home"
         >
-          ← Back Home
+          Back to the main page
         </Link>
         <Link
           href="/student/login"
@@ -45,7 +38,7 @@ export default function ComingSoon({
           style={{ color: "var(--onpoint-blue)", backgroundColor: "#BF9000" }}
           data-testid="link-coming-soon-login"
         >
-          Let's Start! 🚀
+          Log In
         </Link>
       </div>
     </div>

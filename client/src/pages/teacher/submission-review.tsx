@@ -135,7 +135,7 @@ function SubmissionReviewContent() {
 
   const wrongList = (review?.questions || []).filter((q) => q.verdict === "wrong" || q.verdict === "partial");
   const mistakesLabel = wrongList.length === 0
-    ? "All correct! 🎉"
+    ? "All answers correct"
     : "Missed " + wrongList.map((q) => `Q${q.index + 1}${q.verdict === "partial" ? " (partial)" : ""}`).join(", ");
 
   return (
@@ -194,7 +194,7 @@ function SubmissionReviewContent() {
                 {!isMarked && (
                   <Link href={`/teacher/mark/${review.submissionId}`}>
                     <div className="mt-3 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm text-primary cursor-pointer">
-                      This submission hasn't been marked yet — open the marking page to mark it. →
+                      This submission has not been marked. Open the marking page to mark it.
                     </div>
                   </Link>
                 )}

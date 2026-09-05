@@ -11,14 +11,14 @@ export interface Collectible {
 
 // The 12 items in the Treasure Hunt set. Order is not important.
 export const COLLECTIBLES: Collectible[] = [
-  { name: "Ruby Gem",           description: "A blood-red jewel that glows in the dark. Worth a small fortune!" },
+  { name: "Ruby Gem",           description: "A blood-red jewel that glows in the dark. Worth a small fortune." },
   { name: "Golden Compass",     description: "Always points to the nearest treasure — never to home." },
   { name: "Old Map Piece",      description: "One torn corner of a much bigger secret." },
   { name: "Parrot",             description: "Repeats every secret you say — loudly, at the worst moment." },
   { name: "Pearl",              description: "Plucked from the deepest oyster in the seven seas." },
   { name: "Anchor",             description: "Heavy, rusty and stubborn — just like the old captain." },
   { name: "Spyglass",           description: "Spot a storm long before the rest of the crew does." },
-  { name: "Treasure Key",       description: "Opens one chest, somewhere. Good luck finding it!" },
+  { name: "Treasure Key",       description: "Opens one chest, somewhere. " },
   { name: "Silver Coin",        description: "Ping it on the table to hear the ring of real silver." },
   { name: "Message in a Bottle", description: "A soggy note from a sailor who never made it back." },
   { name: "Pirate Flag",        description: "Black cloth, white bones. Raise it and enemies flee." },

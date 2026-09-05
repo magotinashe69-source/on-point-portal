@@ -64,9 +64,9 @@ export default function ViewResults() {
   };
 
   const getGradeLabel = (pct: number) => {
-    if (pct >= 80) return "Excellent!";
-    if (pct >= 60) return "Good Work!";
-    if (pct >= 40) return "Keep Trying!";
+    if (pct >= 80) return "Very strong";
+    if (pct >= 60) return "Good";
+    if (pct >= 40) return "Nearly there";
     return "Needs Improvement";
   };
 

@@ -44,7 +44,7 @@ export default function TeacherLogin() {
       
       if (data.success) {
         toast({
-          title: "Welcome back!",
+          title: "Logged in",
           description: `Logged in as ${data.teacher.fullName}`,
         });
         setTeacher(data.teacher);
@@ -57,8 +57,8 @@ export default function TeacherLogin() {
       }
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to login. Please try again.",
+        title: "Login failed",
+        description: "Check your email and password, then try again.",
         variant: "destructive",
       });
     } finally {

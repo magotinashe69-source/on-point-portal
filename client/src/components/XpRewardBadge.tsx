@@ -40,7 +40,7 @@ export function XpRewardBadge({ award }: { award: XpAward }) {
               className="xprb-star text-lg"
               style={{ ["--tx" as string]: `${tx}px`, ["--ty" as string]: `${ty}px`, animationDelay: `${i * 0.03}s` }}
             >
-              ⭐
+              &#9733;
             </span>
           ))}
         </div>
@@ -53,14 +53,13 @@ export function XpRewardBadge({ award }: { award: XpAward }) {
         }`}
         style={positive ? { background: `linear-gradient(90deg, ${GOLD}, #E0B93A)` } : undefined}
       >
-        <span aria-hidden="true">⚡</span>
         <span data-testid="text-xp-message">{xpMessage(award)}</span>
       </div>
 
       {/* The level-up line. */}
       {award.leveledUp && (
         <div className="xprb-levelup text-sm font-extrabold" style={{ color: GOLD }} data-testid="text-level-up">
-          🎉 Level {award.level} reached!
+          Level {award.level} reached!
         </div>
       )}
     </div>

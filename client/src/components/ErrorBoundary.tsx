@@ -70,7 +70,7 @@ export function PageErrorBoundary({
       <div className="p-3 rounded-full bg-amber-100 dark:bg-amber-900/30 mb-4">
         <AlertTriangle className="h-6 w-6 text-amber-600 dark:text-amber-400" />
       </div>
-      <p className="font-medium">Sorry — this page couldn't be shown.</p>
+      <p className="font-medium">This page could not be shown.</p>
       <p className="text-sm text-muted-foreground mt-1 max-w-md">
         Nothing has been lost. You can go back and try again.
       </p>

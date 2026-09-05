@@ -17,7 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { ArrowLeft, PlusCircle, Trash2, Loader2, Save, X, Image, Users, Circle, CheckCircle2, ChevronUp, ChevronDown, RefreshCw, FileClock, ClipboardPaste, Copy } from "lucide-react";
+import { ArrowLeft, PlusCircle, Trash2, Loader2, Save, X, Image, Users, Circle, CheckCircle2, ChevronUp, ChevronDown, RefreshCw, FileClock, ClipboardPaste, Copy, AlertTriangle } from "lucide-react";
 import logoPath from "@assets/logo.webp";
 import { SimpleUploader } from "@/components/SimpleUploader";
 import { FileAttachmentZone } from "@/components/FileAttachmentZone";
@@ -144,7 +144,7 @@ export default function CreateAssignment() {
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteText, setPasteText] = useState("");
   // When set, the effect below scrolls to that question's text box and focuses
-  // it — so after "Add Question" the teacher can type immediately.
+  // it — so after "Add question" the teacher can type immediately.
   const [focusIndex, setFocusIndex] = useState<number | null>(null);
 
   const formMethods = useForm<CreateAssignmentForm>({
@@ -176,7 +176,7 @@ export default function CreateAssignment() {
   });
 
   // In edit mode, load the assignment (to pre-fill) and its submissions (for the
-  // "already submitted" notice and the per-question re-mark actions).
+  // "already handed in" notice and the per-question re-mark actions).
   const { data: editAssignment } = useQuery<Assignment>({
     queryKey: ["/api/assignments", editId],
     enabled: isEdit,
@@ -422,7 +422,7 @@ export default function CreateAssignment() {
     if (!assignToAll && selectedStudentIds.length === 0) {
       toast({
         title: "No students selected",
-        description: "Please select at least one student or assign to all students.",
+        description: "Select at least one student, or choose all students.",
         variant: "destructive",
       });
       return false;
@@ -496,7 +496,7 @@ export default function CreateAssignment() {
         }
         if (navigate) {
           toast({
-            title: isEdit ? "Assignment updated!" : asDraft ? "Draft saved!" : "Assignment created!",
+            title: isEdit ? "Assignment updated" : asDraft ? "Draft saved" : "Assignment created",
             description: isEdit
               ? "Your changes have been saved."
               : asDraft
@@ -508,15 +508,15 @@ export default function CreateAssignment() {
         return true;
       }
       toast({
-        title: "Error",
-        description: data.message || (isEdit ? "Failed to update assignment" : "Failed to create assignment"),
+        title: isEdit ? "Assignment not updated" : "Assignment not created",
+        description: data.message || "Check the form and try again.",
         variant: "destructive",
       });
       return false;
     } catch (error) {
       toast({
-        title: "Error",
-        description: `Failed to ${isEdit ? "update" : "create"} assignment. Please try again.`,
+        title: isEdit ? "Assignment not updated" : "Assignment not created",
+        description: "Check your connection and try again.",
         variant: "destructive",
       });
       return false;
@@ -529,7 +529,7 @@ export default function CreateAssignment() {
     void doSave(values, true);
   }
 
-  // "Save as Draft" — same assignment, same checks, just not released yet.
+  // "Save as draft" — same assignment, same checks, just not released yet.
   // Runs the form's own validation first so the teacher gets the usual
   // messages about missing fields.
   const handleSaveAsDraft = () => {
@@ -605,7 +605,7 @@ export default function CreateAssignment() {
             changing questions won't retroactively alter marks already given. */}
         {isEdit && submissionCount > 0 && (
           <div className="mb-4 rounded-xl border border-orange-400/60 bg-orange-500/10 px-4 py-3 text-sm" data-testid="submissions-notice">
-            ⚠️ <span className="font-semibold">{submissionCount} student{submissionCount === 1 ? " has" : "s have"} already submitted.</span>{" "}
+            <AlertTriangle className="inline h-4 w-4 mr-1 align-text-bottom" aria-hidden="true" /><span className="font-semibold">{submissionCount} student{submissionCount === 1 ? " has" : "s have"} already handed in.</span>{" "}
             Changes to questions will <span className="font-semibold">not</span> alter marks already given. To update a fixed answer, use the{" "}
             <span className="font-semibold">Re-mark</span> button on that question.
           </div>
@@ -844,7 +844,7 @@ export default function CreateAssignment() {
                         data-testid="button-add-question"
                       >
                         <PlusCircle className="h-4 w-4 mr-2" />
-                        Add Question
+                        Add question
                       </Button>
                     </div>
                   </div>
@@ -872,7 +872,7 @@ export default function CreateAssignment() {
                               <Button type="button" variant="outline" size="sm"
                                 disabled={remarkingQid === formMethods.watch(`questions.${index}.qid`)}
                                 onClick={() => handleRemark(formMethods.getValues(`questions.${index}.qid`))}
-                                title="Save changes and re-mark this question for students who already submitted"
+                                title="Save changes and re-mark this question for students who have already handed in"
                                 data-testid={`button-remark-${index}`}>
                                 {remarkingQid === formMethods.watch(`questions.${index}.qid`)
                                   ? <Loader2 className="h-4 w-4 animate-spin sm:mr-1" />
@@ -1044,7 +1044,7 @@ export default function CreateAssignment() {
                                     );
                                   })}
                                   <Button type="button" variant="outline" size="sm" onClick={() => addOption(index)}>
-                                    <PlusCircle className="h-4 w-4 mr-2" /> Add Option
+                                    <PlusCircle className="h-4 w-4 mr-2" /> Add option
                                   </Button>
                                 </div>
                               )}
@@ -1120,7 +1120,7 @@ export default function CreateAssignment() {
                                     );
                                   })}
                                   <Button type="button" variant="outline" size="sm" onClick={() => addAccepted(index)}>
-                                    <PlusCircle className="h-4 w-4 mr-2" /> Add Accepted Answer
+                                    <PlusCircle className="h-4 w-4 mr-2" /> Add accepted answer
                                   </Button>
                                 </div>
                               )}
@@ -1155,7 +1155,7 @@ export default function CreateAssignment() {
                     data-testid="button-add-question-bottom"
                   >
                     <PlusCircle className="h-5 w-5 mr-2" />
-                    Add Question
+                    Add question
                   </Button>
                 </div>
 
@@ -1218,7 +1218,7 @@ export default function CreateAssignment() {
                   </div>
                 )}
 
-                {/* Save. When creating, "Save as Draft" sits beside the normal
+                {/* Save. When creating, "Save as draft" sits beside the normal
                     create button so the assignment can be prepared ahead of time
                     and released later with one tap. */}
                 <div className="flex flex-col gap-2 sm:flex-row">
@@ -1246,7 +1246,7 @@ export default function CreateAssignment() {
                       data-testid="button-save-draft"
                     >
                       <FileClock className="h-4 w-4 mr-2" />
-                      Save as Draft
+                      Save as draft
                     </Button>
                   )}
                 </div>

@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Loader2, Copy, CheckCheck, ClipboardList, LogOut } from "lucide-react";
+import { ArrowLeft, Loader2, Copy, CheckCheck, ClipboardList, LogOut, Check, X, AlertTriangle } from "lucide-react";
 import logoPath from "@assets/logo.webp";
 
 interface DailyReportData {
@@ -80,39 +80,39 @@ function buildWhatsAppText(
   const subjectLabel = subject === "all" ? "All Subjects" : (SUBJECT_LABELS[subject] || subject);
   const lines: string[] = [];
 
-  lines.push("📚 *Homework Submission Report*");
-  lines.push(`📅 Date: ${dateLabel}`);
-  lines.push(`🏫 Class: ${form}`);
-  lines.push(`📖 Subject: ${subjectLabel}`);
+  lines.push("*Homework submission report*");
+  lines.push(`Date: ${dateLabel}`);
+  lines.push(`Class: ${form}`);
+  lines.push(`Subject: ${subjectLabel}`);
   lines.push("");
 
   if (data.submitted.length > 0) {
-    lines.push("✅ *Students who submitted homework:*");
+    lines.push("*Handed in:*");
     data.submitted.forEach((s, i) => lines.push(`${i + 1}. ${s.fullName}`));
   } else {
-    lines.push("✅ *Students who submitted homework:*");
-    lines.push("None submitted for this period.");
+    lines.push("*Handed in:*");
+    lines.push("No one handed in during this period.");
   }
   lines.push("");
 
   if (data.notSubmitted.length > 0) {
-    lines.push("❌ *Students who did not submit homework:*");
+    lines.push("*Did not hand in:*");
     data.notSubmitted.forEach((s, i) => lines.push(`${i + 1}. ${s.fullName}`));
   } else {
-    lines.push("❌ *Students who did not submit homework:*");
-    lines.push("All students submitted. Well done!");
+    lines.push("*Did not hand in:*");
+    lines.push("Everyone handed in.");
   }
   lines.push("");
 
   if (data.lowAttendance.length > 0) {
-    lines.push("⚠️ *Students who need to improve homework attendance:*");
+    lines.push("*Needs to improve homework attendance:*");
     data.lowAttendance.forEach((s, i) =>
       lines.push(`${i + 1}. ${s.fullName} — ${s.completionRate}% completion`)
     );
     lines.push("");
   }
 
-  lines.push("💬 *Message for Parents:*");
+  lines.push("*Message for parents:*");
   lines.push(
     "Dear Parents, thank you to all learners who completed today's homework. Your effort is noticed and appreciated."
   );
@@ -184,7 +184,7 @@ export default function DailyReport() {
 
   const handleGenerate = () => {
     if (!form) {
-      toast({ title: "Please select a class", variant: "destructive" });
+      toast({ title: "Select a class", variant: "destructive" });
       return;
     }
     const { dateFrom, dateTo, label } = getDateRange(datePreset, customDate);
@@ -198,7 +198,7 @@ export default function DailyReport() {
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
-      toast({ title: "Copied!", description: "Report copied to clipboard. Paste it into WhatsApp." });
+      toast({ title: "Copied", description: "Report copied to clipboard. Paste it into WhatsApp." });
       setTimeout(() => setCopied(false), 3000);
     } catch {
       toast({ title: "Copy failed", description: "Please select and copy the text manually.", variant: "destructive" });
@@ -233,7 +233,7 @@ export default function DailyReport() {
           <Link href="/teacher/dashboard">
             <Button variant="ghost" size="sm" data-testid="button-back-dashboard">
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Dashboard
+              Back to dashboard
             </Button>
           </Link>
         </div>
@@ -316,7 +316,7 @@ export default function DailyReport() {
               data-testid="button-generate-report"
             >
               {isLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ClipboardList className="h-4 w-4 mr-2" />}
-              Generate Report
+              Generate report
             </Button>
           </CardContent>
         </Card>
@@ -342,10 +342,10 @@ export default function DailyReport() {
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div>
                   <h2 className="text-xl font-bold flex items-center gap-2">
-                    📚 Homework Submission Report
+                    Homework submission report
                   </h2>
                   <p className="text-sm text-muted-foreground mt-1">
-                    📅 {queryParams.dateLabel} &nbsp;·&nbsp; 🏫 {queryParams.form} &nbsp;·&nbsp; 📖 {subjectLabel}
+                    {queryParams.dateLabel} &nbsp;·&nbsp; {queryParams.form} &nbsp;·&nbsp; {subjectLabel}
                   </p>
                 </div>
                 <Button
@@ -356,7 +356,7 @@ export default function DailyReport() {
                   data-testid="button-copy-whatsapp"
                 >
                   {copied ? (
-                    <><CheckCheck className="h-4 w-4 mr-2" />Copied!</>
+                    <><CheckCheck className="h-4 w-4 mr-2" />Copied</>
                   ) : (
                     <><Copy className="h-4 w-4 mr-2" />Copy WhatsApp Message</>
                   )}
@@ -368,7 +368,7 @@ export default function DailyReport() {
               {/* Submitted */}
               <div>
                 <h3 className="font-semibold text-base flex items-center gap-2 mb-3">
-                  <span className="text-xl">✅</span>
+                  <Check className="h-5 w-5 text-green-600 dark:text-green-400" aria-hidden="true" />
                   Students who submitted homework
                   <Badge className="bg-green-600 text-white ml-1" data-testid="badge-submitted-count">
                     {reportData.submitted.length}
@@ -391,7 +391,7 @@ export default function DailyReport() {
               {/* Not submitted */}
               <div>
                 <h3 className="font-semibold text-base flex items-center gap-2 mb-3">
-                  <span className="text-xl">❌</span>
+                  <X className="h-5 w-5 text-destructive" aria-hidden="true" />
                   Students who did not submit homework
                   <Badge variant="destructive" className="ml-1" data-testid="badge-not-submitted-count">
                     {reportData.notSubmitted.length}
@@ -399,7 +399,7 @@ export default function DailyReport() {
                 </h3>
                 {reportData.notSubmitted.length === 0 ? (
                   <p className="text-sm pl-8 text-green-700 dark:text-green-400 font-medium">
-                    All students submitted. Well done! 🎉
+                    Everyone handed in.
                   </p>
                 ) : (
                   <ol className="space-y-1 pl-8" data-testid="list-not-submitted">
@@ -417,7 +417,7 @@ export default function DailyReport() {
               {reportData.lowAttendance.length > 0 && (
                 <div>
                   <h3 className="font-semibold text-base flex items-center gap-2 mb-3">
-                    <span className="text-xl">⚠️</span>
+                    <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" aria-hidden="true" />
                     Students who need to improve homework attendance
                     <Badge className="bg-orange-500 text-white ml-1" data-testid="badge-low-attendance-count">
                       {reportData.lowAttendance.length}
@@ -454,7 +454,7 @@ export default function DailyReport() {
                 data-testid="button-copy-whatsapp-bottom"
               >
                 {copied ? (
-                  <><CheckCheck className="h-4 w-4 mr-2" />Copied to Clipboard!</>
+                  <><CheckCheck className="h-4 w-4 mr-2" />Copied to clipboard</>
                 ) : (
                   <><Copy className="h-4 w-4 mr-2" />Copy WhatsApp Message</>
                 )}

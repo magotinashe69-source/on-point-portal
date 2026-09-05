@@ -268,12 +268,12 @@ function MediaRecorder_({ onRecordingComplete, type }: { onRecordingComplete: (b
         {!isRecording ? (
           <Button type="button" onClick={startRecording} variant="default" size="lg" data-testid="button-start-recording">
             <Circle className="h-5 w-5 fill-red-500 text-red-500 mr-2" />
-            Start Recording
+            Start recording
           </Button>
         ) : (
           <Button type="button" onClick={stopRecording} variant="destructive" size="lg" data-testid="button-stop-recording">
             <Square className="h-5 w-5 mr-2" />
-            Stop Recording ({formatTime(recordingTime)})
+            Stop recording ({formatTime(recordingTime)})
           </Button>
         )}
       </div>
@@ -338,7 +338,7 @@ export default function TeacherLessons() {
     onSuccess: (data) => {
       if (data.success) {
         queryClient.invalidateQueries({ queryKey: ["/api/lessons"] });
-        toast({ title: "Lesson added successfully" });
+        toast({ title: "Lesson added" });
         setIsDialogOpen(false);
         form.reset();
         setRecordedBlob(null);
@@ -455,9 +455,9 @@ export default function TeacherLessons() {
       if (!uploadRes.ok) throw new Error("Failed to upload recording");
       
       form.setValue("fileUrl", objectPath);
-      toast({ title: "Recording uploaded successfully" });
+      toast({ title: "Recording uploaded" });
     } catch (err) {
-      toast({ title: "Upload failed", description: "Please try again", variant: "destructive" });
+      toast({ title: "Recording not uploaded", description: "Check your connection and try again.", variant: "destructive" });
     } finally {
       setIsUploadingRecording(false);
     }
@@ -582,7 +582,7 @@ export default function TeacherLessons() {
             <DialogTrigger asChild>
               <Button data-testid="button-add-lesson">
                 <PlusCircle className="h-4 w-4 mr-2" />
-                Add Lesson
+                Add lesson
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
@@ -770,7 +770,7 @@ export default function TeacherLessons() {
 
                   <Button type="submit" className="w-full" disabled={createMutation.isPending || isUploadingRecording} data-testid="button-submit-lesson">
                     {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                    Add Lesson
+                    Add lesson
                   </Button>
                 </form>
               </Form>
@@ -897,7 +897,7 @@ export default function TeacherLessons() {
               <p className="text-muted-foreground mb-4">Upload or record your first video or audio lesson</p>
               <Button onClick={() => setIsDialogOpen(true)}>
                 <PlusCircle className="h-4 w-4 mr-2" />
-                Add Lesson
+                Add lesson
               </Button>
             </CardContent>
           </Card>
