@@ -422,7 +422,7 @@ export default function StudentDashboard() {
                           <div>
                             <p className="font-medium">{submission.assignmentTitle || 'Assignment'}</p>
                             <p className="text-sm text-muted-foreground">
-                              Submitted: {new Date(submission.submittedAt).toLocaleDateString()}
+                              Handed in: {new Date(submission.submittedAt).toLocaleDateString()}
                             </p>
                           </div>
                         </div>
@@ -444,7 +444,7 @@ export default function StudentDashboard() {
                           <div>
                             <p className="font-medium">{submission.assignmentTitle || 'Assignment'}</p>
                             <p className="text-sm text-muted-foreground">
-                              Submitted: {new Date(submission.submittedAt).toLocaleDateString()}
+                              Handed in: {new Date(submission.submittedAt).toLocaleDateString()}
                             </p>
                           </div>
                         </div>
