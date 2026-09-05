@@ -70,6 +70,38 @@ const LEGACY_SPACING = {
   "96":  "24rem",
 } as const;
 
+/* ---------------------------------------------------------------------------
+   TYPE — the Carbon steps, each with its own line-height (S3).
+   ---------------------------------------------------------------------------
+   Added to `extend`, NOT replacing Tailwind's own sizes: these are new class
+   names (text-label-01, text-body-compact-01 ...) so nothing already written
+   changes. Their branch also remapped text-sm / text-lg / text-2xl onto this
+   scale, which restyles every screen at once; that is a separate decision and
+   is deliberately not taken here.
+
+   Each entry is [size, { lineHeight, letterSpacing }] so a step can never be
+   used without the leading it was designed with.
+   --------------------------------------------------------------------------- */
+const step = (size: string, line: string, tracking: string) =>
+  [size, { lineHeight: line, letterSpacing: tracking }] as const;
+
+const CARBON_TYPE = {
+  "caption-01":         step("0.75rem", "1rem", "0.32px"),      /* 12 / 16 */
+  "label-01":           step("0.75rem", "1rem", "0.32px"),      /* 12 / 16 */
+  "helper-01":          step("0.75rem", "1rem", "0.32px"),      /* 12 / 16 */
+  "body-compact-01":    step("0.875rem", "1.125rem", "0.16px"), /* 14 / 18 */
+  "heading-compact-01": step("0.875rem", "1.125rem", "0.16px"), /* 14 / 18 */
+  "body-01":            step("0.875rem", "1.25rem", "0.16px"),  /* 14 / 20 */
+  "heading-01":         step("0.875rem", "1.25rem", "0.16px"),  /* 14 / 20 */
+  "body-compact-02":    step("1rem", "1.375rem", "0px"),        /* 16 / 22 */
+  "heading-compact-02": step("1rem", "1.375rem", "0px"),        /* 16 / 22 */
+  "body-02":            step("1rem", "1.5rem", "0px"),          /* 16 / 24 */
+  "heading-02":         step("1rem", "1.5rem", "0px"),          /* 16 / 24 */
+  "heading-03":         step("1.25rem", "1.75rem", "0px"),      /* 20 / 28 */
+  "heading-04":         step("1.75rem", "2.25rem", "0px"),      /* 28 / 36 */
+  "heading-05":         step("2rem", "2.5rem", "0px"),          /* 32 / 40 */
+} as const;
+
 export default {
   darkMode: ["class"],
   content: ["./client/index.html", "./client/src/**/*.{js,jsx,ts,tsx}"],
@@ -89,6 +121,7 @@ export default {
       full: "9999px",
     },
     extend: {
+      fontSize: { ...CARBON_TYPE },
       colors: {
         // Flat / base colors (regular buttons)
         background: "hsl(var(--background) / <alpha-value>)",

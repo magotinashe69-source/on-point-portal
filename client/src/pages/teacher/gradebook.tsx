@@ -2,16 +2,17 @@ import { useEffect, useState } from "react";
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
+import { QueryError } from "@/components/QueryError";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth";
-import { QueryError } from "@/components/QueryError";
 import { PageErrorBoundary } from "@/components/ErrorBoundary";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { ArrowLeft, CheckCircle, XCircle, Download, Printer, Loader2, BookOpen, AlertTriangle } from "lucide-react";
+import { ArrowLeft, CheckCircle, XCircle, Download, Printer, BookOpen, Filter } from "lucide-react";
 import logoPath from "@assets/logo.webp";
 
 interface GradebookRow {
@@ -27,6 +28,18 @@ interface GradebookRow {
   score: number | null;
   status: string;
 }
+
+// The column layout lives in one place so the table and its loading skeleton
+// cannot drift apart - a skeleton whose columns do not line up with the real
+// table is worse than no skeleton, because the page jumps when it loads.
+const COLUMNS = [
+  { key: "learner", label: "Learner", head: "", bar: "w-24" },
+  { key: "class", label: "Class", head: "w-24", bar: "w-12" },
+  { key: "assignment", label: "Assignment", head: "", bar: "w-40" },
+  { key: "handedIn", label: "Handed in", head: "w-40", bar: "w-20" },
+  { key: "mark", label: "Mark", head: "w-24 text-right", bar: "w-10 ml-auto" },
+  { key: "date", label: "Date", head: "w-40", bar: "w-24" },
+] as const;
 
 function GradeBookContent() {
   const [, setLocation] = useLocation();
@@ -93,6 +106,19 @@ function GradeBookContent() {
     ? statsData.stats.filter(s => s && typeof s === "object")
     : [];
 
+  // Every record, ignoring the filters. This already had to be fetched for the
+  // assignment dropdown, so telling "you have nothing yet" apart from "your
+  // filters hid it" costs no extra request.
+  const allRows = toRows(allData?.rows);
+  const filtersActive =
+    filterAssignmentId !== "ALL" || filterStatus !== "ALL" || !!filterDateFrom || !!filterDateTo;
+  const clearFilters = () => {
+    setFilterAssignmentId("ALL");
+    setFilterStatus("ALL");
+    setFilterDateFrom("");
+    setFilterDateTo("");
+  };
+
   const submittedCount = rows.filter(r => r.status && r.status !== "NOT_SUBMITTED").length;
   const notSubmittedCount = rows.filter(r => !r.status || r.status === "NOT_SUBMITTED").length;
 
@@ -124,20 +150,24 @@ function GradeBookContent() {
     });
   };
 
-  const getStatusBadge = (status: string) => {
-    if (status === "NOT_SUBMITTED") {
-      return (
-        <Badge variant="destructive" className="gap-1" data-testid="badge-not-submitted">
-          <XCircle className="h-3 w-3" />
-          Not Submitted
-        </Badge>
-      );
-    }
+  // Handed in / not, as a dot and a word rather than a filled badge. Twenty
+  // saturated badges stacked down a column shout; a dot carries the same
+  // information quietly, which is what the staff skin asks for. The colour is
+  // never the only cue - the word is always there for anyone who cannot
+  // separate the two colours.
+  const handedIn = (status: string) => {
+    const not = status === "NOT_SUBMITTED";
     return (
-      <Badge className="gap-1 bg-green-600 hover:bg-green-700" data-testid="badge-submitted">
-        <CheckCircle className="h-3 w-3" />
-        Submitted
-      </Badge>
+      <span
+        className="inline-flex items-center gap-2 whitespace-nowrap"
+        data-testid={not ? "badge-not-submitted" : "badge-submitted"}
+      >
+        <span
+          aria-hidden="true"
+          className={`h-2 w-2 shrink-0 rounded-full ${not ? "bg-destructive" : "bg-green-600"}`}
+        />
+        {not ? "Not handed in" : "Handed in"}
+      </span>
     );
   };
 
@@ -158,7 +188,7 @@ function GradeBookContent() {
         <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-4">
           <Link href="/teacher/dashboard" className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
-            <span className="text-sm">Back to Dashboard</span>
+            <span className="text-sm">Back to dashboard</span>
           </Link>
           <div className="flex items-center gap-3">
             <img src={logoPath} alt="On Point" className="h-8 w-auto" />
@@ -175,7 +205,7 @@ function GradeBookContent() {
             </div>
             <div>
               <h1 className="text-2xl font-bold">Grade Book</h1>
-              <p className="text-sm text-muted-foreground">Track submissions and scores across all assignments</p>
+              <p className="text-sm text-muted-foreground">Every mark across every assignment.</p>
             </div>
           </div>
           <div className="flex gap-2">
@@ -235,7 +265,7 @@ function GradeBookContent() {
                     <SelectValue placeholder="All assignments" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="ALL">All Assignments</SelectItem>
+                    <SelectItem value="ALL">All assignments</SelectItem>
                     {uniqueAssignments.map(a => (
                       <SelectItem key={a.id} value={String(a.id)}>{a.title}</SelectItem>
                     ))}
@@ -250,8 +280,8 @@ function GradeBookContent() {
                     <SelectValue placeholder="All statuses" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="ALL">All Statuses</SelectItem>
-                    <SelectItem value="SUBMITTED">Submitted (not yet marked)</SelectItem>
+                    <SelectItem value="ALL">All statuses</SelectItem>
+                    <SelectItem value="SUBMITTED">Handed in, not yet marked</SelectItem>
                     <SelectItem value="MARKED">Marked</SelectItem>
                     <SelectItem value="NOT_SUBMITTED">Not handed in</SelectItem>
                   </SelectContent>
@@ -259,7 +289,7 @@ function GradeBookContent() {
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="filter-from">Submitted From</Label>
+                <Label htmlFor="filter-from">Handed in from</Label>
                 <Input
                   id="filter-from"
                   type="date"
@@ -270,7 +300,7 @@ function GradeBookContent() {
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="filter-to">Submitted To</Label>
+                <Label htmlFor="filter-to">Handed in to</Label>
                 <Input
                   id="filter-to"
                   type="date"
@@ -281,17 +311,12 @@ function GradeBookContent() {
               </div>
             </div>
 
-            {(filterAssignmentId !== "ALL" || filterStatus !== "ALL" || filterDateFrom || filterDateTo) && (
+            {filtersActive && (
               <div className="mt-3">
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => {
-                    setFilterAssignmentId("ALL");
-                    setFilterStatus("ALL");
-                    setFilterDateFrom("");
-                    setFilterDateTo("");
-                  }}
+                  onClick={clearFilters}
                   data-testid="button-clear-filters"
                 >
                   Clear filters
@@ -338,79 +363,159 @@ function GradeBookContent() {
           </Card>
         )}
 
-        {/* Table */}
-        <Card>
-          <CardContent className="p-0">
+        {/* Table.
+            One frame around all four states - loading, failed, empty and the
+            table itself - so the panel keeps its shape whatever is inside it.
+            A plain div rather than <Card>, because Card carries shadow-sm and
+            rounded-xl: this screen wants no shadow and a single 4px radius. */}
+        <div className="overflow-hidden rounded-sm border border-border">
+            {/* Four states, and they are four different things. Loading is not
+                empty, empty is not broken, and "you have nothing yet" is not
+                "your filters hid it". Order matters: a real failure is reported
+                before we start guessing why the list is short. */}
             {isLoading ? (
-              <div className="flex items-center justify-center py-16">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              /* A skeleton rather than a spinner: the table's shape is known
+                 before the data is, so hold the layout instead of collapsing it
+                 and jolting the page when rows arrive. */
+              <div className="overflow-x-auto" data-testid="gradebook-skeleton" aria-busy="true" aria-live="polite">
+                <span className="sr-only">Loading the Grade Book</span>
+                <Table>
+                  <TableHeader>
+                    <TableRow className="h-8 bg-muted/50 hover:bg-muted/50">
+                      {COLUMNS.map(c => (
+                        <TableHead key={c.key} className={`h-8 px-3 text-label-01 ${c.head}`}>{c.label}</TableHead>
+                      ))}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {Array.from({ length: 8 }).map((_, i) => (
+                      <TableRow key={i} className="h-8 hover:bg-transparent">
+                        {COLUMNS.map(c => (
+                          <TableCell key={c.key} className="px-3 py-0">
+                            <Skeleton className={`h-3 ${c.bar} motion-reduce:animate-none`} />
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
             ) : isError ? (
-              // A load that failed is not the same as a class with no records —
-              // say which one it is, so nobody is left staring at an empty table.
-              // refetch() rather than a page reload: S8 asks for a retry that
-              // does not throw away the filters the teacher has set.
-              <QueryError error={error} what="the Grade Book" variant="page" onRetry={() => refetch()} data-testid="gradebook-load-error" />
+              /* The shared component, per S8 - it says which kind of failure
+                 this was and offers a retry that refetches rather than
+                 reloading the whole page. */
+              <QueryError
+                error={error}
+                what="the Grade Book"
+                onRetry={() => refetch()}
+                data-testid="gradebook-load-error"
+              />
+            ) : rows.length === 0 && filtersActive && allRows.length > 0 ? (
+              /* Filters hid everything. Say how much is really there, so nobody
+                 concludes the Grade Book is empty. */
+              <div className="flex flex-col items-center justify-center py-16 px-4 text-center" data-testid="gradebook-no-results">
+                <Filter className="h-10 w-10 mb-3 text-muted-foreground opacity-40" />
+                <p className="font-medium">Nothing matches those filters</p>
+                <p className="text-body-01 text-muted-foreground mt-1 max-w-sm">
+                  There {allRows.length === 1 ? "is" : "are"} {allRows.length} record{allRows.length === 1 ? "" : "s"} in
+                  the Grade Book. Try a wider set of dates, or a different class or assignment.
+                </p>
+                <Button variant="outline" size="sm" className="mt-4" onClick={clearFilters} data-testid="button-no-results-clear">
+                  Clear filters
+                </Button>
+              </div>
             ) : rows.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-                <BookOpen className="h-10 w-10 mb-3 opacity-40" />
-                <p className="font-medium">No records found</p>
-                <p className="text-sm">Try adjusting your filters</p>
+              /* Genuinely nothing yet. Do not tell a teacher to adjust filters
+                 when there is not a single mark to filter. */
+              <div className="flex flex-col items-center justify-center py-16 px-4 text-center" data-testid="gradebook-empty">
+                <BookOpen className="h-10 w-10 mb-3 text-muted-foreground opacity-40" />
+                <p className="font-medium">No marks yet</p>
+                <p className="text-body-01 text-muted-foreground mt-1 max-w-sm">
+                  Marks appear here once you have set an assignment and your class has started handing it in.
+                </p>
+                <Link href="/teacher/assignments/new">
+                  <Button size="sm" className="mt-4" data-testid="button-empty-create-assignment">
+                    Set an assignment
+                  </Button>
+                </Link>
               </div>
             ) : (
+              /* Carbon `sm` density: 32px rows, so 20+ records read at once
+                 without scrolling (20 rows + header = 672px, against 840px at
+                 `md`). S7's row heights reserve 40px+ for rows holding a
+                 button, checkbox or input - the mark below is an inline text
+                 link, not a control, so `sm` is the right size here.
+
+                 No shadow and a single 4px radius on the frame only: rows and
+                 cells are square, so there is exactly one corner treatment in
+                 the whole component. */
               <div className="overflow-x-auto">
-                <table className="w-full text-sm" data-testid="table-gradebook">
-                  <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th className="text-left px-4 py-3 font-medium">Student Name</th>
-                      <th className="text-left px-4 py-3 font-medium">Form</th>
-                      <th className="text-left px-4 py-3 font-medium">Assignment</th>
-                      <th className="text-left px-4 py-3 font-medium">Subject</th>
-                      <th className="text-left px-4 py-3 font-medium">Score</th>
-                      <th className="text-left px-4 py-3 font-medium">Submitted At</th>
-                      <th className="text-left px-4 py-3 font-medium">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                <Table data-testid="table-gradebook">
+                  <TableHeader>
+                    <TableRow className="h-8 bg-muted/50 hover:bg-muted/50">
+                      {COLUMNS.map(c => (
+                        <TableHead key={c.key} className={`h-8 px-3 text-label-01 ${c.head}`}>{c.label}</TableHead>
+                      ))}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {rows.map((row, idx) => (
-                      <tr
+                      <TableRow
                         key={`${row.studentId}-${row.assignmentId}-${idx}`}
-                        className={`border-b last:border-0 transition-colors ${idx % 2 === 0 ? "" : "bg-muted/20"} hover:bg-muted/40`}
+                        className="h-8"
                         data-testid={`row-gradebook-${row.studentId}-${row.assignmentId}`}
                       >
-                        <td className="px-4 py-3 font-medium">{row.studentName || "—"}</td>
-                        <td className="px-4 py-3 text-muted-foreground">{row.form || "—"}</td>
-                        <td className="px-4 py-3">{row.assignmentTitle || "—"}</td>
-                        <td className="px-4 py-3 text-muted-foreground">{row.subject || "—"}</td>
-                        <td className="px-4 py-3">
-                          {/* No submission, or no mark yet, is normal — it shows a
-                              dash or "Awaiting mark", never a broken cell. */}
+                        <TableCell className="px-3 py-0 text-body-compact-01 font-medium">
+                          {row.studentName || "\u2014"}
+                        </TableCell>
+                        <TableCell className="px-3 py-0 text-body-compact-01 text-muted-foreground">
+                          {row.form || "\u2014"}
+                        </TableCell>
+                        <TableCell className="px-3 py-0 text-body-compact-01">
+                          {row.assignmentTitle || "\u2014"}
+                        </TableCell>
+                        <TableCell className="px-3 py-0 text-body-compact-01">
+                          {handedIn(row.status || "NOT_SUBMITTED")}
+                        </TableCell>
+                        {/* Right-aligned and tabular so marks line up down the
+                            column and can be compared at a glance. No submission,
+                            or no mark yet, is normal - a dash or "Awaiting",
+                            never a broken cell. */}
+                        <TableCell className="px-3 py-0 text-body-compact-01 text-right tabular-nums">
                           {row.status === "NOT_SUBMITTED" || !row.submissionId ? (
-                            <span className="text-muted-foreground">—</span>
+                            <span className="text-muted-foreground">{"\u2014"}</span>
                           ) : row.score !== null && row.score !== undefined ? (
                             <Link href={`/teacher/submissions/${row.submissionId}`}>
-                              <span className="font-medium text-primary underline underline-offset-2 cursor-pointer hover:opacity-80" data-testid={`link-review-${row.submissionId}`} title="Open this submission">
+                              <span
+                                className="font-medium text-primary underline underline-offset-2 cursor-pointer hover:opacity-80"
+                                data-testid={`link-review-${row.submissionId}`}
+                                title="Open this submission"
+                              >
                                 {row.score}/{row.totalMarks ?? 0}
                               </span>
                             </Link>
                           ) : (
                             <Link href={`/teacher/submissions/${row.submissionId}`}>
-                              <span className="text-primary underline underline-offset-2 cursor-pointer text-xs" data-testid={`link-review-${row.submissionId}`} title="Open this submission">
-                                Awaiting mark
+                              <span
+                                className="text-primary underline underline-offset-2 cursor-pointer"
+                                data-testid={`link-review-${row.submissionId}`}
+                                title="Open this submission"
+                              >
+                                Awaiting
                               </span>
                             </Link>
                           )}
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground text-xs">{formatDate(row.submittedAt ?? null)}</td>
-                        <td className="px-4 py-3">{getStatusBadge(row.status || "NOT_SUBMITTED")}</td>
-                      </tr>
+                        </TableCell>
+                        <TableCell className="px-3 py-0 text-caption-01 text-muted-foreground whitespace-nowrap">
+                          {formatDate(row.submittedAt ?? null)}
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
             )}
-          </CardContent>
-        </Card>
+        </div>
 
         <p className="text-xs text-muted-foreground mt-4 text-right no-print">
           Showing {rows.length} record{rows.length !== 1 ? "s" : ""}
@@ -425,7 +530,7 @@ function GradeBookContent() {
 // back instead of a blank white screen.
 export default function GradeBook() {
   return (
-    <PageErrorBoundary backHref="/teacher/dashboard" backLabel="Back to Dashboard" label="gradebook">
+    <PageErrorBoundary backHref="/teacher/dashboard" backLabel="Back to dashboard" label="gradebook">
       <GradeBookContent />
     </PageErrorBoundary>
   );
