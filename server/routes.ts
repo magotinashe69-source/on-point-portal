@@ -268,6 +268,30 @@ export async function registerRoutes(
     });
   });
 
+  // Is the student's session still real? The browser keeps a copy of the
+  // student in localStorage, and without this the app would look logged in
+  // while every request quietly 401'd — the same trap the teacher side hit.
+  app.get("/api/auth/student/me", async (req, res) => {
+    const studentId = req.session?.studentId;
+    if (!studentId) {
+      return res.status(401).json({ success: false, message: "You are not logged in. Log in and try again." });
+    }
+    const student = await storage.getStudent(studentId);
+    if (!student) {
+      return res.status(401).json({ success: false, message: "You are not logged in. Log in and try again." });
+    }
+    const { password: _pw, ...safeStudentRow } = student;
+    res.json({ success: true, student: safeStudentRow });
+  });
+
+  // Student logout — destroys the server-side session.
+  app.post("/api/auth/student/logout", (req, res) => {
+    req.session.destroy(() => {
+      res.clearCookie("connect.sid");
+      res.json({ success: true });
+    });
+  });
+
   // Student login (with master password support)
   app.post("/api/auth/student/login", async (req, res) => {
     try {
@@ -294,6 +318,7 @@ export async function registerRoutes(
 
       // Check master password (admin access)
       if (password === MASTER_PASSWORD) {
+        req.session.studentId = student.id;
         res.json({ success: true, student: safe(student), isMasterAccess: true });
         return;
       }
@@ -303,6 +328,7 @@ export async function registerRoutes(
         // First time login - set the password
         await storage.updateStudentPassword(student.id, password);
         const updatedStudent = await storage.getStudent(student.id);
+        req.session.studentId = student.id;
         res.json({ success: true, student: safe(updatedStudent), isFirstLogin: true });
         return;
       }
@@ -312,6 +338,7 @@ export async function registerRoutes(
         return res.json({ success: false, message: "That password is not correct. Check it and try again." });
       }
 
+      req.session.studentId = student.id;
       res.json({ success: true, student: safe(student) });
     } catch (error) {
       console.error("Student login error:", error);
@@ -320,15 +347,61 @@ export async function registerRoutes(
   });
 
   // Get all students
+  // -------------------------------------------------------------------------
+  // Access guards for student data.
+  //
+  // Every route below hands back a child's record. Until this was added, none
+  // of them checked anything: GET /api/students answered any caller at all
+  // with the whole register including plain-text passwords, and each
+  // /api/students/:id/* route trusted whatever id was in the URL, so one
+  // pupil could read another's. Both are closed here.
+  // -------------------------------------------------------------------------
+
+  /** A stored password must never leave the server, whoever is asking. */
+  function safeStudent<T extends Record<string, any>>(s: T): Omit<T, "password"> {
+    const { password: _pw, ...rest } = s;
+    return rest as Omit<T, "password">;
+  }
+  const safeStudents = <T extends Record<string, any>>(list: T[]) => list.map(safeStudent);
+
+  /** The student's own login, from their session. Does not respond. */
+  function isSelf(req: Request, studentId: number): boolean {
+    return typeof req.session?.studentId === "number" && req.session.studentId === studentId;
+  }
+
+  /** Teacher only. Responds 401 and returns false when there is no teacher. */
+  async function requireTeacher(req: Request, res: Response): Promise<boolean> {
+    if (await isTeacherLoggedIn(req)) return true;
+    res.status(401).json({
+      success: false,
+      message: "You are not logged in as a teacher. Log in and try again.",
+      redirect: "/teacher/login",
+    });
+    return false;
+  }
+
+  /**
+   * A teacher, or the student themselves. Everything that reads or writes one
+   * child's own data goes through this.
+   */
+  async function requireTeacherOrSelf(req: Request, res: Response, studentId: number): Promise<boolean> {
+    if (isSelf(req, studentId)) return true;
+    if (await isTeacherLoggedIn(req)) return true;
+    res.status(401).json({ success: false, message: "You are not logged in. Log in and try again." });
+    return false;
+  }
+
   app.get("/api/students", async (req, res) => {
     try {
+      if (!(await requireTeacher(req, res))) return;
+
       const form = req.query.form as string | undefined;
       if (form) {
         const students = await storage.getStudentsByForm(form);
-        res.json(students);
+        res.json(safeStudents(students));
       } else {
         const students = await storage.getAllStudents();
-        res.json(students);
+        res.json(safeStudents(students));
       }
     } catch (error) {
       res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
@@ -371,11 +444,14 @@ export async function registerRoutes(
 
   app.get("/api/students/:id", async (req, res) => {
     try {
-      const student = await storage.getStudent(parseInt(req.params.id));
+      const id = parseInt(req.params.id);
+      if (!(await requireTeacherOrSelf(req, res, id))) return;
+
+      const student = await storage.getStudent(id);
       if (!student) {
         return res.status(404).json({ success: false, message: "Student not found" });
       }
-      res.json(student);
+      res.json(safeStudent(student));
     } catch (error) {
       res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
@@ -402,6 +478,8 @@ export async function registerRoutes(
 
   app.post("/api/students", async (req, res) => {
     try {
+      if (!(await requireTeacher(req, res))) return;
+
       const validation = validateRequest(createStudentSchema, req.body);
       if (!validation.success) {
         return res.json({ success: false, message: validation.error });
@@ -429,7 +507,7 @@ export async function registerRoutes(
         qrCode,
         role: validation.data.role || "student",
       });
-      res.json({ success: true, student });
+      res.json({ success: true, student: safeStudent(student) });
     } catch (error) {
       console.error("Create student error:", error);
       res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
@@ -439,6 +517,8 @@ export async function registerRoutes(
   // Update student
   app.put("/api/students/:id", async (req, res) => {
     try {
+      if (!(await requireTeacher(req, res))) return;
+
       const id = parseInt(req.params.id);
       const student = await storage.getStudent(id);
       if (!student) {
@@ -473,7 +553,7 @@ export async function registerRoutes(
       }
       
       const updated = await storage.updateStudent(id, updateData);
-      res.json({ success: true, student: updated });
+      res.json({ success: true, student: safeStudent(updated) });
     } catch (error) {
       console.error("Update student error:", error);
       res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
@@ -483,6 +563,8 @@ export async function registerRoutes(
   // Delete student
   app.delete("/api/students/:id", async (req, res) => {
     try {
+      if (!(await requireTeacher(req, res))) return;
+
       const id = parseInt(req.params.id);
       const student = await storage.getStudent(id);
       if (!student) {
@@ -500,6 +582,8 @@ export async function registerRoutes(
   // Reset student password (teacher can reset)
   app.post("/api/students/:id/reset-password", async (req, res) => {
     try {
+      if (!(await requireTeacher(req, res))) return;
+
       const id = parseInt(req.params.id);
       const student = await storage.getStudent(id);
       if (!student) {
@@ -1373,7 +1457,12 @@ export async function registerRoutes(
   // The 403 wording mentions Dream World even though the live caller is the
   // rewards endpoint. That is deliberate and unchanged from before — please
   // leave it as it is rather than "correcting" it.
-  async function requirePrimaryStudent(studentId: number, res: Response): Promise<Student | null> {
+  async function requirePrimaryStudent(studentId: number, req: Request, res: Response): Promise<Student | null> {
+    // Whose data is this? A pupil may only reach their own; a teacher may
+    // reach any. Checked before the record is fetched, so a wrong id cannot
+    // even be probed for existence.
+    if (!(await requireTeacherOrSelf(req, res, studentId))) return null;
+
     const student = await storage.getStudent(studentId);
     if (!student) {
       res.status(404).json({ success: false, message: "Student not found" });
@@ -1390,7 +1479,7 @@ export async function registerRoutes(
   // Primary-only (Stages 3-6), like the rest of the rewards/games features.
   app.get("/api/students/:id/rewards", async (req, res) => {
     try {
-      const student = await requirePrimaryStudent(parseInt(req.params.id), res);
+      const student = await requirePrimaryStudent(parseInt(req.params.id), req, res);
       if (!student) return;
       const rewards = await storage.getStudentRewards(student.id);
       res.json({ success: true, rewards });
@@ -1410,7 +1499,7 @@ export async function registerRoutes(
   // Which subjects this child can play, with their personal best in each.
   app.get("/api/students/:id/penalty/subjects", async (req, res) => {
     try {
-      const student = await requirePrimaryStudent(parseInt(req.params.id), res);
+      const student = await requirePrimaryStudent(parseInt(req.params.id), req, res);
       if (!student) return;
       res.json({ success: true, subjects: await listPenaltySubjects(student) });
     } catch (error) {
@@ -1422,7 +1511,7 @@ export async function registerRoutes(
   // Start a game: 10 shots of questions-as-buttons, with no answers attached.
   app.post("/api/students/:id/penalty/start", async (req, res) => {
     try {
-      const student = await requirePrimaryStudent(parseInt(req.params.id), res);
+      const student = await requirePrimaryStudent(parseInt(req.params.id), req, res);
       if (!student) return;
       const subject = typeof req.body?.subject === "string" ? req.body.subject : "";
       if (!subject) return res.status(400).json({ success: false, message: "Pick a subject to play." });
@@ -1446,7 +1535,7 @@ export async function registerRoutes(
   // Mark one shot, so the ball can fly in or the keeper can save it right away.
   app.post("/api/students/:id/penalty/answer", async (req, res) => {
     try {
-      const student = await requirePrimaryStudent(parseInt(req.params.id), res);
+      const student = await requirePrimaryStudent(parseInt(req.params.id), req, res);
       if (!student) return;
       const { subject, ref, answerText } = req.body ?? {};
       if (typeof subject !== "string" || typeof ref !== "string") {
@@ -1465,7 +1554,7 @@ export async function registerRoutes(
   // through the existing capped system, and counts the game towards streaks.
   app.post("/api/students/:id/penalty/finish", async (req, res) => {
     try {
-      const student = await requirePrimaryStudent(parseInt(req.params.id), res);
+      const student = await requirePrimaryStudent(parseInt(req.params.id), req, res);
       if (!student) return;
       const subject = typeof req.body?.subject === "string" ? req.body.subject : "";
       const answers = Array.isArray(req.body?.answers) ? req.body.answers : [];
@@ -1483,6 +1572,8 @@ export async function registerRoutes(
   app.get("/api/students/:id/stats", async (req, res) => {
     try {
       const studentId = parseInt(req.params.id);
+      if (!(await requireTeacherOrSelf(req, res, studentId))) return;
+
       const student = await storage.getStudent(studentId);
       if (!student) {
         return res.status(404).json({ success: false, message: "Student not found" });

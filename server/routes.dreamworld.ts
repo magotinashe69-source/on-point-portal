@@ -36,14 +36,14 @@ import {
 // uses the primary-class check. They are handed in rather than duplicated.
 interface Deps {
   requireTeacherAuth: (req: Request, res: Response) => Promise<string | null>;
-  requirePrimaryStudent: (studentId: number, res: Response) => Promise<Student | null>;
+  requirePrimaryStudent: (studentId: number, req: Request, res: Response) => Promise<Student | null>;
 }
 
 export function registerDreamWorldRoutes(app: Express, { requireTeacherAuth, requirePrimaryStudent }: Deps) {
   // The student's wallet and saved town layout.
   app.get("/api/students/:id/dreamworld", async (req, res) => {
     try {
-      const student = await requirePrimaryStudent(parseInt(req.params.id), res);
+      const student = await requirePrimaryStudent(parseInt(req.params.id), req, res);
       if (!student) return;
       const state = await getDreamState(student);
       res.json({ success: true, ...state });
@@ -68,7 +68,7 @@ export function registerDreamWorldRoutes(app: Express, { requireTeacherAuth, req
   // Place a building. The server validates bounds, free tiles, and cost.
   app.post("/api/students/:id/dreamworld/place", async (req, res) => {
     try {
-      const student = await requirePrimaryStudent(parseInt(req.params.id), res);
+      const student = await requirePrimaryStudent(parseInt(req.params.id), req, res);
       if (!student) return;
       if (await blockedByOverdue(student, res)) return;
       const { buildingId, x, y } = req.body ?? {};
@@ -84,7 +84,7 @@ export function registerDreamWorldRoutes(app: Express, { requireTeacherAuth, req
   // Remove the building on a tile (refunds half its cost).
   app.post("/api/students/:id/dreamworld/remove", async (req, res) => {
     try {
-      const student = await requirePrimaryStudent(parseInt(req.params.id), res);
+      const student = await requirePrimaryStudent(parseInt(req.params.id), req, res);
       if (!student) return;
       const { x, y } = req.body ?? {};
       const result = await removeBuilding(student.id, x, y);
@@ -99,7 +99,7 @@ export function registerDreamWorldRoutes(app: Express, { requireTeacherAuth, req
   // Upgrade the building on a tile to the next level.
   app.post("/api/students/:id/dreamworld/upgrade", async (req, res) => {
     try {
-      const student = await requirePrimaryStudent(parseInt(req.params.id), res);
+      const student = await requirePrimaryStudent(parseInt(req.params.id), req, res);
       if (!student) return;
       if (await blockedByOverdue(student, res)) return;
       const { x, y } = req.body ?? {};
@@ -115,7 +115,7 @@ export function registerDreamWorldRoutes(app: Express, { requireTeacherAuth, req
   // Expand the plot (8x8 -> 10x10), once.
   app.post("/api/students/:id/dreamworld/expand", async (req, res) => {
     try {
-      const student = await requirePrimaryStudent(parseInt(req.params.id), res);
+      const student = await requirePrimaryStudent(parseInt(req.params.id), req, res);
       if (!student) return;
       if (await blockedByOverdue(student, res)) return;
       const result = await expandPlot(student.id);
@@ -130,7 +130,7 @@ export function registerDreamWorldRoutes(app: Express, { requireTeacherAuth, req
   // Name (or rename) the town — once a week, server-validated.
   app.post("/api/students/:id/dreamworld/name", async (req, res) => {
     try {
-      const student = await requirePrimaryStudent(parseInt(req.params.id), res);
+      const student = await requirePrimaryStudent(parseInt(req.params.id), req, res);
       if (!student) return;
       const result = await setTownName(student, req.body?.name ?? "");
       if (!result.ok) return res.status(400).json({ success: false, message: result.message });
@@ -144,7 +144,7 @@ export function registerDreamWorldRoutes(app: Express, { requireTeacherAuth, req
   // Classmates (same class only) to visit.
   app.get("/api/students/:id/dreamworld/neighbours", async (req, res) => {
     try {
-      const student = await requirePrimaryStudent(parseInt(req.params.id), res);
+      const student = await requirePrimaryStudent(parseInt(req.params.id), req, res);
       if (!student) return;
       res.json({ success: true, neighbours: await getNeighbours(student) });
     } catch (error) {
@@ -156,7 +156,7 @@ export function registerDreamWorldRoutes(app: Express, { requireTeacherAuth, req
   // View a classmate's town (read-only, same class only).
   app.get("/api/students/:id/dreamworld/town/:otherId", async (req, res) => {
     try {
-      const student = await requirePrimaryStudent(parseInt(req.params.id), res);
+      const student = await requirePrimaryStudent(parseInt(req.params.id), req, res);
       if (!student) return;
       const result = await getTownView(student, parseInt(req.params.otherId));
       if (!result.ok) return res.status(result.code).json({ success: false, message: result.message });

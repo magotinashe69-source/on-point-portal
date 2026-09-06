@@ -61,9 +61,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // The same check for a student. This matters most right now: students who
+  // logged in before student sessions existed have a remembered student in
+  // localStorage and no session cookie at all, so every request for their own
+  // data would 401 while the app still looked logged in. Asking the server
+  // once on startup turns that into a clean trip back to the login screen.
+  useEffect(() => {
+    if (!student) return;
+    let cancelled = false;
+    fetch("/api/auth/student/me", { credentials: "include" })
+      .then((res) => {
+        if (!cancelled && res.status === 401) setStudent(null);
+      })
+      .catch(() => {
+        // Offline or the server is down — keep the remembered login rather
+        // than logging a child out over a temporary network blip.
+      });
+    return () => { cancelled = true; };
+    // Runs once on startup; later changes come from logging in or out.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const logout = () => {
-    // Destroy server-side teacher session (fire-and-forget; best-effort)
+    // Destroy whichever server-side session exists (fire-and-forget).
     fetch("/api/auth/teacher/logout", { method: "POST" }).catch(() => {});
+    fetch("/api/auth/student/logout", { method: "POST" }).catch(() => {});
     setTeacher(null);
     setStudent(null);
     localStorage.removeItem("onpoint-teacher");

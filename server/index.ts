@@ -23,6 +23,11 @@ declare module "http" {
 declare module "express-session" {
   interface SessionData {
     teacherId?: number;
+    // A student's own login. Until this existed there was no server-side
+    // student identity at all: the client held the student in localStorage
+    // and passed its id in the URL, so every /api/students/:id/* route
+    // trusted whatever id it was handed.
+    studentId?: number;
   }
 }
 
