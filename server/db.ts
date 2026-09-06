@@ -116,6 +116,9 @@ const ASSIGNMENTS_ADDED_COLUMNS: { name: string; type: string }[] = [
 // engines ignores nulls, so any number of rows can sit unlinked.
 const STUDENTS_ADDED_COLUMNS: { name: string; type: string }[] = [
   { name: "qr_code", type: "TEXT" },
+  // Card login needs a way to stop a card working. Defaults true so every
+  // pupil already on the register keeps working exactly as before.
+  { name: "active", type: "BOOLEAN NOT NULL DEFAULT true" },
 ];
 
 // Filled in below depending on which database we use.
@@ -186,7 +189,9 @@ if (usePostgres) {
       catch { /* column already present */ }
     }
     for (const col of STUDENTS_ADDED_COLUMNS) {
-      try { await client.execute(`ALTER TABLE students ADD COLUMN ${col.name} ${col.type}`); }
+      // SQLite stores booleans as 0/1, so swap the PostgreSQL wording.
+      const type = col.type.replace("BOOLEAN", "INTEGER").replace("true", "1").replace("false", "0");
+      try { await client.execute(`ALTER TABLE students ADD COLUMN ${col.name} ${type}`); }
       catch { /* column already present */ }
     }
     try {

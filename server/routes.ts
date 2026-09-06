@@ -1,5 +1,6 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
+import rateLimit from "express-rate-limit";
 import { storage } from "./storage";
 import { registerObjectStorageRoutes } from "./local_object_storage";
 import {
@@ -268,6 +269,61 @@ export async function registerRoutes(
     });
   });
 
+  // Card login is the one student-facing endpoint with no credential behind
+  // it beyond the code itself, and the codes run in sequence, so it is the one
+  // place a guessing attack is worth mounting. Ten tries per IP per five
+  // minutes leaves a real parent who mis-scans plenty of room and makes
+  // walking the range impractical.
+  const scanLoginLimiter = rateLimit({
+    windowMs: 5 * 60 * 1000,
+    limit: 10,
+    standardHeaders: "draft-7",
+    legacyHeaders: false,
+    message: { success: false, message: "Too many attempts. Wait a few minutes and try again." },
+  });
+
+  /**
+   * Log a pupil in from their attendance card.
+   *
+   * Deliberately NOT behind requireTeacher: a child uses this themselves. In
+   * return it is the narrowest endpoint in the app —
+   *   * it only ever sets studentId on the session, and clears any teacherId,
+   *     so a scan can never hand out or preserve teacher access;
+   *   * it refuses an inactive pupil;
+   *   * unknown code, unlinked code and deactivated pupil all answer with the
+   *     SAME sentence, so it cannot be used to work out which codes are real;
+   *   * it is rate limited.
+   */
+  app.post("/api/auth/student/scan-login", scanLoginLimiter, async (req, res) => {
+    try {
+      const code = normaliseQrCode(req.body?.code);
+      // One message for every failure. Telling a caller "that card exists but
+      // the pupil is inactive" would confirm a code for them.
+      const refuse = () =>
+        res.status(401).json({
+          success: false,
+          message: "Card not recognised. Ask your teacher to check it.",
+        });
+
+      if (!code) return refuse();
+
+      const student = await storage.getStudentByQrCode(code);
+      if (!student) return refuse();
+      if (!student.active) return refuse();
+
+      // A scan makes you the pupil and nothing else. Any teacher session on
+      // this browser is dropped rather than carried alongside.
+      req.session.teacherId = undefined;
+      req.session.studentId = student.id;
+
+      const { password: _pw, ...safeStudentRow } = student;
+      res.json({ success: true, student: safeStudentRow });
+    } catch (error) {
+      console.error("Scan login error:", error);
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
+    }
+  });
+
   // Is the student's session still real? The browser keeps a copy of the
   // student in localStorage, and without this the app would look logged in
   // while every request quietly 401'd — the same trap the teacher side hit.
@@ -305,6 +361,13 @@ export async function registerRoutes(
       const student = await storage.getStudentByName(fullName);
       
       if (!student) {
+        return res.json({ success: false, message: "That name is not on the class list. Enter your name exactly as your teacher registered it." });
+      }
+
+      // Deactivating a pupil has to close every way in, not just the card.
+      // Same wording as an unknown name, so the form cannot be used to work
+      // out who is on the register.
+      if (!student.active) {
         return res.json({ success: false, message: "That name is not on the class list. Enter your name exactly as your teacher registered it." });
       }
       
@@ -536,6 +599,9 @@ export async function registerRoutes(
         updateData.form = req.body.form;
       }
       if (req.body.studentId) updateData.studentId = req.body.studentId;
+      // Tested against undefined so that `false` (deactivate) is honoured; a
+      // truthiness test would make it impossible to turn a pupil off.
+      if (req.body.active !== undefined) updateData.active = req.body.active === true;
       // Tested against undefined, not truthiness: an empty string is how the
       // form says "unlink this card", and a truthiness test would ignore it.
       if (req.body.qrCode !== undefined) {

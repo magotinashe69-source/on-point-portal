@@ -34,6 +34,7 @@ export const students = sqliteTable("students", {
   form: text("form").notNull(),
   password: text("password"), // set by the student on first login
   role: text("role").notNull().default("student"),
+  active: integer("active", { mode: "boolean" }).notNull().default(true),
   createdAt: timestamp("created_at").notNull().$defaultFn(() => new Date()),
 });
 
@@ -265,6 +266,7 @@ CREATE TABLE IF NOT EXISTS students (
   form TEXT NOT NULL,
   password TEXT,
   role TEXT NOT NULL DEFAULT 'student',
+  active INTEGER NOT NULL DEFAULT 1,
   created_at INTEGER NOT NULL
 );
 

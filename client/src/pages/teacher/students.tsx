@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { QrBackfillDialog } from "@/components/QrBackfillDialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { QueryError } from "@/components/QueryError";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -586,6 +587,22 @@ export default function StudentManagement() {
                     data-testid="input-edit-student-id"
                   />
                 </div>
+                <label className="flex items-start gap-3 rounded-sm border p-3 cursor-pointer">
+                  <Checkbox
+                    checked={editingStudent.active !== false}
+                    onCheckedChange={v =>
+                      setEditingStudent({ ...editingStudent, active: v === true })
+                    }
+                    data-testid="checkbox-edit-student-active"
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium">Active</span>
+                    <span className="block text-xs text-muted-foreground">
+                      An inactive pupil keeps their work and marks, but cannot log in and their
+                      card stops working. Use this when a pupil leaves.
+                    </span>
+                  </span>
+                </label>
                 <div className="space-y-2">
                   <Label htmlFor="input-edit-student-qr">QR card code</Label>
                   <Input
@@ -653,6 +670,7 @@ export default function StudentManagement() {
                         studentId: editingStudent.studentId,
                         // Blank means "no card", which the column stores as null.
                         qrCode: editingStudent.qrCode?.trim() || null,
+                        active: editingStudent.active !== false,
                         fullName: editingStudent.fullName,
                         form: editingStudent.form,
                         gender: editingStudent.gender,

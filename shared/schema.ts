@@ -67,6 +67,12 @@ export const students = pgTable("students", {
   form: text("form").notNull(), // Form 1, Form 2
   password: text("password"), // Personalized password - set by student on first login
   role: text("role").notNull().default("student"), // Role for access control
+  // Whether this pupil may still use the portal. There was no such idea until
+  // card login arrived: a pupil who left was simply deleted, which also took
+  // their submissions and marks with them. A card is a standing credential, so
+  // there has to be a way to stop one working without erasing the child's
+  // record. Existing rows default to active.
+  active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

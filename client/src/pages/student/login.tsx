@@ -10,7 +10,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { studentLoginSchema, type StudentLogin } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
-import { ArrowLeft, LogIn, Loader2, Eye, EyeOff } from "lucide-react";
+import { QrScanDialog } from "@/components/QrScanDialog";
+import { ArrowLeft, LogIn, Loader2, Eye, EyeOff, Camera } from "lucide-react";
 import { Link } from "wouter";
 import { ThemeToggle } from "@/components/theme-toggle";
 import logoPath from "@assets/logo.webp";
@@ -35,6 +36,42 @@ export default function StudentLoginPage() {
       password: "",
     },
   });
+
+  // Whether to offer card login at all. enumerateDevices resolves without a
+  // permission prompt, so this costs the parent nothing and avoids showing a
+  // button that could only fail. Anything unexpected means "assume no camera".
+  const [hasCamera, setHasCamera] = useState(false);
+  const [scanOpen, setScanOpen] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    navigator.mediaDevices?.enumerateDevices?.()
+      .then(devices => {
+        if (!cancelled) setHasCamera(devices.some(d => d.kind === "videoinput"));
+      })
+      .catch(() => { /* leave the button hidden */ });
+    return () => { cancelled = true; };
+  }, []);
+
+  /**
+   * A card was read. The server decides whether it is good — the browser only
+   * carries the code across and reacts to the answer.
+   */
+  async function onScanned(code: string): Promise<string | null> {
+    try {
+      const res = await apiRequest("POST", "/api/auth/student/scan-login", { code });
+      const data = await res.json();
+      if (!data.success) return data.message || "Card not recognised. Ask your teacher to check it.";
+
+      setStudent(data.student);
+      setScanOpen(false);
+      toast({ title: `Welcome, ${String(data.student.fullName || "").split(" ")[0]}` });
+      setLocation("/student/dashboard");
+      return null;
+    } catch {
+      return "Check your connection and try again.";
+    }
+  }
 
   async function onSubmit(values: StudentLogin) {
     setIsLoading(true);
@@ -173,6 +210,29 @@ export default function StudentLoginPage() {
                 </Button>
               </form>
             </Form>
+
+            {/* Card login. Hidden entirely when the device has no camera, so a
+                parent on a desktop is never offered something that cannot
+                work. Sits below the password form because it is the addition,
+                not the replacement. */}
+            {hasCamera && (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full mt-3 h-12 text-base"
+                onClick={() => setScanOpen(true)}
+                data-testid="button-scan-login"
+              >
+                <Camera className="h-5 w-5 mr-2" />
+                Scan QR card to log in
+              </Button>
+            )}
+
+            <QrScanDialog
+              open={scanOpen}
+              onOpenChange={setScanOpen}
+              onScanned={onScanned}
+            />
             <div className="mt-6 p-4 bg-muted rounded-md">
               <p className="text-sm text-muted-foreground text-center">
                 First time logging in? Enter your name exactly as registered and create a password.
