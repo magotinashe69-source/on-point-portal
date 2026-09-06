@@ -59,8 +59,17 @@ export default function StudentLoginPage() {
    */
   async function onScanned(code: string): Promise<string | null> {
     try {
-      const res = await apiRequest("POST", "/api/auth/student/scan-login", { code });
-      const data = await res.json();
+      // Plain fetch, not apiRequest: that helper throws on any non-2xx, which
+      // would turn the rate limiter's 429 and its explanation into a generic
+      // connection error. Here the server's own wording is what the child
+      // needs to read.
+      const res = await fetch("/api/auth/student/scan-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ code }),
+      });
+      const data = await res.json().catch(() => ({}));
       if (!data.success) return data.message || "Card not recognised. Ask your teacher to check it.";
 
       setStudent(data.student);

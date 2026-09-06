@@ -297,10 +297,17 @@ export async function registerRoutes(
   app.post("/api/auth/student/scan-login", scanLoginLimiter, async (req, res) => {
     try {
       const code = normaliseQrCode(req.body?.code);
-      // One message for every failure. Telling a caller "that card exists but
+      // A card we do not know is not an authorisation failure — the caller is
+      // a logged-out child at the login screen, which is exactly who this
+      // endpoint is for. Answering 401 made a normal "wrong card" look like
+      // the endpoint was refusing to serve them, and because apiRequest throws
+      // on any non-2xx it also meant the pupil saw a connection error instead
+      // of the real reason. 200 with success:false, read by the client.
+      //
+      // One message for every failure: telling a caller "that card exists but
       // the pupil is inactive" would confirm a code for them.
       const refuse = () =>
-        res.status(401).json({
+        res.json({
           success: false,
           message: "Card not recognised. Ask your teacher to check it.",
         });
