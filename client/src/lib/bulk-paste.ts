@@ -55,6 +55,59 @@ export function splitPastedLines(raw: string): PastedLine[] {
   return lines;
 }
 
+/** One line of a pasted card-code list: the code, and the name to find it by. */
+export interface ParsedCardCodeLine {
+  lineNumber: number;
+  text: string;
+  code: string;
+  fullName: string;
+}
+
+export interface ParsedCardCodes {
+  rows: ParsedCardCodeLine[];
+  skipped: SkippedLine[];
+}
+
+/**
+ * Read a pasted block of "card code | full name".
+ *
+ * Same shape as parsePastedStudents on the Students screen, and built on the
+ * same splitPastedLines, so a bar or a tab both work and a list copied
+ * straight out of a spreadsheet needs no reformatting. Only the meaning of
+ * the columns differs.
+ *
+ * Nothing is matched or judged here beyond "are both fields present" — the
+ * pairing to a real pupil is a separate step, so a line with a typo in the
+ * name still arrives with its line number intact and can be reported rather
+ * than silently dropped.
+ */
+export function parsePastedCardCodes(raw: string): ParsedCardCodes {
+  const rows: ParsedCardCodeLine[] = [];
+  const skipped: SkippedLine[] = [];
+
+  for (const line of splitPastedLines(raw)) {
+    const code = (line.parts[0] ?? "").trim().toUpperCase();
+    const fullName = (line.parts[1] ?? "").trim();
+
+    if (code === "") {
+      skipped.push({ lineNumber: line.lineNumber, text: line.text, reason: "No card code" });
+      continue;
+    }
+    if (fullName === "") {
+      skipped.push({
+        lineNumber: line.lineNumber,
+        text: line.text,
+        reason: "No name to match the code to",
+      });
+      continue;
+    }
+
+    rows.push({ lineNumber: line.lineNumber, text: line.text, code, fullName });
+  }
+
+  return { rows, skipped };
+}
+
 /**
  * Split a list into what to add and what to skip, using a key that decides
  * whether two entries are the same thing (a pupil's name, a resource's link).

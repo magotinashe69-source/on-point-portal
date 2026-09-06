@@ -12,10 +12,11 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
+import { QrBackfillDialog } from "@/components/QrBackfillDialog";
 import { QueryError } from "@/components/QueryError";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { ArrowLeft, PlusCircle, Pencil, Trash2, KeyRound, Loader2, Users, ClipboardPaste } from "lucide-react";
+import { ArrowLeft, PlusCircle, Pencil, Trash2, KeyRound, Loader2, Users, ClipboardPaste, QrCode } from "lucide-react";
 import logoPath from "@assets/logo.webp";
 import type { Student } from "@shared/schema";
 
@@ -79,6 +80,7 @@ export default function StudentManagement() {
   const { teacher } = useAuth();
   const { toast } = useToast();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isBackfillOpen, setIsBackfillOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [filterForm, setFilterForm] = useState<string>("all");
@@ -343,6 +345,33 @@ export default function StudentManagement() {
                   confirm: "button-paste-students-confirm",
                   cancel: "button-paste-students-cancel",
                 }}
+              />
+
+              <Button
+                variant="outline"
+                onClick={() => setIsBackfillOpen(true)}
+                data-testid="button-link-cards"
+              >
+                <QrCode className="h-4 w-4 mr-2" />
+                Link cards
+              </Button>
+
+              <QrBackfillDialog
+                open={isBackfillOpen}
+                onOpenChange={setIsBackfillOpen}
+                students={students}
+                onSave={async (studentId, code) => {
+                  // Only the card code is sent. studentId is deliberately not
+                  // in this payload, so a backfill can never renumber a pupil.
+                  try {
+                    const res = await apiRequest("PUT", `/api/students/${studentId}`, { qrCode: code });
+                    const data = await res.json();
+                    return data.success ? null : (data.message || "Did not save");
+                  } catch {
+                    return "Check your connection and try again.";
+                  }
+                }}
+                onDone={() => queryClient.invalidateQueries({ queryKey: ["/api/students"] })}
               />
 
               <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
