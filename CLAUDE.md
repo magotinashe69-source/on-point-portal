@@ -71,6 +71,34 @@ logged-out caller gets nothing. It tidies up the accounts it made.
 Run it after touching anything under `/api/parent/`, any guard in
 `server/routes.ts`, or the parents table. All checks must pass.
 
+**What this test cannot see.** It is an HTTP test, so it only proves what the
+server *sends*. It cannot see what the browser *keeps* — and one family's data
+did once appear on another family's screen without the server ever getting it
+wrong. See the next section.
+
+### The other half of the wall: the browser cache
+
+The parent addresses deliberately carry no pupil id, which is what stops a
+parent asking for another child. The side effect is that **every parent reads
+the same cache key** — `/api/parent/overview` is one key for the whole school.
+
+TanStack Query is configured with `staleTime: Infinity` and no refetch on focus
+(`client/src/lib/queryClient.ts`), so a cached answer is kept for the life of
+the page and never re-fetched. Logging out of one parent and into another on the
+same tab therefore used to show the previous family's marks and feedback,
+straight from the cache, with nothing to correct it.
+
+The fix lives in `client/src/lib/auth.tsx`: an effect watches an `identityKey`
+(`parent:12`, `teacher:3`, `none`, …) and calls `queryClient.clear()` the moment
+the signed-in person changes. It is done there, in one place, rather than in
+each login page, so a login added later is covered without anyone remembering.
+
+**So: never cache a per-person answer under a key that does not identify the
+person, unless the cache is cleared when the person changes.** If you add
+another shared-key endpoint, or relax `staleTime`, check this still holds — and
+check it in a real browser by logging out of one account and into another,
+because the HTTP test above will pass either way.
+
 ### Who can call the API
 
 Every `/api/...` endpoint requires a login. There is no endpoint that answers an

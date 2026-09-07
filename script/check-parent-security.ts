@@ -119,19 +119,37 @@ async function main() {
     process.exit(1);
   }
 
-  const childA = students[0];
-  const childB = students[1];
-  console.log(`Child A: ${childA.fullName} (id ${childA.id})`);
-  console.log(`Child B: ${childB.fullName} (id ${childB.id})\n`);
-
-  // Start from a clean slate: remove any parent account these two already
-  // have, so the check can create its own and delete them again afterwards.
-  const existing = (await teacher.get("/api/parents")).body || [];
-  for (const p of existing) {
-    if (p.studentId === childA.id || p.studentId === childB.id) {
+  // Clear up after a previous run that was interrupted before it tidied up.
+  // ONLY accounts this check created are removed — they are recognisable by
+  // their username. A real parent account is never touched: this script may be
+  // pointed at a database that people depend on, and a test that quietly
+  // deletes a family's login is worse than no test at all.
+  const before = (await teacher.get("/api/parents")).body || [];
+  for (const p of before) {
+    if (typeof p.username === "string" && p.username.startsWith("checkparent_")) {
       await teacher.delete(`/api/parents/${p.id}`);
     }
   }
+
+  // Two children who do NOT already have a parent account, because there is
+  // one account per child and this check needs to create its own.
+  const taken = new Set(
+    ((await teacher.get("/api/parents")).body || []).map((p: any) => p.studentId),
+  );
+  const free = students.filter((s: any) => !taken.has(s.id));
+  if (free.length < 2) {
+    console.error(
+      `Need two pupils with no parent account to run this check — only ${free.length} free.\n` +
+      "Remove a parent account, or add another pupil, and try again. " +
+      "(This check will not delete an account it did not create.)",
+    );
+    process.exit(1);
+  }
+
+  const childA = free[0];
+  const childB = free[1];
+  console.log(`Child A: ${childA.fullName} (id ${childA.id})`);
+  console.log(`Child B: ${childB.fullName} (id ${childB.id})\n`);
 
   const stamp = Date.now();
   const credsA = { fullName: "Test Parent A", username: `checkparent_a_${stamp}`, password: "parentA123" };

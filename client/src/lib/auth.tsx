@@ -1,5 +1,6 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState, useEffect, useRef } from "react";
 import type { Teacher, Student, Parent } from "@shared/schema";
+import { queryClient } from "./queryClient";
 
 type AuthContextType = {
   teacher: Teacher | null;
@@ -115,6 +116,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Runs once on startup; later changes come from logging in or out.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Whoever is signed in at this moment, as one value we can compare against
+  // the last one. "none" means nobody.
+  const identityKey = teacher
+    ? `teacher:${teacher.id}`
+    : parent
+      ? `parent:${parent.id}`
+      : student
+        ? `student:${student.id}`
+        : "none";
+
+  // Throw away every cached answer the moment the signed-in person changes.
+  //
+  // This matters most for parents. The parent addresses deliberately carry NO
+  // pupil id — the server works out the child from the session — which is what
+  // stops a parent asking for another family's child. But it also means two
+  // different parents READ THE SAME CACHE KEY. Without this, logging out of one
+  // parent and into another would show the previous family's marks and feedback
+  // straight from the cache, and because queries are set to staleTime: Infinity
+  // it would never correct itself.
+  //
+  // The server never sent that data to the wrong parent — the browser simply
+  // kept it. Clearing here, rather than in each login page, means a login added
+  // later is covered without anybody having to remember.
+  const previousIdentity = useRef(identityKey);
+  useEffect(() => {
+    if (previousIdentity.current === identityKey) return;
+    previousIdentity.current = identityKey;
+    queryClient.clear();
+  }, [identityKey]);
 
   const logout = () => {
     // Destroy whichever server-side session exists (fire-and-forget).
