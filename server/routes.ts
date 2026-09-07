@@ -6,6 +6,8 @@ import { registerObjectStorageRoutes } from "./local_object_storage";
 import {
   teacherLoginSchema,
   studentLoginSchema,
+  parentLoginSchema,
+  createParentAccountSchema,
   MASTER_PASSWORD
 } from "@shared/schema";
 import type { Assignment, Submission, Student } from "@shared/schema";
@@ -206,7 +208,52 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  
+
+  // ─── The parent access gate ──────────────────────────────────────────────
+  //
+  // The single most important rule in the parent portal: a parent may only
+  // ever reach their own child's data.
+  //
+  // Rather than trusting every current and future route to remember that, this
+  // one gate sits in front of the whole API and refuses a parent session
+  // anywhere except the parent's own corner of it (/api/parent/...) and the
+  // login endpoints (/api/auth/...). So a parent who edits the address bar and
+  // asks for /api/students/7, /api/submissions, /api/assignments?studentId=7
+  // or anything else is stopped here, before the route that would answer them
+  // ever runs — and a route added later is locked to parents by default
+  // instead of being open until someone remembers to close it.
+  //
+  // Inside /api/parent/... the second rule applies: the child is looked up
+  // from the parent's own database row, never from the address (see
+  // requireParent / requireParentChild below).
+  app.use("/api", (req, res, next) => {
+    // Not a parent? Nothing changes for teachers, students or logged-out users.
+    if (typeof req.session?.parentId !== "number") return next();
+
+    // req.path here is relative to the "/api" mount, e.g. "/parent/child".
+    const path = req.path;
+    if (path.startsWith("/parent/") || path.startsWith("/auth/")) return next();
+
+    return res.status(403).json({
+      success: false,
+      message: "A parent account can only see its own child. Log in to the parent portal.",
+      redirect: "/parent/dashboard",
+    });
+  });
+
+  // One session is only ever ONE role. Logging in as any of the three clears
+  // the other two, so a browser can never hold a parent identity and a student
+  // or teacher identity side by side — which is what "a parent gets only a
+  // parent session, never student or teacher access" means in practice.
+  function setSessionRole(
+    req: Request,
+    role: { teacherId?: number; studentId?: number; parentId?: number },
+  ) {
+    req.session.teacherId = role.teacherId;
+    req.session.studentId = role.studentId;
+    req.session.parentId = role.parentId;
+  }
+
   // Register object storage routes for file uploads
   registerObjectStorageRoutes(app);
   
@@ -233,7 +280,7 @@ export async function registerRoutes(
       }
 
       // Establish server-side session
-      req.session.teacherId = teacher.id;
+      setSessionRole(req, { teacherId: teacher.id });
       
       const { password: _, ...safeTeacher } = teacher;
       res.json({ success: true, teacher: safeTeacher });
@@ -320,8 +367,7 @@ export async function registerRoutes(
 
       // A scan makes you the pupil and nothing else. Any teacher session on
       // this browser is dropped rather than carried alongside.
-      req.session.teacherId = undefined;
-      req.session.studentId = student.id;
+      setSessionRole(req, { studentId: student.id });
 
       const { password: _pw, ...safeStudentRow } = student;
       res.json({ success: true, student: safeStudentRow });
@@ -388,7 +434,7 @@ export async function registerRoutes(
 
       // Check master password (admin access)
       if (password === MASTER_PASSWORD) {
-        req.session.studentId = student.id;
+        setSessionRole(req, { studentId: student.id });
         res.json({ success: true, student: safe(student), isMasterAccess: true });
         return;
       }
@@ -398,7 +444,7 @@ export async function registerRoutes(
         // First time login - set the password
         await storage.updateStudentPassword(student.id, password);
         const updatedStudent = await storage.getStudent(student.id);
-        req.session.studentId = student.id;
+        setSessionRole(req, { studentId: student.id });
         res.json({ success: true, student: safe(updatedStudent), isFirstLogin: true });
         return;
       }
@@ -408,10 +454,293 @@ export async function registerRoutes(
         return res.json({ success: false, message: "That password is not correct. Check it and try again." });
       }
 
-      req.session.studentId = student.id;
+      setSessionRole(req, { studentId: student.id });
       res.json({ success: true, student: safe(student) });
     } catch (error) {
       console.error("Student login error:", error);
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
+    }
+  });
+
+
+  // ─── Parent portal ────────────────────────────────────────────────────────
+  //
+  // Two rules hold the whole thing up:
+  //   1. The gate at the top of this file keeps a parent out of every route
+  //      that is not /api/parent/... — so the routes below are the ONLY ones a
+  //      parent can reach at all.
+  //   2. In here, the child is always read from the parent's own row in the
+  //      database (parent.studentId). Nothing a parent sends — an id in the
+  //      address, a field in the body — is ever used to choose whose data comes
+  //      back.
+  // -------------------------------------------------------------------------
+
+  /** A parent's stored password must never leave the server. */
+  function safeParent<T extends Record<string, any>>(p: T): Omit<T, "password"> {
+    const { password: _pw, ...rest } = p;
+    return rest as Omit<T, "password">;
+  }
+
+  // Parent logins are guessable in the way any username-and-password form is,
+  // and these accounts sit in front of a child's record, so the login is rate
+  // limited the same way card login is.
+  const parentLoginLimiter = rateLimit({
+    windowMs: 5 * 60 * 1000,
+    limit: 10,
+    standardHeaders: "draft-7",
+    legacyHeaders: false,
+    message: { success: false, message: "Too many attempts. Wait a few minutes and try again." },
+  });
+
+  app.post("/api/auth/parent/login", parentLoginLimiter, async (req, res) => {
+    try {
+      const validation = validateRequest(parentLoginSchema, req.body);
+      if (!validation.success) {
+        return res.json({ success: false, message: validation.error });
+      }
+
+      const { username, password } = validation.data;
+
+      // One message for every kind of failure — unknown username, wrong
+      // password, switched-off account. Saying which was wrong would let
+      // someone work out that a particular username exists.
+      const refuse = () =>
+        res.json({
+          success: false,
+          message: "That username and password do not match. Check both and try again.",
+        });
+
+      const parent = await storage.getParentByUsername(username);
+      if (!parent) return refuse();
+      if (!parent.active) return refuse();
+      if (parent.password !== password) return refuse();
+
+      // A parent login makes you a parent and nothing else: any teacher or
+      // student session on this browser is dropped rather than kept alongside.
+      setSessionRole(req, { parentId: parent.id });
+
+      res.json({ success: true, parent: safeParent(parent) });
+    } catch (error) {
+      console.error("Parent login error:", error);
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
+    }
+  });
+
+  // "Am I still logged in?" — the browser remembers the parent, but the real
+  // login is a session on the server that can end (a restart is enough). Same
+  // check the teacher and student sides already do.
+  app.get("/api/auth/parent/me", async (req, res) => {
+    const parent = await getSessionParent(req);
+    if (!parent) {
+      return res.status(401).json({ success: false, message: "You are not logged in. Log in and try again." });
+    }
+    res.json({ success: true, parent: safeParent(parent) });
+  });
+
+  // Parent logout — destroys the server-side session.
+  app.post("/api/auth/parent/logout", (req, res) => {
+    req.session.destroy(() => {
+      res.clearCookie("connect.sid");
+      res.json({ success: true });
+    });
+  });
+
+  /**
+   * The parent this request belongs to, read from the session and re-checked
+   * against the database every time. Does not respond.
+   *
+   * Re-reading the row matters: it means an account switched off by the school
+   * stops working on the parent's very next request, rather than lasting until
+   * their cookie happens to expire.
+   */
+  async function getSessionParent(req: Request) {
+    const parentId = req.session?.parentId;
+    if (typeof parentId !== "number") return null;
+    const parent = await storage.getParent(parentId);
+    if (!parent || !parent.active) return null;
+    return parent;
+  }
+
+  /** Parent only. Responds 401 and returns null when there is no parent. */
+  async function requireParent(req: Request, res: Response) {
+    const parent = await getSessionParent(req);
+    if (parent) return parent;
+    res.status(401).json({
+      success: false,
+      message: "You are not logged in as a parent. Log in and try again.",
+      redirect: "/parent/login",
+    });
+    return null;
+  }
+
+  /**
+   * Parent only, AND the student id in the address must be their own child.
+   *
+   * This is the check that makes URL tampering pointless. The id in the address
+   * is never used to fetch anything — it is only compared against the child on
+   * the parent's own row, and anything else is refused. Every future parent
+   * route that carries a student id should go through here.
+   */
+  async function requireParentChild(req: Request, res: Response, studentId: number) {
+    const parent = await requireParent(req, res);
+    if (!parent) return null;
+
+    if (!Number.isInteger(studentId) || studentId !== parent.studentId) {
+      // 403, not 404: the honest answer is "you are logged in, and you may not
+      // see this", and it is the same answer whether or not that pupil exists,
+      // so the address bar cannot be used to find out who is on the register.
+      res.status(403).json({
+        success: false,
+        message: "You can only see your own child's information.",
+      });
+      return null;
+    }
+    return parent;
+  }
+
+  /** What a parent is allowed to know about their child. Stage 1: the name. */
+  function childSummary(student: Student) {
+    return {
+      id: student.id,
+      fullName: student.fullName,
+      form: student.form,
+    };
+  }
+
+  // The parent dashboard. Takes NO id at all — the child comes from the
+  // parent's own row, so there is nothing here for a parent to tamper with.
+  app.get("/api/parent/child", async (req, res) => {
+    try {
+      const parent = await requireParent(req, res);
+      if (!parent) return;
+
+      const student = await storage.getStudent(parent.studentId);
+      if (!student) {
+        return res.status(404).json({
+          success: false,
+          message: "That pupil is no longer on the register. Ask the school to check.",
+        });
+      }
+      res.json({ success: true, child: childSummary(student) });
+    } catch (error) {
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
+    }
+  });
+
+  // The same information, but reached by id — the shape later stages will need
+  // for results and submissions. Included now so the rule is enforced and
+  // testable from the start: any id but the parent's own child is refused.
+  app.get("/api/parent/students/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const parent = await requireParentChild(req, res, id);
+      if (!parent) return;
+
+      // The id used here is the parent's own child from the database, not the
+      // one from the address, even though the check above proved they match.
+      // The address is never the source of truth.
+      const student = await storage.getStudent(parent.studentId);
+      if (!student) {
+        return res.status(404).json({
+          success: false,
+          message: "That pupil is no longer on the register. Ask the school to check.",
+        });
+      }
+      res.json({ success: true, child: childSummary(student) });
+    } catch (error) {
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
+    }
+  });
+
+  // ─── Parent accounts, managed by the school ───────────────────────────────
+
+  // Every parent account, so the student list can show which children already
+  // have one. Teacher only, and passwords are stripped.
+  app.get("/api/parents", async (req, res) => {
+    try {
+      if (!(await requireTeacher(req, res))) return;
+      const all = await storage.getAllParents();
+      res.json(all.map(safeParent));
+    } catch (error) {
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
+    }
+  });
+
+  // Create a parent account for one child.
+  //
+  // The child is taken from the address, which only a logged-in teacher can
+  // reach, and the account is tied to that child at the moment it is created.
+  // A parent never picks their own child, and cannot change it afterwards.
+  app.post("/api/students/:id/parent", async (req, res) => {
+    try {
+      if (!(await requireTeacher(req, res))) return;
+
+      const studentId = parseInt(req.params.id);
+      if (!Number.isInteger(studentId)) {
+        return res.json({ success: false, message: "That is not a valid pupil." });
+      }
+
+      const student = await storage.getStudent(studentId);
+      if (!student) {
+        return res.status(404).json({ success: false, message: "Student not found" });
+      }
+
+      const validation = validateRequest(createParentAccountSchema, req.body);
+      if (!validation.success) {
+        return res.json({ success: false, message: validation.error });
+      }
+
+      // Usernames are stored lower case so that logging in is not case
+      // sensitive and two accounts cannot differ by capitals alone.
+      const username = validation.data.username.trim().toLowerCase();
+      if (username.includes(" ")) {
+        return res.json({ success: false, message: "The username cannot contain spaces." });
+      }
+
+      // One account per child for now.
+      const existingForChild = await storage.getParentByStudentId(studentId);
+      if (existingForChild) {
+        return res.json({
+          success: false,
+          message: `${student.fullName} already has a parent account (${existingForChild.username}).`,
+        });
+      }
+
+      const existingUsername = await storage.getParentByUsername(username);
+      if (existingUsername) {
+        return res.json({ success: false, message: "That username is already taken. Choose another." });
+      }
+
+      const parent = await storage.createParent({
+        fullName: validation.data.fullName.trim(),
+        username,
+        password: validation.data.password,
+        studentId,
+        role: "parent",
+        active: true,
+      });
+
+      res.json({ success: true, parent: safeParent(parent) });
+    } catch (error) {
+      console.error("Create parent account error:", error);
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
+    }
+  });
+
+  // Remove a parent account — so a mistake can be undone and the child given a
+  // new one. Teacher only. The pupil and their work are untouched.
+  app.delete("/api/parents/:id", async (req, res) => {
+    try {
+      if (!(await requireTeacher(req, res))) return;
+
+      const id = parseInt(req.params.id);
+      const parent = await storage.getParent(id);
+      if (!parent) {
+        return res.status(404).json({ success: false, message: "Parent account not found" });
+      }
+      await storage.deleteParent(id);
+      res.json({ success: true });
+    } catch (error) {
       res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });

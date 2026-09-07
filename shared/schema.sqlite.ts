@@ -38,6 +38,20 @@ export const students = sqliteTable("students", {
   createdAt: timestamp("created_at").notNull().$defaultFn(() => new Date()),
 });
 
+// --- Parents ---
+// A login that can see exactly one child. `student_id` is UNIQUE, which is what
+// keeps it to one parent account per child.
+export const parents = sqliteTable("parents", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  fullName: text("full_name").notNull(),
+  username: text("username").notNull().unique(),
+  password: text("password").notNull(),
+  studentId: integer("student_id").notNull().unique().references(() => students.id),
+  role: text("role").notNull().default("parent"),
+  active: integer("active", { mode: "boolean" }).notNull().default(true),
+  createdAt: timestamp("created_at").notNull().$defaultFn(() => new Date()),
+});
+
 // --- Assignments ---
 export const assignments = sqliteTable("assignments", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -266,6 +280,17 @@ CREATE TABLE IF NOT EXISTS students (
   form TEXT NOT NULL,
   password TEXT,
   role TEXT NOT NULL DEFAULT 'student',
+  active INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS parents (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  full_name TEXT NOT NULL,
+  username TEXT NOT NULL UNIQUE,
+  password TEXT NOT NULL,
+  student_id INTEGER NOT NULL UNIQUE,
+  role TEXT NOT NULL DEFAULT 'parent',
   active INTEGER NOT NULL DEFAULT 1,
   created_at INTEGER NOT NULL
 );

@@ -320,10 +320,17 @@ export default function Landing() {
             <span className="font-extrabold" style={{ color: NAVY }}>On Point Education Centre</span>
           </div>
           <p className="text-sm text-black/50 mb-4">Quality Beyond Measure</p>
-          {/* Teacher access is kept discreet here so staff can still log in. */}
-          <Link href="/teacher/login" className="text-sm font-semibold hover:underline" style={{ color: NAVY }} data-testid="link-teacher-login">
-            Teacher Login
-          </Link>
+          {/* Parent and teacher access are kept discreet here — the main page
+              is for pupils — while still being easy to find. */}
+          <div className="flex items-center justify-center gap-4">
+            <Link href="/parent/login" className="text-sm font-semibold hover:underline" style={{ color: NAVY }} data-testid="link-parent-login">
+              Parent Login
+            </Link>
+            <span className="text-black/20">|</span>
+            <Link href="/teacher/login" className="text-sm font-semibold hover:underline" style={{ color: NAVY }} data-testid="link-teacher-login">
+              Teacher Login
+            </Link>
+          </div>
         </div>
       </footer>
     </div>

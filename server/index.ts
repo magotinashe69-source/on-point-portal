@@ -28,6 +28,13 @@ declare module "express-session" {
     // and passed its id in the URL, so every /api/students/:id/* route
     // trusted whatever id it was handed.
     studentId?: number;
+    // A parent's login. Deliberately a THIRD, separate field rather than a
+    // shared "userId" with a role beside it: because teacher and student
+    // routes read teacherId and studentId only, a parent session satisfies
+    // none of them and is refused by the whole existing app by default. A
+    // parent can therefore never gain student or teacher access, and new
+    // routes are locked down unless someone opts them in.
+    parentId?: number;
   }
 }
 

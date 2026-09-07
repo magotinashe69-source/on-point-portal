@@ -1,11 +1,13 @@
 import { createContext, useContext, useState, useEffect } from "react";
-import type { Teacher, Student } from "@shared/schema";
+import type { Teacher, Student, Parent } from "@shared/schema";
 
 type AuthContextType = {
   teacher: Teacher | null;
   student: Student | null;
+  parent: Parent | null;
   setTeacher: (teacher: Teacher | null) => void;
   setStudent: (student: Student | null) => void;
+  setParent: (parent: Parent | null) => void;
   logout: () => void;
 };
 
@@ -19,6 +21,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   
   const [student, setStudent] = useState<Student | null>(() => {
     const stored = localStorage.getItem("onpoint-student");
+    return stored ? JSON.parse(stored) : null;
+  });
+
+  const [parent, setParent] = useState<Parent | null>(() => {
+    const stored = localStorage.getItem("onpoint-parent");
     return stored ? JSON.parse(stored) : null;
   });
 
@@ -37,6 +44,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem("onpoint-student");
     }
   }, [student]);
+
+  useEffect(() => {
+    if (parent) {
+      localStorage.setItem("onpoint-parent", JSON.stringify(parent));
+    } else {
+      localStorage.removeItem("onpoint-parent");
+    }
+  }, [parent]);
 
   // The browser remembers the teacher forever, but the real login is a session
   // on the server that can end (the server restarting is enough). When that
@@ -82,18 +97,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // The same startup check again for a parent. Without it a parent whose
+  // server session has ended would sit on a dashboard whose every request
+  // fails, instead of being sent cleanly back to the login page.
+  useEffect(() => {
+    if (!parent) return;
+    let cancelled = false;
+    fetch("/api/auth/parent/me", { credentials: "include" })
+      .then((res) => {
+        if (!cancelled && res.status === 401) setParent(null);
+      })
+      .catch(() => {
+        // Offline or the server is down — keep the remembered login rather
+        // than logging a parent out over a temporary network blip.
+      });
+    return () => { cancelled = true; };
+    // Runs once on startup; later changes come from logging in or out.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const logout = () => {
     // Destroy whichever server-side session exists (fire-and-forget).
     fetch("/api/auth/teacher/logout", { method: "POST" }).catch(() => {});
     fetch("/api/auth/student/logout", { method: "POST" }).catch(() => {});
+    fetch("/api/auth/parent/logout", { method: "POST" }).catch(() => {});
     setTeacher(null);
     setStudent(null);
+    setParent(null);
     localStorage.removeItem("onpoint-teacher");
     localStorage.removeItem("onpoint-student");
+    localStorage.removeItem("onpoint-parent");
   };
 
   return (
-    <AuthContext.Provider value={{ teacher, student, setTeacher, setStudent, logout }}>
+    <AuthContext.Provider value={{ teacher, student, parent, setTeacher, setStudent, setParent, logout }}>
       {children}
     </AuthContext.Provider>
   );

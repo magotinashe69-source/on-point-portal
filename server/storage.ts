@@ -3,12 +3,13 @@ import { eq, and, inArray, or, isNull, desc } from "drizzle-orm";
 // the right database (SQLite or PostgreSQL) at runtime.
 import {
   db,
-  teachers, students, assignments, submissions, marks, resources, announcements, lessons, exportLogs, studentRewards, studentXp, studentStreaks, dreamWorld, penaltyBest,
+  teachers, students, parents, assignments, submissions, marks, resources, announcements, lessons, exportLogs, studentRewards, studentXp, studentStreaks, dreamWorld, penaltyBest,
 } from "./db";
 // The TypeScript types are the same for both databases, so they come from the shared schema.
 import {
   type Teacher, type InsertTeacher,
   type Student, type InsertStudent,
+  type Parent, type InsertParent,
   type Assignment, type InsertAssignment,
   type Submission, type InsertSubmission,
   type Mark, type InsertMark,
@@ -42,6 +43,14 @@ export interface IStorage {
   updateStudentPassword(id: number, password: string): Promise<void>;
   resetStudentPassword(id: number): Promise<void>;
   deleteStudent(id: number): Promise<void>;
+
+  // Parents
+  getParent(id: number): Promise<Parent | undefined>;
+  getParentByUsername(username: string): Promise<Parent | undefined>;
+  getParentByStudentId(studentId: number): Promise<Parent | undefined>;
+  getAllParents(): Promise<Parent[]>;
+  createParent(parent: InsertParent): Promise<Parent>;
+  deleteParent(id: number): Promise<void>;
   
   // Assignments
   getAssignment(id: number): Promise<Assignment | undefined>;
@@ -194,7 +203,44 @@ export class DatabaseStorage implements IStorage {
       await db.delete(marks).where(eq(marks.submissionId, sub.id));
     }
     await db.delete(submissions).where(eq(submissions.studentId, id));
+    // The child's parent account goes with them. Leaving it behind would mean a
+    // working login pointing at a pupil who no longer exists.
+    await db.delete(parents).where(eq(parents.studentId, id));
     await db.delete(students).where(eq(students.id, id));
+  }
+
+  // Parents
+  async getParent(id: number): Promise<Parent | undefined> {
+    const [parent] = await db.select().from(parents).where(eq(parents.id, id));
+    return parent || undefined;
+  }
+
+  // Usernames are stored and compared in lower case, so a parent typing
+  // "Mrs.Moyo" still matches the account created as "mrs.moyo".
+  async getParentByUsername(username: string): Promise<Parent | undefined> {
+    const name = username.trim().toLowerCase();
+    if (!name) return undefined;
+    const [parent] = await db.select().from(parents).where(eq(parents.username, name));
+    return parent || undefined;
+  }
+
+  // Used to check a child does not already have an account before making one.
+  async getParentByStudentId(studentId: number): Promise<Parent | undefined> {
+    const [parent] = await db.select().from(parents).where(eq(parents.studentId, studentId));
+    return parent || undefined;
+  }
+
+  async getAllParents(): Promise<Parent[]> {
+    return db.select().from(parents);
+  }
+
+  async createParent(parent: InsertParent): Promise<Parent> {
+    const [newParent] = await db.insert(parents).values(parent).returning();
+    return newParent;
+  }
+
+  async deleteParent(id: number): Promise<void> {
+    await db.delete(parents).where(eq(parents.id, id));
   }
 
   // Assignments

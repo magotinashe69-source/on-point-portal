@@ -17,9 +17,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { QueryError } from "@/components/QueryError";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { ArrowLeft, PlusCircle, Pencil, Trash2, KeyRound, Loader2, Users, ClipboardPaste, QrCode } from "lucide-react";
+import { ArrowLeft, PlusCircle, Pencil, Trash2, KeyRound, Loader2, Users, ClipboardPaste, QrCode, UserPlus } from "lucide-react";
 import logoPath from "@assets/logo.webp";
-import type { Student } from "@shared/schema";
+import type { Student, Parent } from "@shared/schema";
 
 // --- Bulk paste ---------------------------------------------------------
 // Enrolling a class means typing the same thing thirty times. Each line is one
@@ -96,6 +96,11 @@ export default function StudentManagement() {
 
   // Bulk paste: the dialog, the pasted list, and the settings applied to the
   // whole batch. `pasteBusy` blocks a second click while pupils are being added.
+  // Parent accounts. `parentForStudent` is the child whose parent dialog is
+  // open — null when the dialog is closed.
+  const [parentForStudent, setParentForStudent] = useState<Student | null>(null);
+  const [newParent, setNewParent] = useState({ fullName: "", username: "", password: "" });
+
   const [isPasteDialogOpen, setIsPasteDialogOpen] = useState(false);
   const [pasteText, setPasteText] = useState("");
   const [pasteForm, setPasteForm] = useState<"Stage 3" | "Stage 4" | "Stage 5" | "Stage 6" | "Form 1" | "Form 2">("Form 1");
@@ -111,6 +116,49 @@ export default function StudentManagement() {
 
   const { data: students = [], isLoading, isError, error, refetch } = useQuery<Student[]>({
     queryKey: ["/api/students"],
+  });
+
+  // Every parent account in the school, so each row can show whether that child
+  // already has one. Passwords are never included — the server strips them.
+  const { data: parentAccounts = [] } = useQuery<Parent[]>({
+    queryKey: ["/api/parents"],
+  });
+
+  // The parent account linked to a child, if there is one. One per child for now.
+  const parentFor = (studentId: number) => parentAccounts.find(p => p.studentId === studentId);
+
+  const createParentMutation = useMutation({
+    mutationFn: async ({ studentId, data }: { studentId: number; data: typeof newParent }) => {
+      // The child is named in the address, not the body, so the account can
+      // only ever be linked to the pupil whose record this dialog was opened on.
+      const response = await apiRequest("POST", `/api/students/${studentId}/parent`, data);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        queryClient.invalidateQueries({ queryKey: ["/api/parents"] });
+        toast({
+          title: "Parent account created",
+          description: `Give the parent their username and password. They log in at /parent/login.`,
+        });
+        setParentForStudent(null);
+        setNewParent({ fullName: "", username: "", password: "" });
+      } else {
+        toast({ title: "Parent account not created", description: data.message, variant: "destructive" });
+      }
+    },
+  });
+
+  const deleteParentMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const response = await apiRequest("DELETE", `/api/parents/${id}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/parents"] });
+      toast({ title: "Parent account removed", description: "The pupil and their work are untouched." });
+      setParentForStudent(null);
+    },
   });
 
   const createMutation = useMutation({
@@ -251,6 +299,9 @@ export default function StudentManagement() {
       variant: failed.length > 0 ? "destructive" : undefined,
     });
   };
+
+  // The account already linked to the child whose dialog is open, if any.
+  const existingParent = parentForStudent ? parentFor(parentForStudent.id) : undefined;
 
   if (!teacher) return null;
 
@@ -526,8 +577,27 @@ export default function StudentManagement() {
                       ) : (
                         <Badge variant="outline">No Password</Badge>
                       )}
+                      {parentFor(student.id) && (
+                        <Badge variant="secondary" data-testid={`badge-parent-${student.id}`}>
+                          Parent account
+                        </Badge>
+                      )}
                     </div>
                     <div className="flex items-center gap-2">
+                      {/* Add (or review) this child's parent account. */}
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        title={parentFor(student.id) ? "Parent account" : "Add parent account"}
+                        aria-label={parentFor(student.id) ? "Parent account" : "Add parent account"}
+                        onClick={() => {
+                          setParentForStudent(student);
+                          setNewParent({ fullName: "", username: "", password: "" });
+                        }}
+                        data-testid={`button-add-parent-${student.id}`}
+                      >
+                        <UserPlus className="h-4 w-4" />
+                      </Button>
                       <Button
                         size="icon"
                         variant="ghost"
@@ -568,6 +638,119 @@ export default function StudentManagement() {
             )}
           </CardContent>
         </Card>
+
+        {/* Add a parent account for one child.
+            The child is fixed by the record this was opened from, and is sent
+            in the address of the request — a teacher never picks the child on
+            this form, and a parent can never change it afterwards. */}
+        <Dialog open={!!parentForStudent} onOpenChange={(open) => { if (!open) setParentForStudent(null); }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Parent account</DialogTitle>
+              <DialogDescription>
+                {parentForStudent
+                  ? `For ${parentForStudent.fullName} (${parentForStudent.form})`
+                  : ""}
+              </DialogDescription>
+            </DialogHeader>
+
+            {parentForStudent && existingParent && (
+              /* This child already has an account. One per child for now, so
+                 the form is replaced by what is already there. */
+              <div className="space-y-4 py-4">
+                <div className="rounded-md border p-4 space-y-1">
+                  <p className="text-sm text-muted-foreground">Parent</p>
+                  <p className="font-medium" data-testid="text-existing-parent-name">{existingParent.fullName}</p>
+                  <p className="text-sm text-muted-foreground pt-2">Username</p>
+                  <p className="font-mono text-sm" data-testid="text-existing-parent-username">{existingParent.username}</p>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Each child can have one parent account at a time. To change the login
+                  details, remove this account and add a new one.
+                </p>
+                <Button
+                  variant="outline"
+                  className="w-full text-destructive"
+                  onClick={() => {
+                    if (confirm(`Remove the parent account for ${parentForStudent.fullName}? The pupil and their work are not affected.`)) {
+                      deleteParentMutation.mutate(existingParent.id);
+                    }
+                  }}
+                  disabled={deleteParentMutation.isPending}
+                  data-testid="button-remove-parent"
+                >
+                  {deleteParentMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Remove parent account
+                </Button>
+              </div>
+            )}
+
+            {parentForStudent && !existingParent && (
+              <>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="input-parent-name">Parent's name</Label>
+                    <Input
+                      id="input-parent-name"
+                      value={newParent.fullName}
+                      onChange={(e) => setNewParent({ ...newParent, fullName: e.target.value })}
+                      placeholder="e.g., Mrs Rudo Moyo"
+                      data-testid="input-parent-name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="input-parent-username">Username</Label>
+                    <Input
+                      id="input-parent-username"
+                      value={newParent.username}
+                      onChange={(e) => setNewParent({ ...newParent, username: e.target.value.toLowerCase() })}
+                      placeholder="e.g., rmoyo"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      data-testid="input-parent-username"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      No spaces. This is what the parent types to log in.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="input-parent-password">Password</Label>
+                    <Input
+                      id="input-parent-password"
+                      value={newParent.password}
+                      onChange={(e) => setNewParent({ ...newParent, password: e.target.value })}
+                      placeholder="At least 6 characters"
+                      data-testid="input-parent-password"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Write this down and give it to the parent — it is not shown again.
+                    </p>
+                  </div>
+                  <div className="rounded-md bg-muted p-3">
+                    <p className="text-xs text-muted-foreground">
+                      This account will only ever be able to see {parentForStudent.fullName}.
+                    </p>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button
+                    onClick={() => {
+                      createParentMutation.mutate({
+                        studentId: parentForStudent.id,
+                        data: newParent,
+                      });
+                    }}
+                    disabled={createParentMutation.isPending}
+                    data-testid="button-create-parent"
+                  >
+                    {createParentMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    Create parent account
+                  </Button>
+                </DialogFooter>
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
 
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
           <DialogContent>

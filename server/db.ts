@@ -83,6 +83,24 @@ CREATE TABLE IF NOT EXISTS dream_world (
 );
 `;
 
+// Postgres "create if missing" for the parents table. Same safety net as the
+// gamification tables above: parents is a brand-new stand-alone table, so a
+// deploy where `db:push` has not run yet must not leave the parent login
+// querying a table that does not exist. Additive and referencing a student id
+// only, so CREATE TABLE IF NOT EXISTS does nothing once it is there.
+const PG_PARENTS_DDL = `
+CREATE TABLE IF NOT EXISTS parents (
+  id SERIAL PRIMARY KEY,
+  full_name TEXT NOT NULL,
+  username TEXT NOT NULL UNIQUE,
+  password TEXT NOT NULL,
+  student_id INTEGER NOT NULL UNIQUE,
+  role TEXT NOT NULL DEFAULT 'parent',
+  active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMP NOT NULL DEFAULT now()
+);
+`;
+
 // Columns added to dream_world after it first shipped. Each dialect's startup
 // runs these idempotently so existing tables gain the new columns.
 const DREAM_WORLD_ADDED_COLUMNS: { name: string; type: string }[] = [
@@ -140,6 +158,7 @@ if (usePostgres) {
   // is completely safe and does nothing when they already exist.
   ensureSchemaFn = async () => {
     await pgPoolInstance!.query(PG_GAMIFICATION_DDL);
+    await pgPoolInstance!.query(PG_PARENTS_DDL);
     // Add columns introduced after a table first shipped (idempotent).
     for (const col of DREAM_WORLD_ADDED_COLUMNS) {
       await pgPoolInstance!.query(`ALTER TABLE dream_world ADD COLUMN IF NOT EXISTS ${col.name} ${col.type}`);
@@ -221,6 +240,7 @@ export const ensureSchema = ensureSchemaFn;
 export const {
   teachers,
   students,
+  parents,
   assignments,
   submissions,
   marks,

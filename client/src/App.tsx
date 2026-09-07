@@ -21,6 +21,8 @@ import GradeBook from "@/pages/teacher/gradebook";
 import SubmissionReview from "@/pages/teacher/submission-review";
 import TeacherExport from "@/pages/teacher/export";
 import DailyReport from "@/pages/teacher/daily-report";
+import ParentLogin from "@/pages/parent/login";
+import ParentDashboard from "@/pages/parent/dashboard";
 import StudentLogin from "@/pages/student/login";
 import StudentDashboard from "@/pages/student/dashboard";
 import SubmitAssignment from "@/pages/student/submit-assignment";
@@ -54,6 +56,10 @@ function Router() {
       <Route path="/teacher/submissions/:id" component={SubmissionReview} />
       <Route path="/teacher/export" component={TeacherExport} />
       <Route path="/teacher/daily-report" component={DailyReport} />
+      {/* Parent portal. A parent account can only ever see its own child —
+          the server enforces that on every request, not these routes. */}
+      <Route path="/parent/login" component={ParentLogin} />
+      <Route path="/parent/dashboard" component={ParentDashboard} />
       <Route path="/student/login" component={StudentLogin} />
       <Route path="/student/dashboard" component={StudentDashboard} />
       <Route path="/student/submit/:id" component={SubmitAssignment} />

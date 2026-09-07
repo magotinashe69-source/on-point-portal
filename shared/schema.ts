@@ -49,7 +49,7 @@ export type Teacher = typeof teachers.$inferSelect;
 export type InsertTeacher = z.infer<typeof insertTeacherSchema>;
 
 // Role enum for access control
-export const roleEnum = z.enum(["admin", "teacher", "student"]);
+export const roleEnum = z.enum(["admin", "teacher", "student", "parent"]);
 export type Role = z.infer<typeof roleEnum>;
 
 // Students table
@@ -83,6 +83,42 @@ export const studentsRelations = relations(students, ({ many }) => ({
 export const insertStudentSchema = createInsertSchema(students).omit({ id: true, createdAt: true });
 export type Student = typeof students.$inferSelect;
 export type InsertStudent = z.infer<typeof insertStudentSchema>;
+
+// Parents table
+//
+// A parent account is a login that can see exactly ONE child and nothing else.
+// It stands on its own: it adds no columns to any existing table, and points at
+// a student by id only.
+export const parents = pgTable("parents", {
+  id: serial("id").primaryKey(),
+  fullName: text("full_name").notNull(),
+  // What the parent types to log in. A username rather than an email, because
+  // many families here do not use email — the school hands these details out
+  // in person when the account is created.
+  username: text("username").notNull().unique(),
+  password: text("password").notNull(),
+  // The one child this account may ever see. Every parent request works out the
+  // child from THIS column, never from an id in the address bar — that is what
+  // stops a parent reaching another family's child. UNIQUE keeps it to one
+  // account per child for now.
+  studentId: integer("student_id").notNull().unique().references(() => students.id),
+  role: text("role").notNull().default("parent"), // Role for access control
+  // Lets the school switch an account off without deleting it, the same way a
+  // pupil who leaves is deactivated rather than erased.
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const parentsRelations = relations(parents, ({ one }) => ({
+  student: one(students, {
+    fields: [parents.studentId],
+    references: [students.id],
+  }),
+}));
+
+export const insertParentSchema = createInsertSchema(parents).omit({ id: true, createdAt: true });
+export type Parent = typeof parents.$inferSelect;
+export type InsertParent = z.infer<typeof insertParentSchema>;
 
 // Assignments table
 export const assignments = pgTable("assignments", {
@@ -415,6 +451,26 @@ export const studentLoginSchema = z.object({
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
 export type StudentLogin = z.infer<typeof studentLoginSchema>;
+
+// Parent login. A username and password the school gave them — no first-login
+// password-setting like the student form, because a parent account always has
+// a password from the moment the teacher creates it.
+export const parentLoginSchema = z.object({
+  username: z.string().min(1, "Your username is required"),
+  password: z.string().min(1, "Password is required"),
+});
+export type ParentLogin = z.infer<typeof parentLoginSchema>;
+
+// What a teacher fills in on a student's record to create that child's parent
+// account. The child is taken from the address of the request, not from here,
+// so a teacher cannot aim the new account at a different pupil by editing the
+// form they submit.
+export const createParentAccountSchema = z.object({
+  fullName: z.string().min(1, "The parent's name is required"),
+  username: z.string().min(3, "Username must be at least 3 characters"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+});
+export type CreateParentAccount = z.infer<typeof createParentAccountSchema>;
 
 // Master password for admin access
 export const MASTER_PASSWORD = "onpoint_admin_2024";

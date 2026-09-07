@@ -20,14 +20,36 @@ buttons, readable text, consistent spacing.
 
 ## User roles
 
-There are **two roles**:
+There are **three roles**:
 
 - **Student** — views assignments, submits answers (including photos of handwritten
   work), and views marks and feedback.
 - **Teacher** — creates/edits assignments, manages students, marks submissions,
   posts announcements, and adds learning resources and lessons.
+- **Parent** — signs in to see their own child. A parent account is created by a
+  teacher on a student's record, is linked to **exactly one** student, and can
+  **only ever** see that child. One account per child for now.
 
 (An admin/master-password override also exists for teacher-level access.)
+
+### The parent safety rule
+
+A parent must never reach another child's data, however they edit the address
+bar. Two things enforce this on the **server**, and both live in
+`server/routes.ts`:
+
+1. **The parent access gate** — a middleware at the top of `registerRoutes` that
+   refuses a parent session anywhere except `/api/parent/...` and
+   `/api/auth/...`. Every other endpoint, present and future, is closed to
+   parents by default rather than being open until someone remembers to close it.
+2. **`requireParent` / `requireParentChild`** — inside the parent routes, the
+   child is read from the parent's own database row (`parents.studentId`), never
+   from an id in the address. A route that does take an id compares it to that
+   row and answers **403** for anything else, whether or not that pupil exists.
+
+A session holds **one role only**: `setSessionRole()` is used by every login, and
+setting one of `teacherId` / `studentId` / `parentId` clears the other two. So a
+parent can never also hold student or teacher access.
 
 ## Classes (forms)
 
@@ -74,6 +96,7 @@ client/
     pages/
       teacher/    # Teacher pages (login, dashboard, create, mark, resources, lessons)
       student/    # Student pages (login, dashboard, submit, results, resources, lessons)
+      parent/     # Parent pages (login, dashboard)
     lib/          # Query client and auth helpers
     hooks/        # Custom hooks
 server/
@@ -95,8 +118,12 @@ shared/
   (full name or first name, case-insensitive) plus a password. On first login the
   password they type becomes their saved password. A master password also grants
   admin access.
-- **Note:** passwords are currently stored as plain text — this should be improved
-  (hashing) before any real production use.
+- **Parent login** (`POST /api/auth/parent/login`): username + password, both set
+  by the teacher when the account is created. Usernames are stored and compared
+  in lower case. Rate limited, and every failure gives the same message so the
+  form cannot be used to discover which usernames exist.
+- **Note:** passwords are currently stored as plain text for **all three roles** —
+  this should be improved (hashing) before any real production use.
 
 ## Database notes
 
