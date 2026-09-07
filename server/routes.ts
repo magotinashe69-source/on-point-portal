@@ -790,6 +790,31 @@ export async function registerRoutes(
     return false;
   }
 
+  /**
+   * Anyone signed in to the school portal: a teacher, or any logged-in pupil.
+   *
+   * This is the guard for the things the whole school reads and that are not
+   * about one particular child — the homework list, announcements, lessons and
+   * the resource library. Until this existed these endpoints answered ANYONE at
+   * all, including someone who had never logged in.
+   *
+   * It deliberately does not narrow a pupil to their own class. Class filtering
+   * is what the ?form= parameter already does, and homework titles are not
+   * private between classes; the hole being closed here is that the whole
+   * internet could read them.
+   */
+  async function requireTeacherOrStudent(req: Request, res: Response): Promise<boolean> {
+    if (typeof req.session?.studentId === "number") {
+      // Re-check the pupil, so a deactivated or deleted account stops working
+      // on its very next request rather than when the cookie happens to expire.
+      const student = await storage.getStudent(req.session.studentId);
+      if (student && student.active) return true;
+    }
+    if (await isTeacherLoggedIn(req)) return true;
+    res.status(401).json({ success: false, message: "You are not logged in. Log in and try again." });
+    return false;
+  }
+
   app.get("/api/students", async (req, res) => {
     try {
       if (!(await requireTeacher(req, res))) return;
@@ -1017,6 +1042,8 @@ export async function registerRoutes(
 
   app.get("/api/assignments", async (req, res) => {
     try {
+      if (!(await requireTeacherOrStudent(req, res))) return;
+
       const form = req.query.form as string | undefined;
       const studentId = req.query.studentId ? parseInt(req.query.studentId as string) : undefined;
       const archived = req.query.archived === "true";
@@ -1033,6 +1060,8 @@ export async function registerRoutes(
 
   app.get("/api/assignments/:id", async (req, res) => {
     try {
+      if (!(await requireTeacherOrStudent(req, res))) return;
+
       const assignment = await storage.getAssignment(parseInt(req.params.id));
       if (!assignment) {
         return res.status(404).json({ success: false, message: "Assignment not found" });
@@ -1091,18 +1120,19 @@ export async function registerRoutes(
 
   app.post("/api/assignments", async (req, res) => {
     try {
+      if (!(await requireTeacher(req, res))) return;
+
       const validation = validateRequest(createAssignmentSchema, req.body);
       if (!validation.success) {
         return res.json({ success: false, message: validation.error });
       }
-      
-      const teacher = await storage.getTeacher(validation.data.createdById);
-      if (!teacher) {
-        return res.status(403).json({ success: false, message: "That teacher ID was not recognised." });
-      }
-      
+
+      // The author is the teacher who is logged in. Checking that the
+      // createdById in the body named *a* teacher proved nothing: anyone could
+      // send a valid id and set homework for the whole school.
       const assignment = await storage.createAssignment({
         ...validation.data,
+        createdById: req.session.teacherId!,
         attachments: validation.data.attachments || [],
         targetStudentIds: validation.data.targetStudentIds || [],
         // Default to live, so creating an assignment the normal way is unchanged.
@@ -1457,6 +1487,8 @@ export async function registerRoutes(
   // Extend deadline for specific student
   app.post("/api/assignments/:id/extend-deadline", async (req, res) => {
     try {
+      if (!(await requireTeacher(req, res))) return;
+
       const id = parseInt(req.params.id);
       const { studentId, newDueDate, reason } = req.body;
       
@@ -1502,6 +1534,8 @@ export async function registerRoutes(
 
   app.patch("/api/assignments/:id/archive", async (req, res) => {
     try {
+      if (!(await requireTeacher(req, res))) return;
+
       const id = parseInt(req.params.id);
       const assignment = await storage.getAssignment(id);
       if (!assignment) {
@@ -1520,6 +1554,8 @@ export async function registerRoutes(
   // Delete assignment
   app.delete("/api/assignments/:id", async (req, res) => {
     try {
+      if (!(await requireTeacher(req, res))) return;
+
       const id = parseInt(req.params.id);
       const assignment = await storage.getAssignment(id);
       if (!assignment) {
@@ -1537,9 +1573,18 @@ export async function registerRoutes(
   // Submissions
   app.get("/api/submissions", async (req, res) => {
     try {
+      if (!(await requireTeacherOrStudent(req, res))) return;
+
       const assignmentId = req.query.assignmentId ? parseInt(req.query.assignmentId as string) : undefined;
-      const studentId = req.query.studentId ? parseInt(req.query.studentId as string) : undefined;
-      
+      const askedForStudentId = req.query.studentId ? parseInt(req.query.studentId as string) : undefined;
+
+      // A teacher may ask about any pupil, or about none and get everybody. A
+      // pupil is pinned to their own work: whatever ?studentId= they put in the
+      // address is replaced by their own id. This endpoint used to answer any
+      // caller at all with every child's name and answers.
+      const isTeacher = await isTeacherLoggedIn(req);
+      const studentId = isTeacher ? askedForStudentId : req.session.studentId;
+
       const submissions = await storage.getSubmissions({ assignmentId, studentId });
       
       // Enrich with student, assignment, and mark data
@@ -1568,7 +1613,10 @@ export async function registerRoutes(
       if (!submission) {
         return res.status(404).json({ success: false, message: "Submission not found" });
       }
-      
+
+      // Only a teacher, or the pupil who handed this in, may read it.
+      if (!(await requireTeacherOrSelf(req, res, submission.studentId))) return;
+
       const student = await storage.getStudent(submission.studentId);
       const assignment = await storage.getAssignment(submission.assignmentId);
       
@@ -1594,13 +1642,20 @@ export async function registerRoutes(
 
   app.post("/api/submissions", async (req, res) => {
     try {
+      if (!(await requireTeacherOrStudent(req, res))) return;
+
       const validation = validateRequest(createSubmissionSchema, req.body);
       if (!validation.success) {
         return res.json({ success: false, message: validation.error });
       }
       
       const { assignmentId, studentId, answers } = validation.data;
-      
+
+      // Work can only be handed in for yourself. The studentId arrives in the
+      // request body, so without this check anyone could submit answers in any
+      // child's name.
+      if (!(await requireTeacherOrSelf(req, res, studentId))) return;
+
       const student = await storage.getStudent(studentId);
       if (!student) {
         return res.status(403).json({ success: false, message: "That student ID was not recognised." });
@@ -1703,12 +1758,22 @@ export async function registerRoutes(
   // Update submission (allow students to edit before deadline or before marking)
   app.put("/api/submissions/:id", async (req, res) => {
     try {
+      // Refuse a logged-out caller before the lookup, so the address bar cannot
+      // be used to find out which submission ids exist. The owner check just
+      // below then decides WHOSE work may be changed.
+      if (!(await requireTeacherOrStudent(req, res))) return;
+
       const submissionId = parseInt(req.params.id);
       const submission = await storage.getSubmission(submissionId);
       
       if (!submission) {
         return res.status(404).json({ success: false, message: "Submission not found" });
       }
+
+      // Only a teacher, or the pupil who handed this in, may change it. There
+      // was no owner check here at all, so one pupil could edit another's
+      // answers by putting their submission id in the address.
+      if (!(await requireTeacherOrSelf(req, res, submission.studentId))) return;
 
       // Get assignment first — we need it to know whether this is an
       // auto-marked assignment (which students may retry) or a hand-marked one.
@@ -1789,7 +1854,18 @@ export async function registerRoutes(
   // Marks
   app.get("/api/marks/:submissionId", async (req, res) => {
     try {
-      const mark = await storage.getMark(parseInt(req.params.submissionId));
+      const submissionId = parseInt(req.params.submissionId);
+
+      // A mark belongs to whoever handed the work in, so the submission decides
+      // who may read it. Previously any caller could read any child's marks and
+      // teacher feedback just by counting through the ids.
+      const submission = await storage.getSubmission(submissionId);
+      if (!submission) {
+        return res.status(404).json({ success: false, message: "Mark not found" });
+      }
+      if (!(await requireTeacherOrSelf(req, res, submission.studentId))) return;
+
+      const mark = await storage.getMark(submissionId);
       if (!mark) {
         return res.status(404).json({ success: false, message: "Mark not found" });
       }
@@ -1814,17 +1890,19 @@ export async function registerRoutes(
 
   app.post("/api/marks", async (req, res) => {
     try {
+      // Marking is staff work. Checking that the markedById in the body named
+      // *a* teacher proved nothing — anyone could send a teacher's id and set
+      // any child's marks.
+      if (!(await requireTeacher(req, res))) return;
+
       const validation = validateRequest(createMarkSchema, req.body);
       if (!validation.success) {
         return res.json({ success: false, message: validation.error });
       }
-      
-      const { submissionId, totalScore, feedback, markedById, questionMarks } = validation.data;
-      
-      const teacher = await storage.getTeacher(markedById);
-      if (!teacher) {
-        return res.status(403).json({ success: false, message: "Only teachers can mark submissions." });
-      }
+
+      const { submissionId, totalScore, feedback, questionMarks } = validation.data;
+      // The marker is whoever is logged in, not an id supplied by the caller.
+      const markedById = req.session.teacherId!;
       
       const submission = await storage.getSubmission(submissionId);
       if (!submission) {
@@ -2135,11 +2213,15 @@ export async function registerRoutes(
   // Resources (textbooks, YouTube links, lesson plans)
   app.get("/api/resources", async (req, res) => {
     try {
+      if (!(await requireTeacherOrStudent(req, res))) return;
+
       const form = req.query.form as string | undefined;
       const subject = req.query.subject as string | undefined;
       const type = req.query.type as string | undefined;
-      const teacherOnly = req.query.teacherOnly === 'true';
-      
+      // Teacher-only material is only ever included for an actual teacher.
+      // Until this check existed a pupil could simply add ?teacherOnly=true.
+      const teacherOnly = req.query.teacherOnly === 'true' && await isTeacherLoggedIn(req);
+
       const resources = await storage.getResources({ 
         form: form !== 'undefined' ? form : undefined, 
         subject: subject !== 'undefined' ? subject : undefined, 
@@ -2154,6 +2236,8 @@ export async function registerRoutes(
 
   app.get("/api/resources/:id", async (req, res) => {
     try {
+      if (!(await requireTeacherOrStudent(req, res))) return;
+
       const resource = await storage.getResource(parseInt(req.params.id));
       if (!resource) {
         return res.status(404).json({ success: false, message: "Resource not found" });
@@ -2178,17 +2262,20 @@ export async function registerRoutes(
 
   app.post("/api/resources", async (req, res) => {
     try {
+      if (!(await requireTeacher(req, res))) return;
+
       const validation = validateRequest(createResourceSchema, req.body);
       if (!validation.success) {
         return res.json({ success: false, message: validation.error });
       }
-      
-      const teacher = await storage.getTeacher(validation.data.createdById);
-      if (!teacher) {
-        return res.status(403).json({ success: false, message: "Only teachers can add resources." });
-      }
-      
-      const resource = await storage.createResource(validation.data);
+
+      // The author is the teacher who is logged in. The createdById the browser
+      // sends is ignored: trusting it meant anyone could add a resource just by
+      // naming a teacher's id.
+      const resource = await storage.createResource({
+        ...validation.data,
+        createdById: req.session.teacherId!,
+      });
       res.json({ success: true, resource });
     } catch (error) {
       console.error("Create resource error:", error);
@@ -2198,6 +2285,8 @@ export async function registerRoutes(
 
   app.delete("/api/resources/:id", async (req, res) => {
     try {
+      if (!(await requireTeacher(req, res))) return;
+
       await storage.deleteResource(parseInt(req.params.id));
       res.json({ success: true });
     } catch (error) {
@@ -2208,6 +2297,8 @@ export async function registerRoutes(
   // Announcements
   app.get("/api/announcements", async (req, res) => {
     try {
+      if (!(await requireTeacherOrStudent(req, res))) return;
+
       const form = req.query.form as string | undefined;
       const announcements = await storage.getAnnouncements(form !== 'undefined' ? form : undefined);
       res.json(announcements);
@@ -2227,18 +2318,17 @@ export async function registerRoutes(
 
   app.post("/api/announcements", async (req, res) => {
     try {
+      if (!(await requireTeacher(req, res))) return;
+
       const validation = validateRequest(createAnnouncementSchema, req.body);
       if (!validation.success) {
         return res.json({ success: false, message: validation.error });
       }
-      
-      const teacher = await storage.getTeacher(validation.data.createdById);
-      if (!teacher) {
-        return res.status(403).json({ success: false, message: "Only teachers can post announcements." });
-      }
-      
+
+      // The author is the logged-in teacher, not an id from the request body.
       const announcement = await storage.createAnnouncement({
         ...validation.data,
+        createdById: req.session.teacherId!,
         expiresAt: validation.data.expiresAt ? new Date(validation.data.expiresAt) : null,
       });
       res.json({ success: true, announcement });
@@ -2250,6 +2340,8 @@ export async function registerRoutes(
 
   app.delete("/api/announcements/:id", async (req, res) => {
     try {
+      if (!(await requireTeacher(req, res))) return;
+
       await storage.deleteAnnouncement(parseInt(req.params.id));
       res.json({ success: true });
     } catch (error) {
@@ -2260,6 +2352,8 @@ export async function registerRoutes(
   // Lessons (video and audio)
   app.get("/api/lessons", async (req, res) => {
     try {
+      if (!(await requireTeacherOrStudent(req, res))) return;
+
       const form = req.query.form as string | undefined;
       const subject = req.query.subject as string | undefined;
       const type = req.query.type as string | undefined;
@@ -2288,17 +2382,18 @@ export async function registerRoutes(
 
   app.post("/api/lessons", async (req, res) => {
     try {
+      if (!(await requireTeacher(req, res))) return;
+
       const validation = validateRequest(createLessonSchema, req.body);
       if (!validation.success) {
         return res.json({ success: false, message: validation.error });
       }
-      
-      const teacher = await storage.getTeacher(validation.data.createdById);
-      if (!teacher) {
-        return res.status(403).json({ success: false, message: "Only teachers can add lessons." });
-      }
-      
-      const lesson = await storage.createLesson(validation.data);
+
+      // The author is the logged-in teacher, not an id from the request body.
+      const lesson = await storage.createLesson({
+        ...validation.data,
+        createdById: req.session.teacherId!,
+      });
       res.json({ success: true, lesson });
     } catch (error) {
       console.error("Create lesson error:", error);
@@ -2308,13 +2403,14 @@ export async function registerRoutes(
 
   app.delete("/api/lessons/:id", async (req, res) => {
     try {
+      // This used to look up the teacher who CREATED the lesson, which is a
+      // row that always exists — so it refused nobody. It now checks who is
+      // actually logged in.
+      if (!(await requireTeacher(req, res))) return;
+
       const lesson = await storage.getLesson(parseInt(req.params.id));
       if (!lesson) {
         return res.status(404).json({ success: false, message: "Lesson not found" });
-      }
-      const teacher = await storage.getTeacher(lesson.createdById);
-      if (!teacher) {
-        return res.status(403).json({ success: false, message: "You are not logged in. Log in and try again." });
       }
       await storage.deleteLesson(lesson.id);
       res.json({ success: true });
@@ -2326,6 +2422,9 @@ export async function registerRoutes(
   // Reports API - Get performance data for charts
   app.get("/api/reports", async (req, res) => {
     try {
+      // Whole-school performance figures for every named pupil: staff only.
+      if (!(await requireTeacher(req, res))) return;
+
       const students = await storage.getAllStudents();
       const assignments = await storage.getAssignments();
       const allSubmissions = await storage.getSubmissions();
@@ -2460,6 +2559,8 @@ export async function registerRoutes(
   // Daily Homework Submission Report
   app.get("/api/reports/daily", async (req, res) => {
     try {
+      if (!(await requireTeacher(req, res))) return;
+
       const { form, subject, date, dateFrom: qDateFrom, dateTo: qDateTo } = req.query as {
         form?: string;
         subject?: string;
@@ -2754,6 +2855,10 @@ export async function registerRoutes(
   // Data Science export — full student × assignment matrix with 25 columns
   app.get("/api/export/homework-datasci", async (req, res) => {
     try {
+      // A full dump of every pupil's name, class, gender, marks and feedback.
+      // Staff only — this answered anyone at all before.
+      if (!(await requireTeacher(req, res))) return;
+
       const csvEscape = (val: string | number) => {
         const s = String(val).replace(/"/g, '""');
         return `"${s}"`;

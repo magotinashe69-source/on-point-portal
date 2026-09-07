@@ -51,6 +51,29 @@ A session holds **one role only**: `setSessionRole()` is used by every login, an
 setting one of `teacherId` / `studentId` / `parentId` clears the other two. So a
 parent can never also hold student or teacher access.
 
+### Who can call the API
+
+Every `/api/...` endpoint requires a login. There is no endpoint that answers an
+anonymous caller, and these guards in `server/routes.ts` decide who gets in:
+
+| Guard | Who it lets through | Used for |
+|---|---|---|
+| `requireTeacher` | a logged-in teacher | all writes, reports, exports, the student register |
+| `requireTeacherOrStudent` | a teacher **or** any logged-in pupil | homework, announcements, lessons, resources |
+| `requireTeacherOrSelf` | a teacher **or** that one pupil | a child's own submissions and marks |
+| `requireParent` / `requireParentChild` | a parent, for their own child only | `/api/parent/...` |
+
+Two rules worth keeping in mind when adding an endpoint:
+
+1. **Never trust an id in the request body to say who the caller is.** Several
+   endpoints used to "check" the author by looking up the `createdById` (or
+   `markedById`) sent by the browser — a row that always exists, so it refused
+   nobody. The author is now always taken from the session
+   (`req.session.teacherId`), and the value in the body is ignored.
+2. **A pupil is pinned to their own data.** `GET /api/submissions` replaces any
+   `?studentId=` a pupil sends with their own id, and anything that reads one
+   child's work goes through `requireTeacherOrSelf`.
+
 ## Classes (forms)
 
 Assignments and students are grouped by class:
