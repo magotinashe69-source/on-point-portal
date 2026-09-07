@@ -73,6 +73,14 @@ Two rules worth keeping in mind when adding an endpoint:
 2. **A pupil is pinned to their own data.** `GET /api/submissions` replaces any
    `?studentId=` a pupil sends with their own id, and anything that reads one
    child's work goes through `requireTeacherOrSelf`.
+3. **Check the login before looking anything up.** Answering 404 for a missing
+   id but 401 for a real one tells a logged-out caller which ids exist, so the
+   guard runs first and the lookup second.
+
+The dev-only streak helpers under `/api/dev/...` are teacher-only too, behind a
+single gate on that prefix. They are still registered only when
+`NODE_ENV !== "production"`; the gate is because a dev server is often reachable
+on the office network, and `sim-date` moves the clock for everyone using it.
 
 ## Classes (forms)
 

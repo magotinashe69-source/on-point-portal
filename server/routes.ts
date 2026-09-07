@@ -1609,6 +1609,11 @@ export async function registerRoutes(
 
   app.get("/api/submissions/:id", async (req, res) => {
     try {
+      // Refuse a logged-out caller before the lookup. Answering 404 for a
+      // missing id but 401 for a real one would let someone count the
+      // submissions in the school without logging in.
+      if (!(await requireTeacherOrStudent(req, res))) return;
+
       const submission = await storage.getSubmission(parseInt(req.params.id));
       if (!submission) {
         return res.status(404).json({ success: false, message: "Submission not found" });
@@ -1854,6 +1859,9 @@ export async function registerRoutes(
   // Marks
   app.get("/api/marks/:submissionId", async (req, res) => {
     try {
+      // Same reasoning as above: log in first, then we look anything up.
+      if (!(await requireTeacherOrStudent(req, res))) return;
+
       const submissionId = parseInt(req.params.submissionId);
 
       // A mark belongs to whoever handed the work in, so the submission decides
@@ -2130,8 +2138,25 @@ export async function registerRoutes(
   // These let you simulate day changes and activity so streaks (freezes, resets,
   // milestones) can be tested without waiting real days. They are registered
   // ONLY when NOT running in production, so they can never affect real users.
+  //
+  // They are also teacher-only. Not being in production is not the same as
+  // being private: a dev server is often reachable on the office network, and
+  // these are not read-only toys — sim-date moves the clock for EVERYONE using
+  // that server, and the other three rewrite any pupil's streak from an id in
+  // the request body. One gate covers the whole /api/dev prefix, so a helper
+  // added here later is locked down without anyone having to remember.
   // -------------------------------------------------------------------------
   if (process.env.NODE_ENV !== "production") {
+    app.use("/api/dev", async (req, res, next) => {
+      try {
+        // requireTeacher sends its own 401, so on failure there is nothing to
+        // do but stop: not calling next() ends the request here.
+        if (await requireTeacher(req, res)) next();
+      } catch (error) {
+        next(error);
+      }
+    });
+
     // Set (or clear) the simulated "today". Pass { "date": "YYYY-MM-DD" } to
     // pretend it is that day, or { "date": null } to go back to the real clock.
     app.post("/api/dev/streak/sim-date", (req, res) => {
