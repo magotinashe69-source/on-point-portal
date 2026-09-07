@@ -82,6 +82,41 @@ single gate on that prefix. They are still registered only when
 `NODE_ENV !== "production"`; the gate is because a dev server is often reachable
 on the office network, and `sim-date` moves the clock for everyone using it.
 
+### The weekly parent report
+
+Each linked child gets a short weekly summary, in two places that must always
+agree: the parent reads it in their portal, and the school copies a
+WhatsApp-ready version to send. Both are produced by the same builder, so the
+figures can never drift apart.
+
+- `shared/weekly-report.ts` — the report's shape, the week maths, the subject
+  names, and `buildWhatsAppReport()`. No database access, so it is easy to read
+  and to test.
+- `server/weekly-report.ts` — `buildWeeklyReport()`, which gathers the figures.
+
+Weeks run **Monday to Sunday in CAT**, using `streakToday()` so the report and
+the streak never disagree about which day something happened. `?week=last` asks
+for the completed week, which is what the school sends out.
+
+Percentages are total marks scored over total marks available — the same
+formula as the Reports page and the Grade Book, so a parent and a teacher
+quoting a figure see the same number.
+
+**There is no attendance data in this app.** The QR card called an "attendance
+card" is only used for login, and nothing records a pupil being present. So the
+report says **"Days active on homework"** — the number of days that week the
+child actually handed something in — and the parent portal says in plain words
+that it is not a record of school attendance. Do not relabel it as attendance
+without building a real register first.
+
+Two smaller rules worth keeping:
+
+- An average of `null` means *nothing was marked*, which is not the same as 0%.
+  Both the screen and the message say so rather than showing a zero.
+- "Needs attention" is only filled in when **two or more** subjects were marked.
+  With one subject there is no weakest to name, and telling a parent their
+  child's only subject is both their best and their worst would be nonsense.
+
 ## Classes (forms)
 
 Assignments and students are grouped by class:
@@ -127,7 +162,7 @@ client/
     pages/
       teacher/    # Teacher pages (login, dashboard, create, mark, resources, lessons)
       student/    # Student pages (login, dashboard, submit, results, resources, lessons)
-      parent/     # Parent pages (login, dashboard)
+      parent/     # Parent pages (login, dashboard + weekly report)
     lib/          # Query client and auth helpers
     hooks/        # Custom hooks
 server/
@@ -138,6 +173,7 @@ server/
   replit_integrations/object_storage/   # File-upload integration (see caveat below)
 shared/
   schema.ts       # Drizzle tables, TypeScript types, login schemas
+  weekly-report.ts # Weekly parent report: shape, week maths, WhatsApp message
 ```
 
 ## How login works

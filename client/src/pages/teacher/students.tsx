@@ -17,9 +17,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { QueryError } from "@/components/QueryError";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { ArrowLeft, PlusCircle, Pencil, Trash2, KeyRound, Loader2, Users, ClipboardPaste, QrCode, UserPlus } from "lucide-react";
+import { ArrowLeft, PlusCircle, Pencil, Trash2, KeyRound, Loader2, Users, ClipboardPaste, QrCode, UserPlus, MessageSquare, Copy, Check } from "lucide-react";
 import logoPath from "@assets/logo.webp";
 import type { Student, Parent } from "@shared/schema";
+import type { WeeklyReport } from "@shared/weekly-report";
 
 // --- Bulk paste ---------------------------------------------------------
 // Enrolling a class means typing the same thing thirty times. Each line is one
@@ -100,6 +101,12 @@ export default function StudentManagement() {
   // open — null when the dialog is closed.
   const [parentForStudent, setParentForStudent] = useState<Student | null>(null);
   const [newParent, setNewParent] = useState({ fullName: "", username: "", password: "" });
+
+  // Weekly report. `reportForStudent` is the child whose report is open —
+  // null when the dialog is closed. `reportWeek` picks which week to show.
+  const [reportForStudent, setReportForStudent] = useState<Student | null>(null);
+  const [reportWeek, setReportWeek] = useState<"this" | "last">("last");
+  const [reportCopied, setReportCopied] = useState(false);
 
   const [isPasteDialogOpen, setIsPasteDialogOpen] = useState(false);
   const [pasteText, setPasteText] = useState("");
@@ -220,6 +227,31 @@ export default function StudentManagement() {
       }
     },
   });
+
+  // The report and its WhatsApp message for the child whose dialog is open.
+  // The server sends both together, so the teacher sees exactly what they are
+  // about to send without a second request.
+  const { data: reportData, isLoading: reportLoading, isError: reportError } = useQuery<{
+    success: boolean;
+    report: WeeklyReport;
+    message: string;
+  }>({
+    queryKey: [`/api/students/${reportForStudent?.id}/weekly-report/whatsapp`, { week: reportWeek }],
+    enabled: !!reportForStudent,
+  });
+
+  const copyReport = async () => {
+    const text = reportData?.message;
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      setReportCopied(true);
+      toast({ title: "Copied", description: "Report copied to clipboard. Paste it into WhatsApp." });
+      setTimeout(() => setReportCopied(false), 3000);
+    } catch {
+      toast({ title: "Copy failed", description: "Please select and copy the text manually.", variant: "destructive" });
+    }
+  };
 
   const filteredStudents = students.filter(s => 
     filterForm === "all" || s.form === filterForm
@@ -584,6 +616,20 @@ export default function StudentManagement() {
                       )}
                     </div>
                     <div className="flex items-center gap-2">
+                      {/* This child's weekly report, ready to send to a parent. */}
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        title="Weekly report"
+                        aria-label="Weekly report"
+                        onClick={() => {
+                          setReportForStudent(student);
+                          setReportWeek("last");
+                        }}
+                        data-testid={`button-weekly-report-${student.id}`}
+                      >
+                        <MessageSquare className="h-4 w-4" />
+                      </Button>
                       {/* Add (or review) this child's parent account. */}
                       <Button
                         size="icon"
@@ -638,6 +684,78 @@ export default function StudentManagement() {
             )}
           </CardContent>
         </Card>
+
+        {/* This child's weekly report, and the message to send to their parent.
+            The figures shown here are the same ones the parent sees in their
+            own portal — both come from the server's one report builder. */}
+        <Dialog open={!!reportForStudent} onOpenChange={(open) => { if (!open) setReportForStudent(null); }}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <MessageSquare className="h-5 w-5" />
+                Weekly report{reportForStudent ? ` — ${reportForStudent.fullName}` : ""}
+              </DialogTitle>
+              <DialogDescription>
+                {reportData?.report
+                  ? `Week of ${reportData.report.week.label}. Copy this and send it to the parent.`
+                  : "Copy this and send it to the parent."}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="flex gap-1 rounded-md border p-1 w-fit">
+              <Button
+                size="sm"
+                variant={reportWeek === "last" ? "secondary" : "ghost"}
+                onClick={() => setReportWeek("last")}
+                data-testid="button-report-week-last"
+              >
+                Last week
+              </Button>
+              <Button
+                size="sm"
+                variant={reportWeek === "this" ? "secondary" : "ghost"}
+                onClick={() => setReportWeek("this")}
+                data-testid="button-report-week-this"
+              >
+                This week
+              </Button>
+            </div>
+
+            {reportLoading && (
+              <div className="flex items-center gap-2 text-muted-foreground py-6">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Building the report…
+              </div>
+            )}
+
+            {reportError && (
+              <p className="text-sm text-destructive py-6" data-testid="text-report-error">
+                We could not build this report just now. Try again in a moment.
+              </p>
+            )}
+
+            {reportData?.message && (
+              <>
+                {/* Shown exactly as it will arrive, so nothing is a surprise. */}
+                <div
+                  className="p-4 bg-muted rounded-md text-sm whitespace-pre-wrap font-mono leading-relaxed max-h-80 overflow-y-auto"
+                  data-testid="text-weekly-report-message"
+                >
+                  {reportData.message}
+                </div>
+                <DialogFooter>
+                  <Button className="w-full" onClick={copyReport} data-testid="button-copy-weekly-report">
+                    {reportCopied ? (
+                      <><Check className="h-4 w-4 mr-2" />Copied</>
+                    ) : (
+                      <><Copy className="h-4 w-4 mr-2" />Copy WhatsApp Message</>
+                    )}
+                  </Button>
+                </DialogFooter>
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
 
         {/* Add a parent account for one child.
             The child is fixed by the record this was opened from, and is sent

@@ -14,6 +14,8 @@ import type { Assignment, Submission, Student } from "@shared/schema";
 import { isPrimaryForm } from "@shared/schema";
 import { isFullyAutoMarked, markSubmission, markAnswer, buildFeedback, isAutoMarkable } from "@shared/auto-marking";
 import { awardRandomCollectible } from "./rewards";
+import { buildWeeklyReport } from "./weekly-report";
+import { buildWhatsAppReport } from "@shared/weekly-report";
 import { awardXp, adjustXp, xpProgress, XP_PER_CORRECT, XP_COMPLETION_BONUS, XP_IMPROVEMENT_BONUS } from "./xp";
 import { recordActivity, grantFreezeForLevelUp, refreshStreak, setSimulatedToday, getSimulatedToday, resetStreak, streakToday } from "./streaks";
 // Dream World is retired, so this file imports nothing from ./dreamworld. Its
@@ -648,6 +650,84 @@ export async function registerRoutes(
       }
       res.json({ success: true, child: childSummary(student) });
     } catch (error) {
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
+    }
+  });
+
+
+  // ─── Weekly parent report ─────────────────────────────────────────────────
+  //
+  // One report, two ways out: the parent reads it in their own portal, and the
+  // school copies a WhatsApp version to send. Both come from buildWeeklyReport,
+  // so the numbers can never disagree.
+  //
+  // "week" picks which week: "this" (the default) or "last", which is what the
+  // school wants when it sends summaries out at the end of the week.
+  // -------------------------------------------------------------------------
+
+  /** Which week the caller asked for. Anything unrecognised means this week. */
+  function weekOffsetFromQuery(req: Request): number {
+    return req.query.week === "last" ? 1 : 0;
+  }
+
+  // The parent's own copy. Takes NO id — the child comes from the parent's row,
+  // so there is nothing here to tamper with.
+  app.get("/api/parent/weekly-report", async (req, res) => {
+    try {
+      const parent = await requireParent(req, res);
+      if (!parent) return;
+
+      const student = await storage.getStudent(parent.studentId);
+      if (!student) {
+        return res.status(404).json({
+          success: false,
+          message: "That pupil is no longer on the register. Ask the school to check.",
+        });
+      }
+
+      const report = await buildWeeklyReport(student, weekOffsetFromQuery(req));
+      res.json({ success: true, report });
+    } catch (error) {
+      console.error("Parent weekly report error:", error);
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
+    }
+  });
+
+  // The same report for a teacher, for any pupil on the register.
+  app.get("/api/students/:id/weekly-report", async (req, res) => {
+    try {
+      if (!(await requireTeacher(req, res))) return;
+
+      const student = await storage.getStudent(parseInt(req.params.id));
+      if (!student) {
+        return res.status(404).json({ success: false, message: "Student not found" });
+      }
+
+      const report = await buildWeeklyReport(student, weekOffsetFromQuery(req));
+      res.json({ success: true, report });
+    } catch (error) {
+      console.error("Weekly report error:", error);
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
+    }
+  });
+
+  // The WhatsApp-ready text. Teacher-only: it is the school that sends these
+  // out, and it carries the same figures the parent sees in their portal.
+  app.get("/api/students/:id/weekly-report/whatsapp", async (req, res) => {
+    try {
+      if (!(await requireTeacher(req, res))) return;
+
+      const student = await storage.getStudent(parseInt(req.params.id));
+      if (!student) {
+        return res.status(404).json({ success: false, message: "Student not found" });
+      }
+
+      const report = await buildWeeklyReport(student, weekOffsetFromQuery(req));
+      // The report is sent back alongside the message so the teacher's screen
+      // can show what they are about to send without asking twice.
+      res.json({ success: true, report, message: buildWhatsAppReport(report) });
+    } catch (error) {
+      console.error("Weekly report WhatsApp error:", error);
       res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });

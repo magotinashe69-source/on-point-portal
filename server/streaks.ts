@@ -239,6 +239,26 @@ export interface StreakSummary {
   notice: StreakNotice | null;
 }
 
+/**
+ * Read a student's streak WITHOUT changing anything.
+ *
+ * refreshStreak below is the one the child's own dashboard calls: as well as
+ * settling the streak it delivers (and therefore clears) any pending note, such
+ * as a milestone to celebrate. The weekly parent report must not do that — a
+ * parent opening their report would swallow a celebration the child had not
+ * seen yet. So this settles the numbers in memory only: nothing is written, and
+ * no note is consumed.
+ */
+export async function peekStreak(studentId: number): Promise<{ current: number; longest: number }> {
+  const row = await storage.getStudentStreak(studentId);
+  if (!row) return { current: 0, longest: 0 };
+
+  // Settle against today so a streak the child has already broken is not
+  // reported as though it were still running.
+  const { state } = settle(fromRow(row), streakToday());
+  return { current: state.currentStreak, longest: state.longestStreak };
+}
+
 export async function refreshStreak(studentId: number): Promise<StreakSummary> {
   const today = streakToday();
   const row = await storage.getStudentStreak(studentId);
