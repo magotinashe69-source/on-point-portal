@@ -8,6 +8,7 @@ import {
   studentLoginSchema,
   parentLoginSchema,
   createParentAccountSchema,
+  updateParentAccountSchema,
   MASTER_PASSWORD
 } from "@shared/schema";
 import type { Assignment, Submission, Student } from "@shared/schema";
@@ -15,6 +16,7 @@ import { isPrimaryForm } from "@shared/schema";
 import { isFullyAutoMarked, markSubmission, markAnswer, buildFeedback, isAutoMarkable } from "@shared/auto-marking";
 import { awardRandomCollectible } from "./rewards";
 import { buildWeeklyReport } from "./weekly-report";
+import { buildParentOverview } from "./parent-overview";
 import { buildWhatsAppReport } from "@shared/weekly-report";
 import { awardXp, adjustXp, xpProgress, XP_PER_CORRECT, XP_COMPLETION_BONUS, XP_IMPROVEMENT_BONUS } from "./xp";
 import { recordActivity, grantFreezeForLevelUp, refreshStreak, setSimulatedToday, getSimulatedToday, resetStreak, streakToday } from "./streaks";
@@ -693,6 +695,38 @@ export async function registerRoutes(
     }
   });
 
+  // ─── The parent's view of their child ─────────────────────────────────────
+  //
+  // Everything a parent is allowed to see, in one request: the current
+  // average, marks by subject, recent marks with the teacher's feedback,
+  // homework set against handed in, days active on homework, and the school's
+  // announcements for that class.
+  //
+  // Like the dashboard above it takes NO id. The child is read from the
+  // parent's own row, so a parent editing the address bar has nothing to edit
+  // — there is no pupil id in this request to change. It is also read-only:
+  // there is no matching POST, PATCH or DELETE anywhere under /api/parent/.
+  app.get("/api/parent/overview", async (req, res) => {
+    try {
+      const parent = await requireParent(req, res);
+      if (!parent) return;
+
+      const student = await storage.getStudent(parent.studentId);
+      if (!student) {
+        return res.status(404).json({
+          success: false,
+          message: "That pupil is no longer on the register. Ask the school to check.",
+        });
+      }
+
+      const overview = await buildParentOverview(student);
+      res.json({ success: true, overview });
+    } catch (error) {
+      console.error("Parent overview error:", error);
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
+    }
+  });
+
   // The same report for a teacher, for any pupil on the register.
   app.get("/api/students/:id/weekly-report", async (req, res) => {
     try {
@@ -803,6 +837,60 @@ export async function registerRoutes(
       res.json({ success: true, parent: safeParent(parent) });
     } catch (error) {
       console.error("Create parent account error:", error);
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
+    }
+  });
+
+  // Edit a parent account: fix the name, change the username, or reset the
+  // password. Teacher only.
+  //
+  // What this route will NOT do is move the account to a different child. The
+  // child is never read from the body, and updateParent has no way to write
+  // it, so a linked parent stays linked to the pupil their record was created
+  // on. Re-linking is done by removing the account and adding a new one.
+  app.patch("/api/parents/:id", async (req, res) => {
+    try {
+      if (!(await requireTeacher(req, res))) return;
+
+      const id = parseInt(req.params.id);
+      if (!Number.isInteger(id)) {
+        return res.json({ success: false, message: "That is not a valid parent account." });
+      }
+
+      const parent = await storage.getParent(id);
+      if (!parent) {
+        return res.status(404).json({ success: false, message: "Parent account not found" });
+      }
+
+      const validation = validateRequest(updateParentAccountSchema, req.body);
+      if (!validation.success) {
+        return res.json({ success: false, message: validation.error });
+      }
+
+      const username = validation.data.username.trim().toLowerCase();
+      if (username.includes(" ")) {
+        return res.json({ success: false, message: "The username cannot contain spaces." });
+      }
+
+      // Taken by somebody else? Their own current username is fine, so a
+      // teacher can change the name without also having to change the login.
+      const owner = await storage.getParentByUsername(username);
+      if (owner && owner.id !== id) {
+        return res.json({ success: false, message: "That username is already taken. Choose another." });
+      }
+
+      const updated = await storage.updateParent(id, {
+        fullName: validation.data.fullName.trim(),
+        username,
+        password: validation.data.password || undefined,
+      });
+      if (!updated) {
+        return res.status(404).json({ success: false, message: "Parent account not found" });
+      }
+
+      res.json({ success: true, parent: safeParent(updated) });
+    } catch (error) {
+      console.error("Update parent account error:", error);
       res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });

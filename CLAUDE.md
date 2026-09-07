@@ -51,6 +51,26 @@ A session holds **one role only**: `setSessionRole()` is used by every login, an
 setting one of `teacherId` / `studentId` / `parentId` clears the other two. So a
 parent can never also hold student or teacher access.
 
+A third rule protects the link itself: **an account cannot be moved to another
+child.** `PATCH /api/parents/:id` accepts only the name, the username and the
+password, and `storage.updateParent()` has no way to write `studentId`. A
+`studentId` sent in the body is ignored. To re-link a parent, remove the account
+and add a new one on the right child's record.
+
+### Proving it — `npm run check:parents`
+
+`script/check-parent-security.ts` is the test behind all of this. It runs
+against a **live server** (`npm run dev` first), creates a parent account for
+two different children, and then, as parent A, tries every route we could think
+of for reaching child B — the pupil id in the address, the teacher endpoints,
+the register, the reports, and writing. It also checks that child B's name
+appears nowhere in what parent A is sent, that a made-up pupil id is refused
+with 403 rather than 404 (a 404 would reveal which ids exist), and that a
+logged-out caller gets nothing. It tidies up the accounts it made.
+
+Run it after touching anything under `/api/parent/`, any guard in
+`server/routes.ts`, or the parents table. All checks must pass.
+
 ### Who can call the API
 
 Every `/api/...` endpoint requires a login. There is no endpoint that answers an
@@ -93,6 +113,8 @@ figures can never drift apart.
   names, and `buildWhatsAppReport()`. No database access, so it is easy to read
   and to test.
 - `server/weekly-report.ts` — `buildWeeklyReport()`, which gathers the figures.
+  It also exports `percentage()`, `catDay()` and `dueDateFor()`, which
+  `server/parent-overview.ts` reuses so the two never disagree.
 
 Weeks run **Monday to Sunday in CAT**, using `streakToday()` so the report and
 the streak never disagree about which day something happened. `?week=last` asks
@@ -116,6 +138,31 @@ Two smaller rules worth keeping:
 - "Needs attention" is only filled in when **two or more** subjects were marked.
   With one subject there is no weakest to name, and telling a parent their
   child's only subject is both their best and their worst would be nonsense.
+
+### What a parent sees
+
+Two requests feed the parent's dashboard, and **neither takes a pupil id** —
+the child is read from the parent's own row, so there is nothing in either
+address to tamper with.
+
+- `GET /api/parent/weekly-report` — the week just gone (see above).
+- `GET /api/parent/overview` — the fuller picture: the current average across
+  all marked work, marks by subject, recent marks with the teacher's written
+  feedback, homework set against handed in with what is still outstanding, days
+  active on homework, and the school's announcements for that class.
+
+Its shapes and wording live in `shared/parent-overview.ts`; the figures are
+gathered in `server/parent-overview.ts`. That builder imports `percentage()`,
+`catDay()` and `dueDateFor()` from `server/weekly-report.ts` rather than copying
+them, so the overview, the weekly report, the Reports page and the Grade Book
+can never quote a parent different numbers.
+
+The parent portal is **read-only**: there is no POST, PATCH or DELETE anywhere
+under `/api/parent/`, and the access gate closes every other endpoint to them.
+
+**Attendance:** still none. `attendance.recorded` is hard-coded `false` and the
+only figure offered is days active on homework, labelled in plain words as not
+being a record of school attendance. See the weekly report section above.
 
 ## Classes (forms)
 
@@ -174,6 +221,9 @@ server/
 shared/
   schema.ts       # Drizzle tables, TypeScript types, login schemas
   weekly-report.ts # Weekly parent report: shape, week maths, WhatsApp message
+  parent-overview.ts # The parent's fuller view of their child: shapes + wording
+script/
+  check-parent-security.ts  # npm run check:parents — the parent security test
 ```
 
 ## How login works

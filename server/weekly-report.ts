@@ -23,7 +23,7 @@ import type { Assignment, Student } from "@shared/schema";
  * Matches how streaks decide which day a submission belongs to, so "days
  * active" here and the streak the child sees never disagree by a day.
  */
-function catDay(when: Date | string | number): string {
+export function catDay(when: Date | string | number): string {
   const ms = when instanceof Date ? when.getTime() : new Date(when).getTime();
   return new Date(ms + 2 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
@@ -34,13 +34,13 @@ function catDay(when: Date | string | number): string {
  * A teacher can extend a deadline for one pupil, and if we ignored that the
  * report would tell a parent their child missed work that was never late.
  */
-function dueDateFor(assignment: Assignment, studentId: number): string {
+export function dueDateFor(assignment: Assignment, studentId: number): string {
   const extension = (assignment.extendedDeadlines || []).find(e => e.studentId === studentId);
   return extension?.newDueDate || assignment.dueDate;
 }
 
 /** Total scored / total available, as a whole percentage. Null when nothing counts. */
-function percentage(scored: number, available: number): number | null {
+export function percentage(scored: number, available: number): number | null {
   if (available <= 0) return null;
   return Math.round((scored / available) * 100);
 }

@@ -472,5 +472,25 @@ export const createParentAccountSchema = z.object({
 });
 export type CreateParentAccount = z.infer<typeof createParentAccountSchema>;
 
+// What a teacher may change on an existing parent account: the parent's name,
+// the username they log in with, and their password.
+//
+// The child is deliberately absent. An account is tied to one pupil at the
+// moment it is created and stays there for life, so an edit can never quietly
+// point a parent at somebody else's child. To move a parent, remove the
+// account and add a new one on the right record.
+//
+// A blank password means "leave the current one alone" — a teacher fixing a
+// spelling mistake in the name should not have to reissue the password.
+export const updateParentAccountSchema = z.object({
+  fullName: z.string().min(1, "The parent's name is required"),
+  username: z.string().min(3, "Username must be at least 3 characters"),
+  password: z.union([
+    z.string().min(6, "Password must be at least 6 characters"),
+    z.literal(""),
+  ]).optional(),
+});
+export type UpdateParentAccount = z.infer<typeof updateParentAccountSchema>;
+
 // Master password for admin access
 export const MASTER_PASSWORD = "onpoint_admin_2024";

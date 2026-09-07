@@ -50,6 +50,7 @@ export interface IStorage {
   getParentByStudentId(studentId: number): Promise<Parent | undefined>;
   getAllParents(): Promise<Parent[]>;
   createParent(parent: InsertParent): Promise<Parent>;
+  updateParent(id: number, changes: { fullName: string; username: string; password?: string }): Promise<Parent | undefined>;
   deleteParent(id: number): Promise<void>;
   
   // Assignments
@@ -237,6 +238,28 @@ export class DatabaseStorage implements IStorage {
   async createParent(parent: InsertParent): Promise<Parent> {
     const [newParent] = await db.insert(parents).values(parent).returning();
     return newParent;
+  }
+
+  // Correct the details on an account that already exists.
+  //
+  // Only the three things a teacher can sensibly change are accepted. The
+  // child (studentId) is not one of them: an account belongs to the pupil it
+  // was created on and stays there, so no edit can point a parent at another
+  // family's child.
+  async updateParent(
+    id: number,
+    changes: { fullName: string; username: string; password?: string },
+  ): Promise<Parent | undefined> {
+    const fields: { fullName: string; username: string; password?: string } = {
+      fullName: changes.fullName,
+      username: changes.username.toLowerCase(),
+    };
+    // A blank password means "keep the one they already have", so a teacher
+    // fixing a name does not accidentally lock the parent out.
+    if (changes.password) fields.password = changes.password;
+
+    const [updated] = await db.update(parents).set(fields).where(eq(parents.id, id)).returning();
+    return updated || undefined;
   }
 
   async deleteParent(id: number): Promise<void> {

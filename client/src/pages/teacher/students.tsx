@@ -101,6 +101,11 @@ export default function StudentManagement() {
   // open — null when the dialog is closed.
   const [parentForStudent, setParentForStudent] = useState<Student | null>(null);
   const [newParent, setNewParent] = useState({ fullName: "", username: "", password: "" });
+  // Editing the account a child already has. `editingParent` is true while the
+  // edit form is showing; `parentEdits` holds what the teacher has typed.
+  // A blank password here means "keep the current one".
+  const [editingParent, setEditingParent] = useState(false);
+  const [parentEdits, setParentEdits] = useState({ fullName: "", username: "", password: "" });
 
   // Weekly report. `reportForStudent` is the child whose report is open —
   // null when the dialog is closed. `reportWeek` picks which week to show.
@@ -165,6 +170,30 @@ export default function StudentManagement() {
       queryClient.invalidateQueries({ queryKey: ["/api/parents"] });
       toast({ title: "Parent account removed", description: "The pupil and their work are untouched." });
       setParentForStudent(null);
+      setEditingParent(false);
+    },
+  });
+
+  // Correcting an account that already exists. The child is not sent, and the
+  // server would ignore it anyway — an account stays with the pupil it was
+  // created on, so an edit can never point a parent at a different child.
+  const updateParentMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: typeof parentEdits }) => {
+      const response = await apiRequest("PATCH", `/api/parents/${id}`, data);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        queryClient.invalidateQueries({ queryKey: ["/api/parents"] });
+        toast({
+          title: "Parent account updated",
+          description: "The new details take effect the next time they log in.",
+        });
+        setEditingParent(false);
+        setParentEdits({ fullName: "", username: "", password: "" });
+      } else {
+        toast({ title: "Parent account not updated", description: data.message, variant: "destructive" });
+      }
     },
   });
 
@@ -638,6 +667,7 @@ export default function StudentManagement() {
                         aria-label={parentFor(student.id) ? "Parent account" : "Add parent account"}
                         onClick={() => {
                           setParentForStudent(student);
+                          setEditingParent(false);
                           setNewParent({ fullName: "", username: "", password: "" });
                         }}
                         data-testid={`button-add-parent-${student.id}`}
@@ -761,7 +791,7 @@ export default function StudentManagement() {
             The child is fixed by the record this was opened from, and is sent
             in the address of the request — a teacher never picks the child on
             this form, and a parent can never change it afterwards. */}
-        <Dialog open={!!parentForStudent} onOpenChange={(open) => { if (!open) setParentForStudent(null); }}>
+        <Dialog open={!!parentForStudent} onOpenChange={(open) => { if (!open) { setParentForStudent(null); setEditingParent(false); } }}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Parent account</DialogTitle>
@@ -772,20 +802,44 @@ export default function StudentManagement() {
               </DialogDescription>
             </DialogHeader>
 
-            {parentForStudent && existingParent && (
+            {parentForStudent && existingParent && !editingParent && (
               /* This child already has an account. One per child for now, so
-                 the form is replaced by what is already there. */
+                 what is already linked is shown instead of the add form, with
+                 the two things a teacher can do to it: edit, or remove. */
               <div className="space-y-4 py-4">
                 <div className="rounded-md border p-4 space-y-1">
                   <p className="text-sm text-muted-foreground">Parent</p>
                   <p className="font-medium" data-testid="text-existing-parent-name">{existingParent.fullName}</p>
                   <p className="text-sm text-muted-foreground pt-2">Username</p>
                   <p className="font-mono text-sm" data-testid="text-existing-parent-username">{existingParent.username}</p>
+                  <p className="text-sm text-muted-foreground pt-2">Linked to</p>
+                  <p className="text-sm" data-testid="text-existing-parent-child">
+                    {parentForStudent.fullName} ({parentForStudent.form})
+                  </p>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Each child can have one parent account at a time. To change the login
-                  details, remove this account and add a new one.
+                  This account can only ever see {parentForStudent.fullName}. To link the
+                  parent to a different child, remove this account and add one on that
+                  child's record.
                 </p>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    // Start the form from what is saved, so a teacher changing
+                    // one field does not have to retype the others. The
+                    // password starts blank, meaning "leave it alone".
+                    setParentEdits({
+                      fullName: existingParent.fullName,
+                      username: existingParent.username,
+                      password: "",
+                    });
+                    setEditingParent(true);
+                  }}
+                  data-testid="button-edit-parent"
+                >
+                  Edit details
+                </Button>
                 <Button
                   variant="outline"
                   className="w-full text-destructive"
@@ -801,6 +855,76 @@ export default function StudentManagement() {
                   Remove parent account
                 </Button>
               </div>
+            )}
+
+            {parentForStudent && existingParent && editingParent && (
+              /* Correcting the account. Note there is no way to change the
+                 child here — that is fixed for the life of the account. */
+              <>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="input-edit-parent-name">Parent's name</Label>
+                    <Input
+                      id="input-edit-parent-name"
+                      value={parentEdits.fullName}
+                      onChange={(e) => setParentEdits({ ...parentEdits, fullName: e.target.value })}
+                      data-testid="input-edit-parent-name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="input-edit-parent-username">Username</Label>
+                    <Input
+                      id="input-edit-parent-username"
+                      value={parentEdits.username}
+                      onChange={(e) => setParentEdits({ ...parentEdits, username: e.target.value.toLowerCase() })}
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      data-testid="input-edit-parent-username"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      No spaces. Changing this changes what the parent types to log in.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="input-edit-parent-password">New password</Label>
+                    <Input
+                      id="input-edit-parent-password"
+                      value={parentEdits.password}
+                      onChange={(e) => setParentEdits({ ...parentEdits, password: e.target.value })}
+                      placeholder="Leave blank to keep the current password"
+                      data-testid="input-edit-parent-password"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Only fill this in to give the parent a new password.
+                    </p>
+                  </div>
+                  <div className="rounded-md bg-muted p-3">
+                    <p className="text-xs text-muted-foreground">
+                      Still linked to {parentForStudent.fullName}. Editing cannot move an
+                      account to another child.
+                    </p>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => setEditingParent(false)}
+                    data-testid="button-cancel-edit-parent"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      updateParentMutation.mutate({ id: existingParent.id, data: parentEdits });
+                    }}
+                    disabled={updateParentMutation.isPending}
+                    data-testid="button-save-parent"
+                  >
+                    {updateParentMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    Save changes
+                  </Button>
+                </DialogFooter>
+              </>
             )}
 
             {parentForStudent && !existingParent && (

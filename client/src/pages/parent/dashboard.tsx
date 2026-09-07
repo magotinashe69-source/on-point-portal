@@ -7,7 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { REPORT_TEXT, subjectLabel, type WeeklyReport } from "@shared/weekly-report";
-import { LogOut, Loader2, GraduationCap, CalendarDays, TrendingUp, AlertCircle, Flame } from "lucide-react";
+import { OVERVIEW_TEXT, type ParentOverview } from "@shared/parent-overview";
+import { LogOut, Loader2, GraduationCap, CalendarDays, TrendingUp, AlertCircle, Flame, ClipboardList, MessageSquare, Megaphone, Eye } from "lucide-react";
 import logoPath from "@assets/logo.webp";
 
 // What the server sends back about the child. Deliberately small: a parent sees
@@ -72,10 +73,31 @@ export default function ParentDashboard() {
     enabled: !!parent,
   });
 
+  // The fuller picture: current average, marks by subject, recent marks with
+  // the teacher's feedback, homework, and announcements.
+  //
+  // Like the two above, this address carries NO pupil id. The server works out
+  // whose child it is from the parent's own account, so there is nothing on
+  // this page that could be pointed at somebody else's child.
+  const {
+    data: overviewData,
+    isLoading: overviewLoading,
+    isError: overviewError,
+  } = useQuery<{ success: boolean; overview: ParentOverview }>({
+    queryKey: ["/api/parent/overview"],
+    enabled: !!parent,
+  });
+
   if (!parent) return null;
 
   const child = data?.child;
   const report = reportData?.report;
+  const overview = overviewData?.overview;
+
+  // The teacher's written comments, taken from the recent marks that have one.
+  // Kept as its own list so a parent can read the feedback on its own without
+  // picking through the marks.
+  const feedback = (overview?.recentMarks || []).filter(m => m.feedback);
 
   return (
     <div className="min-h-screen bg-background">
@@ -263,6 +285,238 @@ export default function ParentDashboard() {
             )}
           </CardContent>
         </Card>
+
+        {/* ---- Everything else the parent may see ----
+             All of it is read-only: there is not a single control on this page
+             that changes anything, and the server has no parent endpoint that
+             writes. */}
+        {overviewLoading && (
+          <div className="flex items-center gap-2 text-muted-foreground mt-6">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading…
+          </div>
+        )}
+
+        {overviewError && (
+          <p className="text-sm text-destructive mt-6" data-testid="text-overview-error">
+            We could not load the rest of your child's information just now. Try again in a moment.
+          </p>
+        )}
+
+        {overview && (
+          <div className="space-y-6 mt-6">
+            {/* Current average, and how each subject is going. */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5" />
+                  {OVERVIEW_TEXT.average}
+                </CardTitle>
+                <CardDescription>{OVERVIEW_TEXT.averageNote}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* An average of nothing is said out loud rather than shown as
+                    0%, which would read as a bad report. */}
+                <p className="text-4xl font-bold" data-testid="text-current-average">
+                  {overview.averagePercent === null ? "—" : `${overview.averagePercent}%`}
+                </p>
+                {overview.averagePercent === null && (
+                  <p className="text-sm text-muted-foreground" data-testid="text-overview-nothing-marked">
+                    {OVERVIEW_TEXT.nothingMarked}
+                  </p>
+                )}
+
+                <div className="border-t pt-4">
+                  <p className="text-sm font-semibold mb-3">{OVERVIEW_TEXT.subjects}</p>
+                  {overview.subjects.length === 0 && (
+                    <p className="text-sm text-muted-foreground">{OVERVIEW_TEXT.subjectsEmpty}</p>
+                  )}
+                  <div className="space-y-2">
+                    {overview.subjects.map(s => (
+                      <div
+                        key={s.subject}
+                        className="flex items-center justify-between gap-3 rounded-md border p-3"
+                        data-testid={`row-subject-${s.subject}`}
+                      >
+                        <div>
+                          <p className="font-medium">{subjectLabel(s.subject)}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {s.marked} {s.marked === 1 ? "marked piece" : "marked pieces"}
+                          </p>
+                        </div>
+                        <p className="text-lg font-semibold">{s.averagePercent}%</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* The most recent marked work, newest first. */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ClipboardList className="h-5 w-5" />
+                  {OVERVIEW_TEXT.recentMarks}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {overview.recentMarks.length === 0 && (
+                  <p className="text-sm text-muted-foreground" data-testid="text-no-recent-marks">
+                    {OVERVIEW_TEXT.recentMarksEmpty}
+                  </p>
+                )}
+                <div className="space-y-2">
+                  {overview.recentMarks.map((m, i) => (
+                    <div key={i} className="rounded-md border p-3" data-testid={`row-recent-mark-${i}`}>
+                      <div className="flex items-start justify-between gap-3 flex-wrap">
+                        <div>
+                          <p className="font-medium">{m.title}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {subjectLabel(m.subject)} · {new Date(m.markedAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold">{m.percent}%</p>
+                          <p className="text-xs text-muted-foreground">
+                            {m.score} / {m.outOf}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Homework set against homework handed in, and what is left. */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <GraduationCap className="h-5 w-5" />
+                  {OVERVIEW_TEXT.homework}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <Stat
+                    icon={<ClipboardList className="h-4 w-4" />}
+                    label={OVERVIEW_TEXT.homeworkSet}
+                    value={String(overview.homework.assigned)}
+                    testId="stat-homework-assigned"
+                  />
+                  <Stat
+                    icon={<GraduationCap className="h-4 w-4" />}
+                    label={OVERVIEW_TEXT.homeworkDone}
+                    value={String(overview.homework.completed)}
+                    testId="stat-homework-completed"
+                  />
+                </div>
+
+                <div className="border-t pt-4">
+                  <p className="text-sm font-semibold mb-3">{OVERVIEW_TEXT.outstanding}</p>
+                  {overview.homework.outstanding.length === 0 && (
+                    <p className="text-sm text-muted-foreground" data-testid="text-nothing-outstanding">
+                      {OVERVIEW_TEXT.outstandingEmpty}
+                    </p>
+                  )}
+                  <div className="space-y-2">
+                    {overview.homework.outstanding.map((item, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center justify-between gap-3 rounded-md border p-3"
+                        data-testid={`row-outstanding-${i}`}
+                      >
+                        <div>
+                          <p className="font-medium">{item.title}</p>
+                          <p className="text-xs text-muted-foreground">{subjectLabel(item.subject)}</p>
+                        </div>
+                        <Badge variant="outline">Due {item.dueDate}</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Said plainly, because the school keeps no attendance
+                    register and this figure must never be mistaken for one. */}
+                <div className="border-t pt-4">
+                  <Stat
+                    icon={<CalendarDays className="h-4 w-4" />}
+                    label={OVERVIEW_TEXT.activity}
+                    value={String(overview.attendance.daysActiveLast4Weeks)}
+                    testId="stat-days-active-4-weeks"
+                  />
+                  <p className="text-xs text-muted-foreground mt-2">{OVERVIEW_TEXT.activityNote}</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* What the teacher wrote about the work. */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MessageSquare className="h-5 w-5" />
+                  {OVERVIEW_TEXT.feedback}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {feedback.length === 0 && (
+                  <p className="text-sm text-muted-foreground" data-testid="text-no-feedback">
+                    {OVERVIEW_TEXT.feedbackEmpty}
+                  </p>
+                )}
+                <div className="space-y-3">
+                  {feedback.map((m, i) => (
+                    <div key={i} className="rounded-md border p-3" data-testid={`row-feedback-${i}`}>
+                      <p className="text-xs text-muted-foreground mb-1">
+                        {subjectLabel(m.subject)} · {m.title}
+                      </p>
+                      <p className="text-sm">{m.feedback}</p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* School notices for this child's class. */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Megaphone className="h-5 w-5" />
+                  {OVERVIEW_TEXT.announcements}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {overview.announcements.length === 0 && (
+                  <p className="text-sm text-muted-foreground" data-testid="text-no-announcements">
+                    {OVERVIEW_TEXT.announcementsEmpty}
+                  </p>
+                )}
+                <div className="space-y-3">
+                  {overview.announcements.map(a => (
+                    <div key={a.id} className="rounded-md border p-3" data-testid={`row-announcement-${a.id}`}>
+                      <div className="flex items-start justify-between gap-3 flex-wrap mb-1">
+                        <p className="font-medium">{a.title}</p>
+                        {a.priority !== "normal" && (
+                          <Badge variant={a.priority === "urgent" ? "destructive" : "secondary"}>
+                            {a.priority}
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">{a.content}</p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* A plain reminder of what this account is. */}
+            <p className="text-xs text-muted-foreground flex items-center gap-2" data-testid="text-read-only">
+              <Eye className="h-3 w-3" />
+              {OVERVIEW_TEXT.readOnly}
+            </p>
+          </div>
+        )}
       </main>
     </div>
   );
