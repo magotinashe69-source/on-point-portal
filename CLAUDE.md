@@ -285,13 +285,52 @@ The pupil's results page calls it "What a good answer looks like" and says
 theirs need not match word for word — the same honest wording as the parent's
 page, and for the same reason.
 
-**Still open: the auto-marking answer key is NOT stripped.** `correctOption`,
-`acceptedAnswers`, `correctNumber`, `correctBool` and `tolerance` still go out
-with the questions, so a pupil who opens the browser's network tab can read the
-answers to an auto-marked assignment before answering it. That predates the
-model answer and is a bigger change (the submit page and the marking engine both
-read those fields), so it was left alone — but `assignmentForStudent()` is the
-place to fix it when someone does.
+### The paper, never the answers — `assignmentForStudent()`
+
+A question carries its answer key in the **same row** as its wording. Sending
+that row out whole put the correct option, the accepted spellings, the right
+number and the explanation into the page **before the child had written a
+word** — invisible on screen, plain in the browser's network tab. That is what
+made it easy to miss for so long.
+
+`assignmentForStudent()` in `server/routes.ts` strips all of it for anyone who
+is not a teacher: `correctOption`, `correctBool`, `correctNumber`, `tolerance`,
+`acceptedAnswers`, `explanation` and `modelAnswer`. It is applied in **three**
+places, and all three matter:
+
+1. `GET /api/assignments` — the list
+2. `GET /api/assignments/:id` — one assignment
+3. the assignment embedded in `GET /api/submissions/:id` — which is where the
+   results page reads its questions from
+
+**What survives is as important as what goes.** `type` decides which input the
+page draws and `options` are the choices a multiple-choice question is asking
+about: strip those and the paper cannot be answered. Add a new answer-key field
+to the schema and it must be added to this function too.
+
+**Marking is unaffected, by design.** `autoMarkSubmission()` reads the
+assignment from the database, never from anything a browser was sent, so
+removing these fields cannot change a mark. `npm run check:answers` proves it
+rather than assuming it: it answers a four-question paper 3 right, 1 wrong and
+checks the score comes back 3 of 4.
+
+**A child is still told the answers — afterwards.** The per-question feedback
+the marker writes says what the right answer was ("Correct answer: 6."), and
+`GET /api/marks/:submissionId` carries the model answers. Nothing is hidden from
+a pupil; it is just not handed over early.
+
+### Proving it — `npm run check:answers`
+
+`script/check-answer-key.ts` walks the whole journey as a real logged-in pupil
+against a live server: fetch the paper, answer it, get it marked, read the
+results. It checks the answers are absent on the way out (field by field, and by
+searching the raw response text for the answers themselves), that the question
+wording, type, options and marks all survive, that auto-marking still scores
+exactly right, that the feedback afterwards does tell the child the answer, and
+that a teacher still gets everything. 34 checks.
+
+Run it after touching `assignmentForStudent()`, anything that returns an
+assignment, or the questions schema.
 
 **Attendance:** still none. `attendance.recorded` is hard-coded `false` and the
 only figure offered is days active on homework, labelled in plain words as not

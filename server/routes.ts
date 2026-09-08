@@ -247,12 +247,27 @@ export async function registerRoutes(
   });
 
   /**
-   * An assignment as a STUDENT may see it.
+   * An assignment as a STUDENT may see it: the paper, never the answers.
    *
-   * The model answer a teacher writes on a written question is for AFTERWARDS.
-   * It reaches a child with their mark (GET /api/marks/:submissionId), never
-   * alongside the question itself — otherwise the answer would be sitting in
-   * the page before they had written a word.
+   * A question carries its answer key in the same row as its wording — the
+   * correct option, the accepted spellings, the right number, the model answer
+   * a teacher wrote for a written question. Sending the row out whole put every
+   * one of those in the page BEFORE the child had written a word, where the
+   * browser's network tab would show them. The child never saw them on screen,
+   * which is exactly what made it easy to miss.
+   *
+   * So the key is stripped here, in one place, for anyone who is not a teacher.
+   * Answers reach a child afterwards instead, with their mark:
+   * GET /api/marks/:submissionId carries the model answers, and the per-question
+   * feedback the marker writes already says what the right answer was.
+   *
+   * What SURVIVES matters as much as what goes. `type` decides which input the
+   * page draws, and `options` are the choices a multiple-choice question is
+   * asking about — the paper is unanswerable without them.
+   *
+   * Nothing here is used for marking. Marking reads the assignment from the
+   * database (autoMarkSubmission), never from anything a browser was sent, so
+   * removing these fields cannot change a single mark.
    *
    * A teacher gets the assignment whole: they wrote it.
    */
@@ -261,8 +276,21 @@ export async function registerRoutes(
     return {
       ...assignment,
       questions: questions.map((q: any) => {
-        const { modelAnswer: _hidden, ...rest } = q || {};
-        return rest;
+        const {
+          // The auto-marking answer key.
+          correctOption: _a,
+          correctBool: _b,
+          correctNumber: _c,
+          tolerance: _d,
+          acceptedAnswers: _e,
+          // The note that gives the answer away when a child gets it wrong. It
+          // still reaches them after marking, inside their feedback line.
+          explanation: _f,
+          // A written question's model answer (see GET /api/marks/:id).
+          modelAnswer: _g,
+          ...paper
+        } = q || {};
+        return paper;
       }),
     };
   }

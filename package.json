@@ -9,6 +9,7 @@
     "start": "cross-env NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
     "check:parents": "tsx script/check-parent-security.ts",
+    "check:answers": "tsx script/check-answer-key.ts",
     "db:push": "drizzle-kit push"
   },
   "dependencies": {
