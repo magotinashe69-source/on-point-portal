@@ -46,7 +46,11 @@ export default function ViewResults() {
   const submission = submissionData;
   const assignment = submissionData?.assignment;
 
-  const { data: mark } = useQuery<Mark>({
+  // The mark also carries the model answers for any written question that has
+  // one, keyed by question id. They arrive HERE rather than with the questions
+  // themselves, so a good answer is never sitting in the page before the work
+  // has been marked. See GET /api/marks/:submissionId.
+  const { data: mark } = useQuery<Mark & { modelAnswers?: Record<string, string> }>({
     queryKey: ["/api/marks", id],
     enabled: !!submission && submission.status === "MARKED",
   });
@@ -239,6 +243,29 @@ export default function ViewResults() {
                           </div>
                         )}
                       </div>
+                      {/* What a good answer looks like, when the teacher wrote
+                          one. Deliberately NOT called "the correct answer": a
+                          written question has no single right answer, and a
+                          pupil who wrote something quite different may still
+                          have full marks. Saying otherwise would tell a child
+                          they were wrong when their teacher had said they were
+                          not. */}
+                      {mark?.modelAnswers?.[question.id] && (
+                        <div
+                          className="p-3 bg-green-50 dark:bg-green-950/40 rounded-md border-l-4 border-green-500"
+                          data-testid={`panel-model-answer-${index}`}
+                        >
+                          <p className="text-sm font-medium mb-1">What a good answer looks like:</p>
+                          <p className="text-sm whitespace-pre-wrap" data-testid={`text-model-answer-${index}`}>
+                            {mark.modelAnswers[question.id]}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-2">
+                            Your teacher's example. Yours does not have to match it word for word —
+                            compare the two and see what you could add next time.
+                          </p>
+                        </div>
+                      )}
+
                       {questionMark?.feedback && (
                         <div className="p-3 bg-primary/5 rounded-md border-l-4 border-primary">
                           <p className="text-sm font-medium mb-1">Feedback:</p>

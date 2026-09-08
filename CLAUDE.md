@@ -260,6 +260,33 @@ auto-marked question, so the eye finds it in the same place. It is labelled a
 reminder rather than a mark scheme in both: nothing is checked against it, and
 the teacher is still marking by hand.
 
+**The pupil sees it with their MARK, never with the question.** This is the rule
+that makes a model answer safe to store at all — otherwise it would be sitting
+in the page for a child to copy before they had written a word.
+
+- `assignmentForStudent()` in `server/routes.ts` strips `modelAnswer` from every
+  question on the way out to anyone who is not a teacher. It is applied on the
+  assignment list, on one assignment, and on the assignment embedded in
+  `GET /api/submissions/:id` — all three, because the results page reads its
+  questions from the last of those.
+- `GET /api/marks/:submissionId` carries them instead, as a `modelAnswers` map
+  keyed by question id. A mark exists only once the work has been marked, and
+  that route already refuses everybody except the teacher and the pupil who
+  handed the work in, so it is the one place a child can be shown a good answer
+  without it being available beforehand.
+
+The pupil's results page calls it "What a good answer looks like" and says
+theirs need not match word for word — the same honest wording as the parent's
+page, and for the same reason.
+
+**Still open: the auto-marking answer key is NOT stripped.** `correctOption`,
+`acceptedAnswers`, `correctNumber`, `correctBool` and `tolerance` still go out
+with the questions, so a pupil who opens the browser's network tab can read the
+answers to an auto-marked assignment before answering it. That predates the
+model answer and is a bigger change (the submit page and the marking engine both
+read those fields), so it was left alone — but `assignmentForStudent()` is the
+place to fix it when someone does.
+
 **Attendance:** still none. `attendance.recorded` is hard-coded `false` and the
 only figure offered is days active on homework, labelled in plain words as not
 being a record of school attendance. See the weekly report section above.

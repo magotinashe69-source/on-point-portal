@@ -246,6 +246,27 @@ export async function registerRoutes(
     });
   });
 
+  /**
+   * An assignment as a STUDENT may see it.
+   *
+   * The model answer a teacher writes on a written question is for AFTERWARDS.
+   * It reaches a child with their mark (GET /api/marks/:submissionId), never
+   * alongside the question itself — otherwise the answer would be sitting in
+   * the page before they had written a word.
+   *
+   * A teacher gets the assignment whole: they wrote it.
+   */
+  function assignmentForStudent<T extends { questions: any }>(assignment: T): T {
+    const questions = Array.isArray(assignment.questions) ? assignment.questions : [];
+    return {
+      ...assignment,
+      questions: questions.map((q: any) => {
+        const { modelAnswer: _hidden, ...rest } = q || {};
+        return rest;
+      }),
+    };
+  }
+
   // ─── The parent portal is read-only ──────────────────────────────────────
   //
   // Everything under /api/parent/ is a GET today, and this is what keeps it
@@ -1365,7 +1386,10 @@ export async function registerRoutes(
       // ?includeDrafts=true by hand still gets the published list only.
       const includeDrafts = req.query.includeDrafts === "true" && await isTeacherLoggedIn(req);
       const assignments = await storage.getAssignments(validForm, studentId, archived, includeDrafts);
-      res.json(assignments);
+      // A pupil never gets the model answers with the questions — see
+      // assignmentForStudent.
+      const forTeacher = await isTeacherLoggedIn(req);
+      res.json(forTeacher ? assignments : assignments.map(assignmentForStudent));
     } catch (error) {
       res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
@@ -1381,10 +1405,11 @@ export async function registerRoutes(
       }
       // A draft doesn't exist as far as students are concerned — otherwise
       // someone could reach an unreleased assignment by guessing its address.
-      if (isDraft(assignment) && !(await isTeacherLoggedIn(req))) {
+      const forTeacher = await isTeacherLoggedIn(req);
+      if (isDraft(assignment) && !forTeacher) {
         return res.status(404).json({ success: false, message: "Assignment not found" });
       }
-      res.json(assignment);
+      res.json(forTeacher ? assignment : assignmentForStudent(assignment));
     } catch (error) {
       res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
@@ -1944,11 +1969,16 @@ export async function registerRoutes(
 
       const student = await storage.getStudent(submission.studentId);
       const assignment = await storage.getAssignment(submission.assignmentId);
-      
+
+      // The results page reads its questions from here, so the same rule
+      // applies: a pupil gets the model answers with their MARK, not with the
+      // paper. See assignmentForStudent and GET /api/marks/:submissionId.
+      const forTeacher = await isTeacherLoggedIn(req);
+
       res.json({
         ...submission,
         studentName: student?.fullName,
-        assignment,
+        assignment: assignment && !forTeacher ? assignmentForStudent(assignment) : assignment,
       });
     } catch (error) {
       res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
@@ -2197,7 +2227,21 @@ export async function registerRoutes(
       if (!mark) {
         return res.status(404).json({ success: false, message: "Mark not found" });
       }
-      res.json(mark);
+
+      // The model answers travel WITH the mark, and only with it.
+      //
+      // A mark exists only once the work has been marked, and this route
+      // already refuses everybody except the teacher and the pupil who handed
+      // the work in — so this is the one place a child can be shown what a good
+      // answer looks like without it being available to copy beforehand.
+      const assignment = await storage.getAssignment(submission.assignmentId);
+      const modelAnswers: Record<string, string> = {};
+      for (const q of assignment?.questions || []) {
+        const model = (q as any).modelAnswer?.trim();
+        if (model) modelAnswers[q.id] = model;
+      }
+
+      res.json({ ...mark, modelAnswers });
     } catch (error) {
       res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
