@@ -310,6 +310,64 @@ async function main() {
   await mustBeRefused(anon, "GET", `/api/parent/students/${childA.id}`, "a pupil by id while logged out");
   await mustBeRefused(anon, "GET", "/api/students", "the register while logged out");
 
+  // --- The completed-work view: the one address that carries an id --------
+  //
+  // Every other parent address deliberately carries no id, which is what makes
+  // them impossible to tamper with. The completed-work view has to carry a
+  // submission id — a parent taps a piece of work to open it — so it is the
+  // one place in the portal where changing a number in the address bar is
+  // worth trying. These checks are the reason requireParentSubmission exists.
+
+  console.log("\nCompleted work, and the one id a parent can edit");
+
+  const workRes = await parentA.get("/api/parent/completed-work");
+  check(workRes.status === 200, "parent A can read their own child's completed work",
+    `status ${workRes.status}`);
+  check(Array.isArray(workRes.body?.work), "the completed work comes back as a list");
+
+  const supportRes = await parentA.get("/api/parent/support-report");
+  check(supportRes.status === 200, "parent A can read their own areas-to-practise report",
+    `status ${supportRes.status}`);
+  check(supportRes.body?.report?.child?.id === childA.id,
+    "the report is about child A and nobody else", JSON.stringify(supportRes.body?.report?.child));
+
+  // Any piece of work on the system that is NOT child A's. Asking the teacher
+  // means this holds however the register is seeded, rather than depending on
+  // a particular child having handed something in.
+  const allSubmissions = (await teacher.get("/api/submissions")).body;
+  const notChildAs = Array.isArray(allSubmissions)
+    ? allSubmissions.find((sub: any) => sub.studentId !== childA.id)
+    : undefined;
+
+  if (notChildAs) {
+    const stolen = await parentA.get(`/api/parent/submissions/${notChildAs.id}`);
+    check(stolen.status === 403,
+      "another child's work, by id in the address, is refused with 403", `got ${stolen.status}`);
+    check(!JSON.stringify(stolen.body || {}).includes("question"),
+      "the refusal carries none of that work with it");
+  } else {
+    console.log("  (no other child's work on the register to try — skipped)");
+  }
+
+  // 403 and not 404, for the same reason as everywhere else: a 404 would tell
+  // a parent which submission ids are real.
+  const madeUp = await parentA.get("/api/parent/submissions/999999999");
+  check(madeUp.status === 403,
+    "a submission id that does not exist is refused with 403, not 404", `got ${madeUp.status}`);
+
+  const notANumber = await parentA.get("/api/parent/submissions/abc");
+  check(notANumber.status === 403, "a non-numeric submission id is refused", `got ${notANumber.status}`);
+
+  // The parent portal is read-only. Anything that is not a GET is refused
+  // outright with 405 rather than quietly falling through to the React page,
+  // which answers 200 and reads like it worked.
+  const posted = await parentA.request("POST", "/api/parent/completed-work");
+  check(posted.status === 405, "posting to the completed work list is refused", `got ${posted.status}`);
+  const deleted = await parentA.request("DELETE", "/api/parent/submissions/1");
+  check(deleted.status === 405, "deleting a piece of work is refused", `got ${deleted.status}`);
+  const patched = await parentA.request("PATCH", "/api/parent/overview");
+  check(patched.status === 405, "changing the overview is refused", `got ${patched.status}`);
+
   // --- The login pages must not log the parent straight back out ----------
   //
   // This one reads the source rather than the server, because the server was

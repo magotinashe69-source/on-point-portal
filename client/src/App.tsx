@@ -23,6 +23,8 @@ import TeacherExport from "@/pages/teacher/export";
 import DailyReport from "@/pages/teacher/daily-report";
 import ParentLogin from "@/pages/parent/login";
 import ParentDashboard from "@/pages/parent/dashboard";
+import { ParentWorkList, ParentWorkDetail } from "@/pages/parent/work";
+import ParentSupport from "@/pages/parent/support";
 import StudentLogin from "@/pages/student/login";
 import StudentDashboard from "@/pages/student/dashboard";
 import SubmitAssignment from "@/pages/student/submit-assignment";
@@ -60,6 +62,13 @@ function Router() {
           the server enforces that on every request, not these routes. */}
       <Route path="/parent/login" component={ParentLogin} />
       <Route path="/parent/dashboard" component={ParentDashboard} />
+      {/* Completed work, and one piece opened up question by question. The
+          submission id in the second address is the only id anywhere in the
+          parent portal, and the server checks it belongs to this parent's
+          child before answering — see requireParentSubmission. */}
+      <Route path="/parent/work" component={ParentWorkList} />
+      <Route path="/parent/work/:submissionId" component={ParentWorkDetail} />
+      <Route path="/parent/support" component={ParentSupport} />
       <Route path="/student/login" component={StudentLogin} />
       <Route path="/student/dashboard" component={StudentDashboard} />
       <Route path="/student/submit/:id" component={SubmitAssignment} />

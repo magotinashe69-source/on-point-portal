@@ -178,6 +178,8 @@ the child is read from the parent's own row, so there is nothing in either
 address to tamper with.
 
 - `GET /api/parent/weekly-report` — the week just gone (see above).
+- `GET /api/parent/completed-work`, `GET /api/parent/support-report` — see
+  "Completed work, and the one id a parent can edit" below.
 - `GET /api/parent/overview` — the fuller picture: the current average across
   all marked work, marks by subject, recent marks with the teacher's written
   feedback, homework set against handed in with what is still outstanding, days
@@ -189,8 +191,52 @@ gathered in `server/parent-overview.ts`. That builder imports `percentage()`,
 them, so the overview, the weekly report, the Reports page and the Grade Book
 can never quote a parent different numbers.
 
-The parent portal is **read-only**: there is no POST, PATCH or DELETE anywhere
-under `/api/parent/`, and the access gate closes every other endpoint to them.
+The parent portal is **read-only**, and that is now a rule rather than an
+observation: a middleware on `/api/parent` refuses anything that is not a GET
+with **405**. Without it an unmatched POST does not fail loudly — it falls
+through to the catch-all and answers **200 with the React page**, which reads
+like it worked.
+
+### Completed work, and the one id a parent can edit
+
+Three more views, all GETs, all read-only:
+
+- `GET /api/parent/completed-work` — everything the child has handed in:
+  subject, title, date, and the mark. Handed in is not the same as marked, so a
+  piece still with the teacher says so rather than showing 0%.
+- `GET /api/parent/submissions/:id` — one piece opened up question by question:
+  the question, what the child wrote, the correct answer, right or wrong, and
+  the teacher's comment. This is what a teacher shows a parent on consultation
+  day.
+- `GET /api/parent/support-report` — "areas to practise": the topics the child
+  is getting wrong, grouped by subject, plus their strongest subject and the
+  one being worked on.
+
+The shapes and wording are in `shared/parent-work.ts`; the figures are gathered
+in `server/parent-work.ts`.
+
+**The one id in the whole parent portal.** Every other parent address carries
+no id on purpose, which is what makes it impossible to tamper with. The
+completed-work view has to carry a submission id — a parent taps a piece of
+work to open it — so it is the one place where editing the address bar is worth
+trying. `requireParentSubmission` is the answer: the id is never used to decide
+whose work comes back, the submission is fetched and its owner compared against
+the parent's own row, and anything else is **403** whether it belongs to another
+family or does not exist at all. `npm run check:parents` tries all three.
+
+**Three outcomes, not two.** A hand-marked question can score 3 out of 5.
+Showing that as a red "wrong" would be untrue and discouraging, so a question is
+**correct** (full marks), **partly correct**, or **not yet**, in green, amber
+and red — with the word and an icon as well as the colour.
+
+**There is no model answer for a written question.** Only the auto-marked types
+(multiple choice, true/false, numeric, short text) store an answer key, and the
+correct answer a parent sees comes from `markAnswer()` in
+`shared/auto-marking.ts` — the same function that marked the work, never a
+second copy that could drift. A "written" question is marked by hand and has no
+model answer anywhere in the database, so the page says the teacher marked it
+rather than inventing one. Do not add a made-up "correct answer" for these
+without the school actually storing model answers first.
 
 **Attendance:** still none. `attendance.recorded` is hard-coded `false` and the
 only figure offered is days active on homework, labelled in plain words as not
@@ -254,6 +300,7 @@ shared/
   schema.ts       # Drizzle tables, TypeScript types, login schemas
   weekly-report.ts # Weekly parent report: shape, week maths, WhatsApp message
   parent-overview.ts # The parent's fuller view of their child: shapes + wording
+  parent-work.ts   # Completed work, question by question, areas to practise
 script/
   check-parent-security.ts  # npm run check:parents — the parent security test
 ```

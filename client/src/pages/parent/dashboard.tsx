@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +8,8 @@ import { useAuth } from "@/lib/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { REPORT_TEXT, subjectLabel, type WeeklyReport } from "@shared/weekly-report";
 import { OVERVIEW_TEXT, type ParentOverview } from "@shared/parent-overview";
-import { LogOut, Loader2, GraduationCap, CalendarDays, TrendingUp, AlertCircle, Flame, ClipboardList, MessageSquare, Megaphone, Eye } from "lucide-react";
+import { WORK_TEXT } from "@shared/parent-work";
+import { LogOut, Loader2, GraduationCap, CalendarDays, TrendingUp, AlertCircle, Flame, ClipboardList, MessageSquare, Megaphone, Eye, Target } from "lucide-react";
 import logoPath from "@assets/logo.webp";
 
 // What the server sends back about the child. Deliberately small: a parent sees
@@ -167,6 +168,24 @@ export default function ParentDashboard() {
             )}
           </CardContent>
         </Card>
+
+        {/* ---- The two things a parent came here to do ----
+             Big, plain buttons rather than a menu: this is read on a phone,
+             often by someone who does not use apps much. */}
+        <div className="grid grid-cols-2 gap-3 mb-6">
+          <Link href="/parent/work">
+            <Button variant="outline" className="w-full h-auto py-4 flex-col gap-2" data-testid="button-completed-work">
+              <ClipboardList className="h-5 w-5" />
+              <span className="text-sm font-medium">{WORK_TEXT.completedTitle}</span>
+            </Button>
+          </Link>
+          <Link href="/parent/support">
+            <Button variant="outline" className="w-full h-auto py-4 flex-col gap-2" data-testid="button-support-report">
+              <Target className="h-5 w-5" />
+              <span className="text-sm font-medium">{WORK_TEXT.supportTitle}</span>
+            </Button>
+          </Link>
+        </div>
 
         {/* ---- The weekly report ---- */}
         <Card>

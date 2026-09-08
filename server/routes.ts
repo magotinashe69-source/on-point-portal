@@ -17,6 +17,7 @@ import { isFullyAutoMarked, markSubmission, markAnswer, buildFeedback, isAutoMar
 import { awardRandomCollectible } from "./rewards";
 import { buildWeeklyReport } from "./weekly-report";
 import { buildParentOverview } from "./parent-overview";
+import { buildCompletedWork, buildSubmissionReview, buildSupportReport } from "./parent-work";
 import { buildWhatsAppReport } from "@shared/weekly-report";
 import { awardXp, adjustXp, xpProgress, XP_PER_CORRECT, XP_COMPLETION_BONUS, XP_IMPROVEMENT_BONUS } from "./xp";
 import { recordActivity, grantFreezeForLevelUp, refreshStreak, setSimulatedToday, getSimulatedToday, resetStreak, streakToday } from "./streaks";
@@ -242,6 +243,26 @@ export async function registerRoutes(
       success: false,
       message: "A parent account can only see its own child. Log in to the parent portal.",
       redirect: "/parent/dashboard",
+    });
+  });
+
+  // ─── The parent portal is read-only ──────────────────────────────────────
+  //
+  // Everything under /api/parent/ is a GET today, and this is what keeps it
+  // that way. Without it "read-only" is only true because nobody has yet
+  // written a route that writes — and an unmatched POST does not even fail
+  // loudly, it falls through to the catch-all and answers 200 with the React
+  // page, which reads like success.
+  //
+  // Same thinking as the access gate above: closed by default, so a write
+  // added here by mistake later is stopped before it runs rather than being
+  // open until somebody notices. 405 is the honest answer — the address is
+  // real, the method is not allowed on it.
+  app.use("/api/parent", (req, res, next) => {
+    if (req.method === "GET" || req.method === "HEAD") return next();
+    return res.status(405).json({
+      success: false,
+      message: "The parent portal is view-only.",
     });
   });
 
@@ -602,6 +623,40 @@ export async function registerRoutes(
     return parent;
   }
 
+  /**
+   * Parent only, AND the submission in the address must be their own child's.
+   *
+   * The completed-work view is the one place in the parent portal that takes
+   * an id, so it is the one place URL tampering has anything to aim at. The
+   * rule is the same as requireParentChild: the id is never used to decide
+   * WHOSE work comes back — the submission is fetched, its owner compared
+   * against the parent's own row, and anything else refused.
+   *
+   * The answer is 403 whether the submission belongs to another child or does
+   * not exist at all, so the address bar cannot be used to find out which
+   * submissions are real.
+   */
+  async function requireParentSubmission(req: Request, res: Response, submissionId: number) {
+    const parent = await requireParent(req, res);
+    if (!parent) return null;
+
+    const refuse = () => {
+      res.status(403).json({
+        success: false,
+        message: "You can only see your own child's work.",
+      });
+      return null;
+    };
+
+    if (!Number.isInteger(submissionId)) return refuse();
+
+    const submission = await storage.getSubmission(submissionId);
+    // Same answer for "somebody else's" and "no such thing".
+    if (!submission || submission.studentId !== parent.studentId) return refuse();
+
+    return { parent, submission };
+  }
+
   /** What a parent is allowed to know about their child. Stage 1: the name. */
   function childSummary(student: Student) {
     return {
@@ -723,6 +778,96 @@ export async function registerRoutes(
       res.json({ success: true, overview });
     } catch (error) {
       console.error("Parent overview error:", error);
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
+    }
+  });
+
+  // ─── Completed work, and what to practise ─────────────────────────────────
+  //
+  // What a teacher goes through with a parent on consultation day: everything
+  // the child has handed in, any one piece opened up question by question, and
+  // a plain list of what to go over again.
+  //
+  // All three are GETs. The parent portal stays read-only — there is still no
+  // POST, PATCH or DELETE anywhere under /api/parent/.
+
+  /**
+   * The child's own student record, having checked the parent may see it.
+   * Responds and returns null when the pupil is no longer on the register.
+   */
+  async function parentsChild(res: Response, parent: { studentId: number }) {
+    const student = await storage.getStudent(parent.studentId);
+    if (!student) {
+      res.status(404).json({
+        success: false,
+        message: "That pupil is no longer on the register. Ask the school to check.",
+      });
+      return null;
+    }
+    return student;
+  }
+
+  // Everything the child has handed in, newest first. Takes NO id: the child
+  // comes from the parent's own row, as everywhere else on this dashboard.
+  app.get("/api/parent/completed-work", async (req, res) => {
+    try {
+      const parent = await requireParent(req, res);
+      if (!parent) return;
+
+      const student = await parentsChild(res, parent);
+      if (!student) return;
+
+      const work = await buildCompletedWork(student);
+      res.json({ success: true, work });
+    } catch (error) {
+      console.error("Parent completed work error:", error);
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
+    }
+  });
+
+  // One piece of work, question by question.
+  //
+  // THIS is the only address in the parent portal that carries an id, so it is
+  // the only one worth tampering with. requireParentSubmission refuses any
+  // submission that is not this parent's child's with 403 — the same answer
+  // whether it belongs to another family or does not exist, so the ids on the
+  // system cannot be mapped out by trying them.
+  app.get("/api/parent/submissions/:id", async (req, res) => {
+    try {
+      const allowed = await requireParentSubmission(req, res, parseInt(req.params.id));
+      if (!allowed) return;
+
+      const student = await parentsChild(res, allowed.parent);
+      if (!student) return;
+
+      const review = await buildSubmissionReview(student, allowed.submission);
+      if (!review) {
+        return res.status(404).json({
+          success: false,
+          message: "That piece of work is no longer available.",
+        });
+      }
+
+      res.json({ success: true, review });
+    } catch (error) {
+      console.error("Parent submission review error:", error);
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
+    }
+  });
+
+  // What the child is finding hard, written as what to practise. No id again.
+  app.get("/api/parent/support-report", async (req, res) => {
+    try {
+      const parent = await requireParent(req, res);
+      if (!parent) return;
+
+      const student = await parentsChild(res, parent);
+      if (!student) return;
+
+      const report = await buildSupportReport(student);
+      res.json({ success: true, report });
+    } catch (error) {
+      console.error("Parent support report error:", error);
       res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
