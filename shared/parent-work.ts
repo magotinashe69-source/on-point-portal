@@ -58,11 +58,19 @@ export type ReviewedQuestion = {
 
   // The right answer, when the school has one written down.
   //
-  // Only the auto-marked question types (multiple choice, true/false, numeric,
-  // short text) store an answer key. A "written" question is marked by hand
-  // and has NO model answer anywhere in the database, so this is null and the
-  // page says the teacher marked it rather than inventing an answer.
+  // Two different things can end up here, and the page must not present them
+  // the same way:
+  //
+  //   "key"   — the exact answer the marking engine used, from an auto-marked
+  //             question. Anything else was wrong.
+  //   "model" — the teacher's own model answer to a written question. It is an
+  //             example of a good answer, NOT the only right one, and a child
+  //             who wrote something different may still have full marks.
+  //
+  // Null when neither exists: a written question the teacher marked by hand
+  // without writing a model answer. The page says so rather than inventing one.
   correctAnswer: string | null;
+  correctAnswerKind: "key" | "model" | null;
 
   outcome: QuestionOutcome;
   score: number | null; // null until it has been marked
@@ -147,6 +155,9 @@ export const WORK_TEXT = {
   reviewNote: "This is the same thing a teacher would show you on consultation day.",
   yourChildsAnswer: "Your child's answer",
   correctAnswer: "Correct answer",
+  modelAnswer: "What a good answer looks like",
+  modelAnswerNote:
+    "Your teacher's example. Your child's answer does not have to match it word for word — the mark above is what counts.",
   noAnswerGiven: "No answer given",
   answeredWithPhoto: "Answered with a photo of their written work",
   markedByTeacher: "Marked by your teacher",

@@ -52,6 +52,8 @@ const questionSchema = z.object({
   tolerance: z.number().optional(),
   acceptedAnswers: z.array(z.string()).optional(),
   explanation: z.string().optional(),
+  // written only: what a good answer looks like. Never marked against.
+  modelAnswer: z.string().optional(),
 });
 
 // A short unique id for a brand-new question.
@@ -74,6 +76,7 @@ const newQuestion = () => ({
   tolerance: undefined as number | undefined,
   acceptedAnswers: [""],
   explanation: "",
+  modelAnswer: "",
 });
 
 // --- Bulk paste ---------------------------------------------------------
@@ -236,6 +239,7 @@ export default function CreateAssignment() {
         tolerance: q.tolerance,
         acceptedAnswers: q.acceptedAnswers && q.acceptedAnswers.length ? q.acceptedAnswers : [""],
         explanation: q.explanation || "",
+        modelAnswer: q.modelAnswer || "",
       })),
     });
     const targets = ((a.targetStudentIds as number[] | null) || []);
@@ -467,8 +471,11 @@ export default function CreateAssignment() {
         if (acceptedAnswers.length === 0) { fail("Add at least one accepted answer."); return false; }
         cleanedQuestions.push({ ...base, acceptedAnswers });
       } else {
-        // written: marked by hand, no answer key
-        cleanedQuestions.push(base);
+        // written: marked by hand, so no answer key. The model answer is not
+        // one — nothing is marked against it. It is stored so a parent can be
+        // shown what a good answer looks like beside their child's, and left
+        // off entirely when the teacher did not write one.
+        cleanedQuestions.push({ ...base, modelAnswer: q.modelAnswer?.trim() || undefined });
       }
     }
 
@@ -1000,8 +1007,42 @@ export default function CreateAssignment() {
 
                           if (qType === "written") {
                             return (
-                              <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
-                                This question will be marked by hand. Auto-marking is off for it.
+                              <div className="space-y-3 rounded-md border border-dashed p-3">
+                                <p className="text-sm text-muted-foreground">
+                                  This question will be marked by hand. Auto-marking is off for it.
+                                </p>
+
+                                {/* The model answer. Optional, and never marked
+                                    against — it is what a parent is shown beside
+                                    their child's answer, where an auto-marked
+                                    question would show its answer key. */}
+                                <FormField
+                                  control={formMethods.control}
+                                  name={`questions.${index}.modelAnswer`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel className="text-sm">
+                                        Model answer <span className="text-muted-foreground font-normal">(optional)</span>
+                                      </FormLabel>
+                                      <FormControl>
+                                        <Textarea
+                                          rows={3}
+                                          placeholder="What a good answer looks like, in your own words."
+                                          data-testid={`input-model-answer-${index}`}
+                                          {...field}
+                                          value={field.value || ""}
+                                        />
+                                      </FormControl>
+                                      <p className="text-xs text-muted-foreground">
+                                        Nothing is marked against this — you still mark this question
+                                        yourself. It is shown to parents next to their child's answer,
+                                        so they can see what you were looking for. Leave it blank and
+                                        the parent simply sees that you marked it by hand.
+                                      </p>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
                               </div>
                             );
                           }

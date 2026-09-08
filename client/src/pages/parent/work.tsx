@@ -238,7 +238,7 @@ function QuestionCard({ question }: { question: ReviewedQuestion }) {
         {/* What the child wrote. */}
         <div>
           <p className="text-xs text-muted-foreground mb-1">{WORK_TEXT.yourChildsAnswer}</p>
-          <p className="rounded-md bg-muted px-3 py-2 text-sm" data-testid={`text-child-answer-${question.number}`}>
+          <p className="rounded-md bg-muted px-3 py-2 text-sm whitespace-pre-wrap" data-testid={`text-child-answer-${question.number}`}>
             {question.childAnswer
               ? question.childAnswer
               : question.answeredWithPhoto
@@ -247,18 +247,27 @@ function QuestionCard({ question }: { question: ReviewedQuestion }) {
           </p>
         </div>
 
-        {/* The right answer, when the school has one written down. A question
-            the teacher marked by hand has no model answer stored anywhere, so
-            we say that plainly rather than inventing one. */}
+        {/* The right answer — but only called that when it really is one.
+            An auto-marked question has an exact key: anything else was wrong.
+            A written question has at best the teacher's model answer, which is
+            an EXAMPLE of a good answer, not the only right one, so it is
+            labelled differently and a parent is told their child's answer need
+            not match it. With neither, we say the teacher marked it by hand
+            rather than inventing an answer. */}
         {question.correctAnswer ? (
           <div>
-            <p className="text-xs text-muted-foreground mb-1">{WORK_TEXT.correctAnswer}</p>
+            <p className="text-xs text-muted-foreground mb-1">
+              {question.correctAnswerKind === "model" ? WORK_TEXT.modelAnswer : WORK_TEXT.correctAnswer}
+            </p>
             <p
-              className="rounded-md bg-green-50 dark:bg-green-950/40 px-3 py-2 text-sm font-medium"
+              className="rounded-md bg-green-50 dark:bg-green-950/40 px-3 py-2 text-sm font-medium whitespace-pre-wrap"
               data-testid={`text-correct-answer-${question.number}`}
             >
               {question.correctAnswer}
             </p>
+            {question.correctAnswerKind === "model" && (
+              <p className="text-xs text-muted-foreground mt-1">{WORK_TEXT.modelAnswerNote}</p>
+            )}
           </div>
         ) : (
           <div>

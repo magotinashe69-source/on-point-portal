@@ -114,11 +114,25 @@ export async function buildSubmissionReview(
     const answerText = (answer?.answerText || "").trim();
     const answeredWithPhoto = !answerText && !!answer?.imageUrls?.length;
 
-    // The correct answer, straight from the marking engine. For a hand-marked
-    // "written" question it comes back empty, because the school has no model
-    // answer stored for one — the page says so rather than pretending.
+    // The correct answer.
+    //
+    // For an auto-marked question it comes straight from the marking engine,
+    // so a parent is shown the very key the marker used.
+    //
+    // A "written" question has no key — it is marked by hand — but the teacher
+    // may have written a model answer when they set the work. That is what a
+    // parent sees there. Still null when they did not write one, and the page
+    // says the teacher marked it rather than inventing an answer.
     const key = markAnswer(question, answer?.answerText ?? "");
-    const correctAnswer = key.correctAnswerDisplay || null;
+    const modelAnswer = question.modelAnswer?.trim() || null;
+    const correctAnswer = key.correctAnswerDisplay || modelAnswer;
+    // Which of the two it is, so the page can say "correct answer" for a real
+    // key and "what a good answer looks like" for a teacher's example.
+    const correctAnswerKind: "key" | "model" | null = key.correctAnswerDisplay
+      ? "key"
+      : modelAnswer
+        ? "model"
+        : null;
 
     const score = questionMark ? questionMark.score : null;
     const maxScore = questionMark?.maxScore ?? question.maxScore;
@@ -137,6 +151,7 @@ export async function buildSubmissionReview(
       childAnswer,
       answeredWithPhoto,
       correctAnswer,
+      correctAnswerKind,
       outcome: outcomeFor(score, maxScore),
       score,
       maxScore,

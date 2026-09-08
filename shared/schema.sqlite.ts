@@ -75,6 +75,12 @@ export const assignments = sqliteTable("assignments", {
     tolerance?: number;         // numeric: how far off is still accepted (e.g. 0.05)
     acceptedAnswers?: string[]; // short_text: any of these count as correct
     explanation?: string;       // one-line note shown to students in their feedback
+    // written: what a good answer looks like, in the teacher's own words.
+    // Nothing marks against it — a written question is still marked by hand —
+    // but it is what a parent is shown next to their child's answer instead of
+    // a blank where the correct answer would be. Optional: a question saved
+    // before this existed simply has none, and the parent view says so.
+    modelAnswer?: string;
   }>>().notNull(),
   attachments: text("attachments", { mode: "json" }).$type<Array<{
     name: string;

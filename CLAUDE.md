@@ -25,7 +25,10 @@ There are **three roles**:
 - **Student** — views assignments, submits answers (including photos of handwritten
   work), and views marks and feedback.
 - **Teacher** — creates/edits assignments, manages students, marks submissions,
-  posts announcements, and adds learning resources and lessons.
+  posts announcements, and adds learning resources and lessons. On a written
+  (hand-marked) question they can also type an optional **model answer**, which
+  is never marked against — it is what the child's parent is shown beside their
+  answer. See "What a parent sees".
 - **Parent** — signs in to see their own child. A parent account is created by a
   teacher on a student's record, is linked to **exactly one** student, and can
   **only ever** see that child. One account per child for now.
@@ -229,14 +232,25 @@ Showing that as a red "wrong" would be untrue and discouraging, so a question is
 **correct** (full marks), **partly correct**, or **not yet**, in green, amber
 and red — with the word and an icon as well as the colour.
 
-**There is no model answer for a written question.** Only the auto-marked types
-(multiple choice, true/false, numeric, short text) store an answer key, and the
-correct answer a parent sees comes from `markAnswer()` in
-`shared/auto-marking.ts` — the same function that marked the work, never a
-second copy that could drift. A "written" question is marked by hand and has no
-model answer anywhere in the database, so the page says the teacher marked it
-rather than inventing one. Do not add a made-up "correct answer" for these
-without the school actually storing model answers first.
+**Two different things can appear as "the answer", and they must not be shown
+the same way.** `ReviewedQuestion.correctAnswerKind` says which one it is:
+
+- `"key"` — the exact answer the marking engine used, from an auto-marked
+  question (multiple choice, true/false, numeric, short text). Anything else
+  was wrong. It comes from `markAnswer()` in `shared/auto-marking.ts` — the same
+  function that marked the work, never a second copy that could drift.
+- `"model"` — the teacher's own **model answer** to a written question, typed on
+  the assignment form (`questions[].modelAnswer`). Nothing is ever marked
+  against it: a written question is still marked by hand. It is an *example* of
+  a good answer, so the parent's page labels it "What a good answer looks like"
+  and says plainly that their child's answer need not match it word for word.
+  Calling it "the correct answer" would tell a parent their child was wrong when
+  the teacher had given them full marks.
+- `null` — a written question whose teacher did not write a model answer. The
+  page says the teacher marked it by hand rather than inventing an answer.
+
+The model answer is optional everywhere, so questions saved before it existed
+simply have none. It is a field on the questions JSON, so there is no migration.
 
 **Attendance:** still none. `attendance.recorded` is hard-coded `false` and the
 only figure offered is days active on homework, labelled in plain words as not

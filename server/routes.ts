@@ -1407,6 +1407,9 @@ export async function registerRoutes(
     tolerance: z.number().optional(),
     acceptedAnswers: z.array(z.string()).optional(),
     explanation: z.string().optional(),
+    // written only: the teacher's own model answer. Never used for marking —
+    // it is shown to a parent beside their child's answer.
+    modelAnswer: z.string().optional(),
   });
 
   const createAssignmentSchema = z.object({
