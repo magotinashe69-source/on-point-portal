@@ -332,6 +332,24 @@ that a teacher still gets everything. 34 checks.
 Run it after touching `assignmentForStudent()`, anything that returns an
 assignment, or the questions schema.
 
+### Never call `process.exit()` in a check script
+
+Both check scripts set `process.exitCode` and let the process end by itself.
+
+`process.exit()` tears the process down while `fetch`'s keep-alive sockets are
+still open, and on Node 24 for Windows that trips an assertion inside libuv
+(`!(handle->flags & UV_HANDLE_CLOSING)`). Everything has already run and printed
+by then — but the process dies with **code 127**, so a completely green run
+looks like a failure. That makes the script useless as a CI gate, which is the
+one job it has.
+
+Ending naturally costs a few seconds while those sockets time out, and gives an
+honest 0 or 1. An early stop uses `abort()` and `return`, never `process.exit`.
+
+The older ad-hoc scripts in `script/test-*.ts` still call `process.exit()` and
+would hit the same thing. They are run by hand rather than in CI, so they were
+left alone — but the fix is the same three lines if one is ever wired up.
+
 **Attendance:** still none. `attendance.recorded` is hard-coded `false` and the
 only figure offered is days active on homework, labelled in plain words as not
 being a record of school attendance. See the weekly report section above.

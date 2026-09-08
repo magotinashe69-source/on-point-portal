@@ -99,6 +99,26 @@ async function mustBeRefused(session: Session, method: string, path: string, lab
 
 // ---------------------------------------------------------------------------
 
+// A note on how this script finishes.
+//
+// It sets process.exitCode and lets the process end by itself. It must NOT call
+// process.exit().
+//
+// process.exit() tears the process down while fetch's keep-alive sockets are
+// still open, and on Node 24 for Windows that trips an assertion inside libuv
+// ("!(handle->flags & UV_HANDLE_CLOSING)"). Every check has already run and
+// printed by then, but the process dies with code 127 — so a completely green
+// run looks like a failure, which is worse than useless in CI.
+//
+// Ending naturally costs a few seconds while those sockets time out, and gives
+// an honest 0 or 1.
+
+/** Stop early: say why, mark the run failed, and let main() return. */
+function abort(message: string) {
+  console.error(message);
+  process.exitCode = 1;
+}
+
 async function main() {
   console.log(`\nParent security check against ${BASE}\n`);
 
@@ -107,16 +127,16 @@ async function main() {
   const teacher = new Session("teacher");
   const login = await teacher.post("/api/auth/teacher/login", TEACHER);
   if (login.status !== 200 || !login.body?.success) {
-    console.error("Could not log in as the teacher. Is the server running, and seeded?");
+    abort("Could not log in as the teacher. Is the server running, and seeded?");
     console.error(JSON.stringify(login.body));
-    process.exit(1);
+    return;
   }
 
   const studentsRes = await teacher.get("/api/students");
   const students = studentsRes.body;
   if (!Array.isArray(students) || students.length < 2) {
-    console.error("Need at least two pupils on the register to run this check.");
-    process.exit(1);
+    abort("Need at least two pupils on the register to run this check.");
+    return;
   }
 
   // Clear up after a previous run that was interrupted before it tidied up.
@@ -138,12 +158,12 @@ async function main() {
   );
   const free = students.filter((s: any) => !taken.has(s.id));
   if (free.length < 2) {
-    console.error(
+    abort(
       `Need two pupils with no parent account to run this check — only ${free.length} free.\n` +
       "Remove a parent account, or add another pupil, and try again. " +
       "(This check will not delete an account it did not create.)",
     );
-    process.exit(1);
+    return;
   }
 
   const childA = free[0];
@@ -161,8 +181,8 @@ async function main() {
   check(createdB.body?.success === true, "parent B created for child B", JSON.stringify(createdB.body));
 
   if (!createdA.body?.success || !createdB.body?.success) {
-    console.error("\nCould not create the test parent accounts — stopping.");
-    process.exit(1);
+    abort("\nCould not create the test parent accounts — stopping.");
+    return;
   }
 
   const parentAId = createdA.body.parent.id;
@@ -418,10 +438,10 @@ async function main() {
   // --- Result --------------------------------------------------------------
 
   console.log(`\n${passed} passed, ${failed} failed\n`);
-  process.exit(failed === 0 ? 0 : 1);
+  process.exitCode = failed === 0 ? 0 : 1;
 }
 
 main().catch(err => {
   console.error(err);
-  process.exit(1);
+  process.exitCode = 1;
 });

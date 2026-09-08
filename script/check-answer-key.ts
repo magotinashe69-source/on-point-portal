@@ -215,9 +215,22 @@ async function main() {
   finish();
 }
 
+// A note on how this script finishes.
+//
+// It sets process.exitCode and lets the process end by itself. It must NOT call
+// process.exit().
+//
+// process.exit() tears the process down while fetch's keep-alive sockets are
+// still open, and on Node 24 for Windows that trips an assertion inside libuv
+// ("!(handle->flags & UV_HANDLE_CLOSING)"). Every check has already run and
+// printed by then, but the process dies with code 127 — so a completely green
+// run looks like a failure, which is worse than useless in CI.
+//
+// Ending naturally costs a few seconds while those sockets time out, and gives
+// an honest 0 or 1.
 function finish() {
   console.log(`\n${passed} passed, ${failed} failed\n`);
-  process.exit(failed === 0 ? 0 : 1);
+  process.exitCode = failed === 0 ? 0 : 1;
 }
 
-main().catch(err => { console.error(err); process.exit(1); });
+main().catch(err => { console.error(err); process.exitCode = 1; });
