@@ -64,6 +64,24 @@ CREATE TABLE IF NOT EXISTS penalty_best (
   games_played INTEGER NOT NULL DEFAULT 0,
   updated_at TIMESTAMP NOT NULL DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS game_plays (
+  id SERIAL PRIMARY KEY,
+  student_id INTEGER NOT NULL,
+  day TEXT NOT NULL,
+  game TEXT NOT NULL,
+  used INTEGER NOT NULL DEFAULT 0,
+  active_refs JSONB NOT NULL DEFAULT '[]'::jsonb,
+  active_subject TEXT,
+  updated_at TIMESTAMP NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS blaster_best (
+  id SERIAL PRIMARY KEY,
+  student_id INTEGER NOT NULL,
+  best_score INTEGER NOT NULL DEFAULT 0,
+  best_out_of INTEGER NOT NULL DEFAULT 0,
+  games_played INTEGER NOT NULL DEFAULT 0,
+  updated_at TIMESTAMP NOT NULL DEFAULT now()
+);
 CREATE TABLE IF NOT EXISTS dream_world (
   id SERIAL PRIMARY KEY,
   student_id INTEGER NOT NULL,
@@ -253,4 +271,6 @@ export const {
   studentStreaks,
   dreamWorld,
   penaltyBest,
+  gamePlays,
+  blasterBest,
 } = (usePostgres ? pgSchema : sqliteSchema) as typeof pgSchema;

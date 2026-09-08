@@ -264,6 +264,31 @@ export const penaltyBest = sqliteTable("penalty_best", {
   updatedAt: timestamp("updated_at").notNull().$defaultFn(() => new Date()),
 });
 
+// Plays earned by doing homework — mirrors shared/schema.ts, see the comment
+// there. Only what has been USED is stored; what was earned is counted from
+// today's handed-in assignments, which is what makes the daily reset free.
+export const gamePlays = sqliteTable("game_plays", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  studentId: integer("student_id").notNull().references(() => students.id),
+  day: text("day").notNull(),   // YYYY-MM-DD in CAT
+  game: text("game").notNull(), // "penalty" | "blaster"
+  used: integer("used").notNull().default(0),
+  activeRefs: text("active_refs", { mode: "json" }).$type<string[]>().$defaultFn(() => []),
+  activeSubject: text("active_subject"),
+  updatedAt: timestamp("updated_at").notNull().$defaultFn(() => new Date()),
+});
+
+// Target Blaster's personal best. One row per child: a blast mixes every
+// subject, so there is a single record to chase.
+export const blasterBest = sqliteTable("blaster_best", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  studentId: integer("student_id").notNull().references(() => students.id),
+  bestScore: integer("best_score").notNull().default(0),
+  bestOutOf: integer("best_out_of").notNull().default(0),
+  gamesPlayed: integer("games_played").notNull().default(0),
+  updatedAt: timestamp("updated_at").notNull().$defaultFn(() => new Date()),
+});
+
 // Plain SQL that creates every table above if it does not exist yet.
 // We run this once on startup so a fresh SQLite database is ready to use
 // with no manual migration step.
@@ -441,6 +466,24 @@ CREATE TABLE IF NOT EXISTS penalty_best (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   student_id INTEGER NOT NULL,
   subject TEXT NOT NULL,
+  best_score INTEGER NOT NULL DEFAULT 0,
+  best_out_of INTEGER NOT NULL DEFAULT 0,
+  games_played INTEGER NOT NULL DEFAULT 0,
+  updated_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS game_plays (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  student_id INTEGER NOT NULL,
+  day TEXT NOT NULL,
+  game TEXT NOT NULL,
+  used INTEGER NOT NULL DEFAULT 0,
+  active_refs TEXT NOT NULL DEFAULT '[]',
+  active_subject TEXT,
+  updated_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS blaster_best (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  student_id INTEGER NOT NULL,
   best_score INTEGER NOT NULL DEFAULT 0,
   best_out_of INTEGER NOT NULL DEFAULT 0,
   games_played INTEGER NOT NULL DEFAULT 0,

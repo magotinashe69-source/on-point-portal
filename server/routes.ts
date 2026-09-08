@@ -26,11 +26,19 @@ import { recordActivity, grantFreezeForLevelUp, refreshStreak, setSimulatedToday
 // gate further down; assignments no longer pay out resources.
 import {
   listSubjects as listPenaltySubjects,
-  buildGame as buildPenaltyGame,
+  startGame as startPenaltyGame,
   markShot as markPenaltyShot,
   finishGame as finishPenaltyGame,
 } from "./penalty";
-import { MIN_QUESTIONS as PENALTY_MIN_QUESTIONS } from "@shared/penalty";
+import {
+  startGame as startBlast,
+  markRound as markBlastRound,
+  finishGame as finishBlast,
+  availableQuestions as blasterQuestionCount,
+} from "./blaster";
+import { getAllPlayStates, getPlayState } from "./game-plays";
+import { PLAYS_TEXT } from "@shared/game-plays";
+import { BLASTER_TEXT } from "@shared/blaster";
 import { z } from "zod";
 
 // Mark an auto-markable submission in code and save the result as a Mark.
@@ -2370,6 +2378,124 @@ export async function registerRoutes(
   });
 
   // -------------------------------------------------------------------------
+  // ─── Plays earned by doing homework (Stages 3-6) ─────────────────────────
+  //
+  // How many plays of each game this child has left today, and how they got
+  // them. Behind requirePrimaryStudent like the games themselves, so Forms
+  // never see it.
+  app.get("/api/students/:id/plays", async (req, res) => {
+    try {
+      const student = await requirePrimaryStudent(parseInt(req.params.id), req, res);
+      if (!student) return;
+      const plays = await getAllPlayStates(student);
+      res.json({ success: true, plays });
+    } catch (error) {
+      console.error("Plays error:", error);
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
+    }
+  });
+
+  // ─── Target Blaster (Stages 3-6) ─────────────────────────────────────────
+  //
+  // Six rounds of tap-the-right-target, built from questions the child has
+  // already answered. Every endpoint goes through requirePrimaryStudent, so
+  // Forms get a 403 and never see the game, and the answer key is never sent
+  // to the browser — the server marks every round.
+
+  // What the child needs before starting: how many plays they have, their
+  // record, and whether there is anything to ask them at all.
+  app.get("/api/students/:id/blaster", async (req, res) => {
+    try {
+      const student = await requirePrimaryStudent(parseInt(req.params.id), req, res);
+      if (!student) return;
+      const [plays, questionCount, best] = await Promise.all([
+        getPlayState(student, "blaster"),
+        blasterQuestionCount(student),
+        storage.getBlasterBest(student.id),
+      ]);
+      res.json({
+        success: true,
+        plays,
+        questionCount,
+        bestScore: best?.bestScore ?? 0,
+        bestOutOf: best?.bestOutOf ?? 0,
+        gamesPlayed: best?.gamesPlayed ?? 0,
+      });
+    } catch (error) {
+      console.error("Blaster status error:", error);
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
+    }
+  });
+
+  // Start a blast: six rounds of targets, with no answers attached. Spends one
+  // play, and remembers the questions so the finish can be marked against them.
+  app.post("/api/students/:id/blaster/start", async (req, res) => {
+    try {
+      const student = await requirePrimaryStudent(parseInt(req.params.id), req, res);
+      if (!student) return;
+
+      const started = await startBlast(student);
+
+      // Nothing to ask yet: they have completed no playable work at all.
+      if (!started) {
+        return res.status(400).json({
+          success: false,
+          message: BLASTER_TEXT.nothingYet,
+        });
+      }
+
+      // Out of plays is a refusal, not a failure — the page turns it into
+      // "come back tomorrow" rather than something that looks broken.
+      if ("outOfPlays" in started) {
+        return res.status(200).json({
+          success: false,
+          outOfPlays: true,
+          plays: started.plays,
+          message: started.plays.earned === 0 ? PLAYS_TEXT.noneEarnedYet : PLAYS_TEXT.none,
+        });
+      }
+
+      res.json({ success: true, ...started.game, plays: started.plays });
+    } catch (error) {
+      console.error("Blaster start error:", error);
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
+    }
+  });
+
+  // Mark one round, so a target can burst right away.
+  app.post("/api/students/:id/blaster/answer", async (req, res) => {
+    try {
+      const student = await requirePrimaryStudent(parseInt(req.params.id), req, res);
+      if (!student) return;
+      const { ref, answerText } = req.body ?? {};
+      if (typeof ref !== "string") {
+        return res.status(400).json({ success: false, message: "Missing question." });
+      }
+      const result = await markBlastRound(student, ref, String(answerText ?? ""));
+      if (!result) return res.status(404).json({ success: false, message: "That question isn't part of your game." });
+      res.json({ success: true, ...result });
+    } catch (error) {
+      console.error("Blaster answer error:", error);
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
+    }
+  });
+
+  // Finish a blast: the server re-marks everything against the game it issued,
+  // saves a new record, awards XP through the existing capped system, and
+  // counts the game towards streaks.
+  app.post("/api/students/:id/blaster/finish", async (req, res) => {
+    try {
+      const student = await requirePrimaryStudent(parseInt(req.params.id), req, res);
+      if (!student) return;
+      const answers = Array.isArray(req.body?.answers) ? req.body.answers : [];
+      const result = await finishBlast(student, answers);
+      res.json({ success: true, ...result });
+    } catch (error) {
+      console.error("Blaster finish error:", error);
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
+    }
+  });
+
   // Penalty Shootout — a football quiz for primary classes (Stages 3-6).
   // Every endpoint goes through requirePrimaryStudent, so Forms get a 403 and
   // never see the game. The answer key is never sent to the browser: the
@@ -2396,16 +2522,29 @@ export async function registerRoutes(
       const subject = typeof req.body?.subject === "string" ? req.body.subject : "";
       if (!subject) return res.status(400).json({ success: false, message: "Pick a subject to play." });
 
-      const game = await buildPenaltyGame(student, subject);
-      if (!game) {
-        // A game is 10 different questions, so this subject isn't ready yet.
-        // Say why, rather than "no questions" when there are simply too few.
+      const started = await startPenaltyGame(student, subject);
+
+      // Nothing to ask at all: this child has completed no playable work in
+      // this subject. Not an error — just nothing to play yet.
+      if (!started) {
         return res.status(400).json({
           success: false,
-          message: `This subject needs ${PENALTY_MIN_QUESTIONS} quiz questions before you can play. Ask your teacher to set more.`,
+          message: "Finish an assignment in this subject first — the game is built from questions you have already answered.",
         });
       }
-      res.json({ success: true, ...game });
+
+      // Out of plays. A refusal, not a failure: the page shows the "come back
+      // tomorrow" line rather than something that looks broken.
+      if ("outOfPlays" in started) {
+        return res.status(200).json({
+          success: false,
+          outOfPlays: true,
+          plays: started.plays,
+          message: started.plays.earned === 0 ? PLAYS_TEXT.noneEarnedYet : PLAYS_TEXT.none,
+        });
+      }
+
+      res.json({ success: true, ...started.game, plays: started.plays });
     } catch (error) {
       console.error("Penalty start error:", error);
       res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });

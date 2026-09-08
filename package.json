@@ -10,6 +10,7 @@
     "check": "tsc",
     "check:parents": "tsx script/check-parent-security.ts",
     "check:answers": "tsx script/check-answer-key.ts",
+    "check:games": "tsx script/check-games.ts",
     "db:push": "drizzle-kit push"
   },
   "dependencies": {

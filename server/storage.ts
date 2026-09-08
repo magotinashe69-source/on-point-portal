@@ -3,7 +3,7 @@ import { eq, and, inArray, or, isNull, desc } from "drizzle-orm";
 // the right database (SQLite or PostgreSQL) at runtime.
 import {
   db,
-  teachers, students, parents, assignments, submissions, marks, resources, announcements, lessons, exportLogs, studentRewards, studentXp, studentStreaks, dreamWorld, penaltyBest,
+  teachers, students, parents, assignments, submissions, marks, resources, announcements, lessons, exportLogs, studentRewards, studentXp, studentStreaks, dreamWorld, penaltyBest, gamePlays, blasterBest,
 } from "./db";
 // The TypeScript types are the same for both databases, so they come from the shared schema.
 import {
@@ -22,6 +22,8 @@ import {
   type StudentStreak, type InsertStudentStreak,
   type DreamWorld, type InsertDreamWorld,
   type PenaltyBest, type InsertPenaltyBest,
+  type GamePlays, type InsertGamePlays,
+  type BlasterBest, type InsertBlasterBest,
   MASTER_PASSWORD
 } from "@shared/schema";
 
@@ -118,6 +120,14 @@ export interface IStorage {
   getPenaltyBests(studentId: number): Promise<PenaltyBest[]>;
   createPenaltyBest(row: InsertPenaltyBest): Promise<PenaltyBest>;
   updatePenaltyBest(studentId: number, subject: string, data: Partial<InsertPenaltyBest>): Promise<PenaltyBest>;
+  // Plays earned by doing homework. Keyed by student, CAT day and game, so a
+  // new day simply has no row and yesterday's is left behind.
+  getGamePlays(studentId: number, day: string, game: string): Promise<GamePlays | undefined>;
+  upsertGamePlays(row: InsertGamePlays): Promise<GamePlays>;
+  // Target Blaster's record. One row per child, not per subject.
+  getBlasterBest(studentId: number): Promise<BlasterBest | undefined>;
+  createBlasterBest(row: InsertBlasterBest): Promise<BlasterBest>;
+  updateBlasterBest(studentId: number, data: Partial<InsertBlasterBest>): Promise<BlasterBest>;
 
   // Seed data
   seedInitialData(): Promise<void>;
@@ -655,6 +665,51 @@ export class DatabaseStorage implements IStorage {
     const [updated] = await db.update(penaltyBest)
       .set({ ...data, updatedAt: new Date() })
       .where(and(eq(penaltyBest.studentId, studentId), eq(penaltyBest.subject, subject)))
+      .returning();
+    return updated;
+  }
+
+  // --- Plays earned by doing homework -------------------------------------
+  //
+  // Only what has been USED is stored. What a child EARNED is counted from the
+  // assignments they handed in today (server/game-plays.ts), so nothing here
+  // needs clearing overnight: tomorrow is a different `day` and finds no row.
+
+  async getGamePlays(studentId: number, day: string, game: string): Promise<GamePlays | undefined> {
+    const [row] = await db.select().from(gamePlays).where(
+      and(eq(gamePlays.studentId, studentId), eq(gamePlays.day, day), eq(gamePlays.game, game)),
+    );
+    return row || undefined;
+  }
+
+  async upsertGamePlays(row: InsertGamePlays): Promise<GamePlays> {
+    const existing = await this.getGamePlays(row.studentId, row.day, row.game);
+    if (!existing) {
+      const [created] = await db.insert(gamePlays).values(row).returning();
+      return created;
+    }
+    const [updated] = await db.update(gamePlays)
+      .set({ ...row, updatedAt: new Date() })
+      .where(eq(gamePlays.id, existing.id))
+      .returning();
+    return updated;
+  }
+
+  // Target Blaster's personal best — one row per child.
+  async getBlasterBest(studentId: number): Promise<BlasterBest | undefined> {
+    const [row] = await db.select().from(blasterBest).where(eq(blasterBest.studentId, studentId));
+    return row || undefined;
+  }
+
+  async createBlasterBest(row: InsertBlasterBest): Promise<BlasterBest> {
+    const [created] = await db.insert(blasterBest).values(row).returning();
+    return created;
+  }
+
+  async updateBlasterBest(studentId: number, data: Partial<InsertBlasterBest>): Promise<BlasterBest> {
+    const [updated] = await db.update(blasterBest)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(blasterBest.studentId, studentId))
       .returning();
     return updated;
   }

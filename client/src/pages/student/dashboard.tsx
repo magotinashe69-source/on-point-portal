@@ -23,6 +23,7 @@ import {
   Video,
   Map,
   CircleDot,
+  Target,
 } from "lucide-react";
 import type { Assignment, Announcement } from "@shared/schema";
 import { isPrimaryForm } from "@shared/schema";
@@ -300,6 +301,28 @@ export default function StudentDashboard() {
                   <h3 className="font-semibold">Penalty Shootout</h3>
                   <p className="text-sm text-muted-foreground">
                     Answer correctly to score a penalty and to save one.
+                  </p>
+                </div>
+                <ArrowRight className="h-5 w-5 text-primary" />
+              </CardContent>
+            </Card>
+          </Link>
+          </ErrorBoundary>
+        )}
+
+        {/* Target Blaster — the third game, Stages 3-6 only like the other two.
+            Same rule: Forms never see this card, and the page and its endpoints
+            refuse them as well. */}
+        {isPrimaryForm(student.form) && (
+          <ErrorBoundary label="blaster-card">
+          <Link href="/student/blaster">
+            <Card className="hover-elevate cursor-pointer mb-6 border-primary/30 bg-gradient-to-br from-primary/10 to-transparent">
+              <CardContent className="flex items-center gap-4 py-6">
+                <div className="p-3 rounded-md bg-primary/15"><Target className="h-6 w-6 text-primary" /></div>
+                <div className="flex-1">
+                  <h3 className="font-semibold">Target Blaster</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Tap the right target before it drifts away. Earn plays by finishing homework.
                   </p>
                 </div>
                 <ArrowRight className="h-5 w-5 text-primary" />

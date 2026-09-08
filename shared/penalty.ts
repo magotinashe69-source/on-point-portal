@@ -19,13 +19,38 @@ export const TOTAL_SHOTS = SHOTS_PER_ROUND * 2; // always 10 questions
 export const XP_PER_CORRECT_ANSWER = 2; // fed into the existing capped XP system
 export const ANSWER_REVEAL_MS = 3000;   // how long a missed answer stays on screen
 
-// Because a game needs 10 different questions, a subject with fewer than that
-// simply isn't offered yet — better than a half-length game or the same
-// question twice. Teachers just need to set a few more quiz questions.
-export const MIN_QUESTIONS = TOTAL_SHOTS;
+// A game is always 10 shots. It used to need 10 DIFFERENT questions, and a
+// subject with fewer was hidden — which is how a child who had done their
+// homework could still be told there was nothing to play. Now the questions are
+// their own completed work, so a thin subject repeats a question rather than
+// closing the game: coming round again is exactly what practice is.
+//
+// One playable question is enough. Below that there is genuinely nothing to
+// ask, and the subject is not offered.
+export const MIN_QUESTIONS = 1;
 
 export function canPlay(availableQuestions: number): boolean {
   return availableQuestions >= MIN_QUESTIONS;
+}
+
+/**
+ * Fill a game of `length` shots from however many questions there are.
+ *
+ * With enough questions this is the old behaviour exactly: shuffle, take ten,
+ * no repeats. With fewer, it deals the whole shuffled pack, then shuffles again
+ * and deals more — so a child with three questions meets each of them roughly
+ * three times, spread out, rather than the same one twice in a row.
+ */
+export function dealShots<T>(pool: T[], length: number, rand: () => number = Math.random): T[] {
+  if (pool.length === 0) return [];
+  const out: T[] = [];
+  while (out.length < length) {
+    for (const item of shuffle(pool, rand)) {
+      out.push(item);
+      if (out.length === length) break;
+    }
+  }
+  return out;
 }
 
 // Is a personal best beaten? Every game is 10 shots, so this is a plain

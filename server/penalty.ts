@@ -18,11 +18,13 @@ import { markAnswer } from "@shared/auto-marking";
 import type { ShotOption } from "@shared/penalty";
 import {
   MIN_QUESTIONS, SHOTS_PER_ROUND, TOTAL_SHOTS, XP_PER_CORRECT_ANSWER,
-  buildShotOptions, isPlayable, shuffle, canPlay, beatsRecord, makeRef, readRef,
+  buildShotOptions, isPlayable, shuffle, dealShots, canPlay, beatsRecord, makeRef, readRef,
   type Shot, type Round,
 } from "@shared/penalty";
 import { awardXp, type XpAward } from "./xp";
 import { recordActivity } from "./streaks";
+import { activeGame, clearActiveGame, getPlayState, spendPlay } from "./game-plays";
+import type { PlayState } from "@shared/game-plays";
 
 // One question a student may be asked, tied to the assignment it came from.
 interface PoolItem {
@@ -32,13 +34,29 @@ interface PoolItem {
   question: Question;
 }
 
-// Every question this student is allowed to be asked. Built fresh from their
-// assignments each time, so it can never drift and a child can never be served
-// another class's questions.
+// Every question this student is allowed to be asked: the ones from work they
+// have ALREADY HANDED IN.
+//
+// It used to be every assignment set for their class, done or not, which was
+// wrong twice over. It put questions from tonight's unfinished homework into a
+// game — handing a child a preview of work they still had to do — and it made
+// the game depend on what a teacher happened to have set rather than on what
+// the child had actually earned.
+//
+// Now the game is a reward built out of their own finished work: questions they
+// have already met, coming round again. Built fresh each time, so a child can
+// never be served another class's questions.
 async function questionPool(student: Student): Promise<PoolItem[]> {
+  // Which assignments this child has handed in. A set, so handing the same
+  // piece in twice cannot double its questions up in the pool.
+  const submissions = await storage.getSubmissions({ studentId: student.id });
+  const completed = new Set(submissions.map((s) => s.assignmentId));
+  if (completed.size === 0) return [];
+
   const assignments: Assignment[] = await storage.getAssignments(student.form, student.id, false);
   const out: PoolItem[] = [];
   for (const a of assignments) {
+    if (!completed.has(a.id)) continue; // not done yet — not theirs to play with
     for (const q of (a.questions || []) as Question[]) {
       if (isPlayable(q)) {
         out.push({ subject: a.subject, assignmentId: a.id, ref: makeRef(a.id, q.id), question: q });
@@ -99,8 +117,12 @@ export interface SubjectChoice {
 }
 
 // The subjects this child can play, each with their personal best so they can
-// see what to beat. A game is always 10 different questions, so a subject with
-// fewer than that is hidden until the teacher sets a few more.
+// see what to beat.
+//
+// A subject appears as soon as the child has completed ONE piece of playable
+// work in it. It used to need ten different questions, which is how a child who
+// had done their homework could still be shown an empty screen. A thin subject
+// now repeats questions instead of disappearing.
 export async function listSubjects(student: Student): Promise<SubjectChoice[]> {
   const pool = await questionPool(student);
   const bests = await storage.getPenaltyBests(student.id);
@@ -122,18 +144,26 @@ export async function listSubjects(student: Student): Promise<SubjectChoice[]> {
 export interface Game {
   subject: string;
   perRound: number; // always 5: penalties taken, then saves made
-  shots: Shot[];    // 10 shots, every one a DIFFERENT question, no answer keys
+  // 10 shots, never with an answer key. A question may appear more than once
+  // when the child has not completed much work in this subject yet.
+  shots: Shot[];
 }
 
-// Build a game from the chosen subject: 10 different questions, 5 to shoot and
-// 5 to save. Returns null when the subject doesn't have 10 playable questions,
-// which is also why it wouldn't have been offered in the first place.
+// Build a game from the chosen subject: 10 shots, 5 to shoot and 5 to save.
+//
+// dealShots fills those 10 from however many questions the child has. With ten
+// or more it is the old behaviour exactly — shuffle and take ten, no repeats.
+// With fewer it deals the pack again rather than refusing to play, so a child
+// who has done two pieces of maths still gets a full game.
+//
+// Returns null only when there is genuinely nothing to ask: no completed work
+// in that subject at all.
 export async function buildGame(student: Student, subject: string): Promise<Game | null> {
   const pool = await questionPool(student);
   const usable = usableQuestions(pool, subject);
   if (!canPlay(usable.length)) return null;
 
-  const picked = shuffle(usable).slice(0, TOTAL_SHOTS);
+  const picked = dealShots(usable, TOTAL_SHOTS);
   const shots: Shot[] = picked.map((p, i) => ({
     ref: p.item.ref,
     round: (i < SHOTS_PER_ROUND ? "striker" : "keeper") as Round,
@@ -142,6 +172,39 @@ export async function buildGame(student: Student, subject: string): Promise<Game
     options: p.options,
   }));
   return { subject, perRound: SHOTS_PER_ROUND, shots };
+}
+
+/** A game, together with what the child has left after paying for it. */
+export interface StartedGame {
+  game: Game;
+  plays: PlayState;
+}
+
+/**
+ * Start a game: check they have a play, build it, then spend the play.
+ *
+ * In that order on purpose. Building first and charging afterwards would take a
+ * play off a child whose subject turned out to have nothing in it, and charging
+ * first would lose them a play for the same reason.
+ *
+ * `outOfPlays` is a refusal, not an error — the page turns it into "come back
+ * tomorrow", not something that looks broken.
+ */
+export async function startGame(
+  student: Student, subject: string,
+): Promise<StartedGame | { outOfPlays: true; plays: PlayState } | null> {
+  const plays = await getPlayState(student, "penalty");
+  if (plays.left <= 0) return { outOfPlays: true, plays };
+
+  const game = await buildGame(student, subject);
+  if (!game) return null;
+
+  // Store the questions in the order they were asked, so the finish can be
+  // marked against what was actually put to the child.
+  const spent = await spendPlay(student, "penalty", game.shots.map((sh) => sh.ref), subject);
+  if (!spent) return { outOfPlays: true, plays };
+
+  return { game, plays: spent };
 }
 
 // Mark ONE shot, for the instant feedback the game needs (ball in the net, or
@@ -179,54 +242,85 @@ export interface GameResult {
 }
 
 export interface SubmittedAnswer {
-  ref: string;
+  // `ref` and `round` are still sent by the game and kept here so the shape does
+  // not change under it, but the server no longer believes either of them: which
+  // question an answer belongs to, and which half of the game it is in, are both
+  // decided by its POSITION against the stored game. See finishGame below.
+  ref?: string;
   answerText: string;
-  round: Round;
+  round?: Round;
 }
 
 // Finish a game: re-mark every answer on the server (the browser is never
 // trusted with the score), save a new personal best, award XP through the
 // existing capped system, and count the game towards the daily streak.
+//
+// HOW CHEATING IS STOPPED, and why it had to change.
+//
+// This used to refuse to count the same question twice: ten copies of one
+// known-correct answer scored 1, not 10. That worked while every shot in a game
+// was a different question — but a game may now legitimately repeat one, and
+// that rule would have quietly robbed an honest child of the marks.
+//
+// So the game itself is the record now. Its questions were stored, in order,
+// when the play was spent (server/game-plays.ts). The answer in position 3 is
+// marked against whatever question was actually asked in position 3, and the
+// round comes from that position too. Nothing the browser sends decides which
+// question is being answered, so a replayed answer lands in a slot that is
+// asking something else.
+//
+// A game that has already been finished has no stored questions left, so
+// sending the same winning game up twice scores nothing the second time.
 export async function finishGame(
   student: Student, subject: string, answers: SubmittedAnswer[],
 ): Promise<GameResult> {
   const pool = await questionPool(student);
-
-  // A game is always 10 shots, 5 per round — decided HERE, never taken from
-  // the browser. A subject that can't fill a game scores nothing at all, so a
-  // made-up request can't manufacture a record in a subject too thin to play.
-  const usable = usableQuestions(pool, subject);
   const perRound = SHOTS_PER_ROUND;
   const outOf = TOTAL_SHOTS;
-  if (!canPlay(usable.length)) {
-    return {
-      score: 0, outOf, perRound, strikerScore: 0, keeperScore: 0,
-      bestScore: 0, bestOutOf: 0, previousBest: 0, previousOutOf: 0,
-      newRecord: false, gamesPlayed: 0, playable: false,
-    };
+
+  const empty = (): GameResult => ({
+    score: 0, outOf, perRound, strikerScore: 0, keeperScore: 0,
+    bestScore: 0, bestOutOf: 0, previousBest: 0, previousOutOf: 0,
+    newRecord: false, gamesPlayed: 0, playable: false,
+  });
+
+  // Nothing to play in this subject at all — the same answer as before.
+  if (!canPlay(usableQuestions(pool, subject).length)) return empty();
+
+  // The questions this child was actually asked, in order.
+  const active = await activeGame(student, "penalty");
+  if (active.refs.length === 0 || active.subject !== subject) {
+    // No game in flight for this subject: either it has already been finished
+    // and scored, or this result was never started here. Either way it scores
+    // nothing rather than being taken on trust.
+    return empty();
   }
 
   let strikerScore = 0;
   let keeperScore = 0;
-  // Every shot is a different question, so the same question id can only ever
-  // score once. This is what stops ten copies of one known-correct answer
-  // being sent up as a perfect game.
-  const counted = new Set<string>();
 
-  for (const a of answers) {
-    if (counted.size >= outOf) break;
-    if (counted.has(a.ref)) continue;
-    const found = findByRef(pool, subject, a.ref);
-    if (!found) continue;
-    counted.add(a.ref);
+  // Slot by slot. The child's Nth answer is marked against the Nth question
+  // they were asked, and a missing answer is simply a miss.
+  active.refs.slice(0, outOf).forEach((ref, slot) => {
+    const answer = answers[slot];
+    if (!answer) return;
 
-    if (!markAnswer(found.question, a.answerText).correct) continue;
-    // A round can only hold so many shots, so a flood of "keeper" answers
-    // cannot spill past the real length of that round.
-    if (a.round === "keeper") { if (keeperScore < perRound) keeperScore++; }
-    else if (strikerScore < perRound) strikerScore++;
-  }
+    const found = findByRef(pool, subject, ref);
+    if (!found) return; // the assignment went away mid-game
+
+    if (!markAnswer(found.question, answer.answerText ?? "").correct) return;
+
+    // Which half of the game this slot belongs to is decided here, not by the
+    // browser: the first five are penalties taken, the rest are saves.
+    if (slot < perRound) strikerScore++;
+    else keeperScore++;
+  });
+
   const score = strikerScore + keeperScore;
+
+  // The game is over: forget it, so it cannot be sent up again to score twice.
+  // This does NOT give the play back — it has been played.
+  await clearActiveGame(student, "penalty");
 
   // Personal best for THIS subject, compared as a fraction so a subject whose
   // game got longer (the teacher added questions) still compares fairly.

@@ -29,6 +29,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { PageErrorBoundary } from "@/components/ErrorBoundary";
 import { ArrowLeft, Loader2, Trophy } from "lucide-react";
 import { isPrimaryForm } from "@shared/schema";
+import { PLAYS_TEXT, playsMessage, type PlayState } from "@shared/game-plays";
 import {
   ANSWER_REVEAL_MS, CORNERS, MIN_QUESTIONS, SHOTS_PER_ROUND, TOTAL_SHOTS,
   scoreLine, type Corner, type Shot,
@@ -113,6 +114,14 @@ function PenaltyShootoutContent() {
     enabled: !!student && isPrimaryForm(student?.form ?? ""),
   });
 
+  // How many plays this child has left today. Same ledger as Target Blaster —
+  // one of each earned per assignment handed in.
+  const { data: playsData, refetch: refetchPlays } = useQuery<{ success: boolean; plays: { penalty: PlayState } }>({
+    queryKey: ["/api/students", student?.id, "plays"],
+    enabled: !!student && isPrimaryForm(student?.form ?? ""),
+  });
+  const plays = playsData?.plays?.penalty ?? null;
+
   const subjects = subjectData?.subjects ?? [];
   const shot = shots[shotNo];
   const round = shot?.round ?? "striker";
@@ -131,7 +140,13 @@ function PenaltyShootoutContent() {
     try {
       const res = await apiRequest("POST", `/api/students/${student!.id}/penalty/start`, { subject: chosen });
       const body = await res.json();
-      if (!body.success) { setErrorText(body.message || "Couldn't start the game."); return; }
+      if (!body.success) {
+        // Out of plays is a refusal, not a breakage: show the game's own
+        // wording and put the counter right.
+        if (body.outOfPlays) refetchPlays();
+        setErrorText(body.message || "Couldn't start the game.");
+        return;
+      }
       setSubject(chosen);
       setShots(body.shots);
       setShotNo(0);
@@ -220,6 +235,7 @@ function PenaltyShootoutContent() {
       const body = await res.json();
       if (body.success) {
         setResult(body);
+        refetchPlays();
         // The dashboard shows XP and streaks, so refresh them.
         queryClient.invalidateQueries({ queryKey: ["/api/students", student!.id, "stats"] });
         queryClient.invalidateQueries({ queryKey: ["/api/students", student!.id, "penalty", "subjects"] });
@@ -313,24 +329,39 @@ function PenaltyShootoutContent() {
             {subjectsLoading ? (
               <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
             ) : subjects.length === 0 ? (
+              // The only way to see this now is to have handed nothing in yet.
+              // A subject used to disappear when it had fewer than ten
+              // questions, which is how a child who HAD done their homework
+              // could still be told there was nothing to play.
               <Card>
                 <CardContent className="py-10 text-center text-sm text-muted-foreground">
-                  <p className="font-medium text-foreground mb-1">No games ready yet</p>
+                  <p className="font-medium text-foreground mb-1">Nothing to play yet</p>
                   <p>
-                    A shootout needs {MIN_QUESTIONS} quiz questions in a subject — that's a different
-                    question for each of your {SHOTS_PER_ROUND} penalties and {SHOTS_PER_ROUND} saves.
+                    A shootout is built from questions you have already answered.
+                    Finish an assignment and come back — it will be here.
                   </p>
-                  <p className="mt-2">Ask your teacher to set a few more quiz questions in this subject.</p>
                 </CardContent>
               </Card>
             ) : (
               <div className="space-y-3" data-testid="subject-list">
+                {/* Plays left today, in the child's own terms. */}
+                <div className="rounded-xl border p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs text-muted-foreground">{PLAYS_TEXT.title}</p>
+                    <p className="text-2xl font-bold" data-testid="text-plays-left">{plays?.left ?? 0}</p>
+                  </div>
+                  <p className="text-sm mt-1" data-testid="text-plays-message">
+                    {plays ? playsMessage(plays) : ""}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-2">{PLAYS_TEXT.resetNote}</p>
+                </div>
+
                 <p className="text-sm font-medium">Pick a subject:</p>
                 {subjects.map((s) => (
                   <button
                     key={s.subject}
                     onClick={() => startGame(s.subject)}
-                    disabled={starting}
+                    disabled={starting || (plays?.left ?? 0) <= 0}
                     className="w-full text-left rounded-xl border-2 border-primary/25 bg-primary/5 px-4 py-4 hover:bg-primary/10 active:scale-[0.99] transition-transform disabled:opacity-60"
                     data-testid={`subject-${s.subject}`}
                   >

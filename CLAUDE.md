@@ -354,6 +354,87 @@ left alone — but the fix is the same three lines if one is ever wired up.
 only figure offered is days active on homework, labelled in plain words as not
 being a record of school attendance. See the weekly report section above.
 
+## The three games (Stages 3-6 only)
+
+Treasure Island, Target Blaster and Penalty Shootout. Forms never see any of
+them: every endpoint goes through `requirePrimaryStudent`, and each page sends a
+Form pupil back to their dashboard.
+
+### Plays are earned by doing homework
+
+Every assignment a child hands in **today** earns them one play of Target
+Blaster and one of Penalty Shootout. Three assignments, three plays of each.
+
+Treasure Island is deliberately **not** part of this. It has always rewarded
+completing assignments with chests and is left exactly as it was.
+
+The rules are in `shared/game-plays.ts`; the counting is in
+`server/game-plays.ts`. One idea holds it together:
+
+> **Plays earned are never stored.** They are counted, every time, from the
+> assignments handed in today. Only what has been USED is written down.
+
+That is what makes the daily reset free rather than something to remember. The
+CAT day (from `streakToday()`, so games and streaks never disagree about what
+day it is) is part of the row's key, so tomorrow finds no row: used starts at 0
+and earned is recounted. Unused plays cannot carry over because there is nothing
+to carry, and no overnight job can fail to run.
+
+A play is spent when a game **starts**, like a coin in an arcade machine.
+Walking away halfway does not refund it — otherwise a child could restart until
+the questions suited them and the record they are chasing would mean nothing.
+
+### Both games are built from work already handed in
+
+Penalty Shootout used to draw its questions from every assignment set for the
+child's class, done or not. That was wrong twice over: it put questions from
+tonight's unfinished homework into a game, and it made the game depend on what a
+teacher happened to have set. Both games now use only assignments the child has
+**already handed in** — the game is a reward built out of their own finished
+work.
+
+A thin subject **repeats questions rather than disappearing**. It used to need
+ten different questions, which is how a child who had done their homework could
+still be told "no games ready". `dealShots()` in `shared/penalty.ts` deals the
+whole shuffled pack, then shuffles and deals again.
+
+**That change broke the old anti-cheat, so it had to be replaced.** Finishing
+used to refuse to count the same question twice, which stopped ten copies of one
+known-correct answer scoring ten. A game may now legitimately repeat a question,
+so that rule would have robbed an honest child. Instead **the issued game is
+stored** (`game_plays.active_refs`) when the play is spent, and the finish is
+marked **slot by slot** against it: the answer in position 3 is marked against
+whatever was actually asked in position 3. Nothing the browser sends decides
+which question is being answered, and a finished game has no stored questions
+left, so a winning result cannot be sent up twice.
+
+### The two games are deliberately different
+
+|            | Penalty Shootout      | Target Blaster                  |
+|------------|-----------------------|---------------------------------|
+| questions  | one subject you pick  | every subject you have done     |
+| length     | 10 shots              | 6 rounds                        |
+| pressure   | none                  | a timer per round               |
+| record     | one per subject       | one overall                     |
+
+Target Blaster's rules are in `shared/blaster.ts`, its server logic in
+`server/blaster.ts`, its page at `client/src/pages/student/target-blaster.tsx`.
+
+### Proving it — `npm run check:games`
+
+`script/check-games.ts` runs against a live server as a real Stage 3 pupil:
+completes three assignments, checks three plays of each game appear, plays them
+down to zero, checks the fourth game is refused *politely* with the "come back
+tomorrow" wording, checks a fourth assignment earns another play mid-day, checks
+both games build from completed work and never from an assignment left undone,
+checks the answer key never reaches the browser, checks a finished game cannot
+be replayed to score twice, checks Treasure Island still earns chests, checks
+Forms get 403 from all of it, and moves the clock to tomorrow to prove unused
+plays do not carry over. 44 checks.
+
+Run it after touching either game, the plays ledger, or anything under
+`/api/students/:id/plays`.
+
 ## Classes (forms)
 
 Assignments and students are grouped by class:

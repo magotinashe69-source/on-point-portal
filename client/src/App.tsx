@@ -33,6 +33,7 @@ import StudentResources from "@/pages/student/resources";
 import StudentLessons from "@/pages/student/lessons";
 import TreasureIsland from "@/pages/student/treasure-island";
 import PenaltyShootout from "@/pages/student/penalty-shootout";
+import TargetBlaster from "@/pages/student/target-blaster";
 // Dream World is retired. Its pages (dream-world, visit, town-view, certificate)
 // are still in the repo but are no longer imported or routed to — see the
 // redirects below.
@@ -79,6 +80,9 @@ function Router() {
       {/* Penalty Shootout is primary-only; the page itself sends Forms back to
           their dashboard, and every endpoint behind it refuses them too. */}
       <Route path="/student/penalty" component={PenaltyShootout} />
+      {/* Target Blaster, like the other two games, is Stages 3-6 only.
+          The page sends Forms back and every endpoint refuses them. */}
+      <Route path="/student/blaster" component={TargetBlaster} />
       {/* Dream World is retired. An old bookmark or a typed address lands back
           on the dashboard instead of opening a game we no longer run. Nothing
           has been deleted — the towns are all still saved. */}

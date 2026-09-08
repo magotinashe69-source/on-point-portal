@@ -445,6 +445,64 @@ export const insertPenaltyBestSchema = createInsertSchema(penaltyBest).omit({ id
 export type PenaltyBest = typeof penaltyBest.$inferSelect;
 export type InsertPenaltyBest = z.infer<typeof insertPenaltyBestSchema>;
 
+// Plays earned by doing homework (Stages 3-6 only).
+//
+// A child earns one play of Target Blaster and one of Penalty Shootout for
+// every assignment they hand in that day. This table holds only what they have
+// USED: how many they EARNED is counted from the assignments they handed in
+// today, never stored.
+//
+// That is what makes the daily reset free. A "day" is the CAT date in the `day`
+// column, so tomorrow simply has no row — used starts at 0 and earned is
+// recounted from tomorrow's homework. Unused plays cannot carry over because
+// there is nothing to carry: yesterday's row is just left behind.
+//
+// The game in flight is kept here too. Its questions are fixed the moment a
+// game starts, so the finish can be marked slot by slot against the questions
+// actually asked rather than trusting whatever the browser sends back.
+export const gamePlays = pgTable("game_plays", {
+  id: serial("id").primaryKey(),
+  studentId: integer("student_id").notNull().references(() => students.id),
+  day: text("day").notNull(),   // YYYY-MM-DD in CAT, from streakToday()
+  game: text("game").notNull(), // "penalty" | "blaster"
+  used: integer("used").notNull().default(0),
+  // The questions of the game currently being played, in order, as
+  // "assignmentId:questionId" refs. Empty when no game is in flight.
+  activeRefs: jsonb("active_refs").$type<string[]>().default([]),
+  activeSubject: text("active_subject"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type GamePlays = typeof gamePlays.$inferSelect;
+
+// Written out by hand rather than derived from the table. createInsertSchema
+// turns the JSON array column into a shape TypeScript will not accept back as
+// a plain string[], and this row is only ever written by our own code, so a
+// short honest type is clearer than fighting the generated one.
+export type InsertGamePlays = {
+  studentId: number;
+  day: string;
+  game: string;
+  used?: number;
+  activeRefs?: string[];
+  activeSubject?: string | null;
+};
+
+// Target Blaster's personal best. One row per child, not per subject: a blast
+// mixes every subject they have done, so there is a single record to chase.
+export const blasterBest = pgTable("blaster_best", {
+  id: serial("id").primaryKey(),
+  studentId: integer("student_id").notNull().references(() => students.id),
+  bestScore: integer("best_score").notNull().default(0),
+  bestOutOf: integer("best_out_of").notNull().default(0),
+  gamesPlayed: integer("games_played").notNull().default(0),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertBlasterBestSchema = createInsertSchema(blasterBest).omit({ id: true, updatedAt: true });
+export type BlasterBest = typeof blasterBest.$inferSelect;
+export type InsertBlasterBest = z.infer<typeof insertBlasterBestSchema>;
+
 // Login schemas
 export const teacherLoginSchema = z.object({
   email: z.string().email("Valid email is required"),
