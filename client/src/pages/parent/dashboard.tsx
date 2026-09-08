@@ -9,7 +9,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { REPORT_TEXT, subjectLabel, type WeeklyReport } from "@shared/weekly-report";
 import { OVERVIEW_TEXT, type ParentOverview } from "@shared/parent-overview";
 import { WORK_TEXT } from "@shared/parent-work";
-import { LogOut, Loader2, GraduationCap, CalendarDays, TrendingUp, AlertCircle, Flame, ClipboardList, MessageSquare, Megaphone, Eye, Target } from "lucide-react";
+import { LogOut, Loader2, GraduationCap, CalendarDays, TrendingUp, AlertCircle, Flame, ClipboardList, MessageSquare, Megaphone, Eye, Target, ChevronRight } from "lucide-react";
 import logoPath from "@assets/logo.webp";
 
 // What the server sends back about the child. Deliberately small: a parent sees
@@ -385,26 +385,46 @@ export default function ParentDashboard() {
                     {OVERVIEW_TEXT.recentMarksEmpty}
                   </p>
                 )}
+                {/* Each row opens that piece of work, question by question.
+                    The whole row is the link so it is easy to hit with a thumb.
+                    The id in the address is checked against this parent's own
+                    child on the server before anything comes back. */}
                 <div className="space-y-2">
                   {overview.recentMarks.map((m, i) => (
-                    <div key={i} className="rounded-md border p-3" data-testid={`row-recent-mark-${i}`}>
-                      <div className="flex items-start justify-between gap-3 flex-wrap">
-                        <div>
-                          <p className="font-medium">{m.title}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {subjectLabel(m.subject)} · {new Date(m.markedAt).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-semibold">{m.percent}%</p>
-                          <p className="text-xs text-muted-foreground">
-                            {m.score} / {m.outOf}
-                          </p>
+                    <Link
+                      key={i}
+                      href={`/parent/work/${m.submissionId}`}
+                      data-testid={`link-recent-mark-${m.submissionId}`}
+                    >
+                      <div
+                        className="rounded-md border p-3 hover-elevate active-elevate-2 cursor-pointer"
+                        data-testid={`row-recent-mark-${i}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium truncate">{m.title}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {subjectLabel(m.subject)} · {new Date(m.markedAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="font-semibold">{m.percent}%</p>
+                            <p className="text-xs text-muted-foreground">
+                              {m.score} / {m.outOf}
+                            </p>
+                          </div>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
                         </div>
                       </div>
-                    </div>
+                    </Link>
                   ))}
                 </div>
+
+                {overview.recentMarks.length > 0 && (
+                  <p className="text-xs text-muted-foreground mt-3">
+                    Tap any piece to see each question, your child's answer and the right answer.
+                  </p>
+                )}
               </CardContent>
             </Card>
 
@@ -441,6 +461,9 @@ export default function ParentDashboard() {
                   )}
                   <div className="space-y-2">
                     {overview.homework.outstanding.map((item, i) => (
+                      // Not a link, on purpose: this is work that has NOT been
+                      // handed in, so there are no answers to open. Making it
+                      // tappable would promise a page that cannot exist yet.
                       <div
                         key={i}
                         className="flex items-center justify-between gap-3 rounded-md border p-3"
@@ -454,6 +477,18 @@ export default function ParentDashboard() {
                       </div>
                     ))}
                   </div>
+
+                  {/* The work that HAS been handed in is all openable, so the
+                      way through to it sits here where a parent is already
+                      thinking about homework. */}
+                  {overview.homework.completed > 0 && (
+                    <Link href="/parent/work">
+                      <Button variant="outline" size="sm" className="mt-3 w-full" data-testid="button-see-completed-work">
+                        <ClipboardList className="h-4 w-4 mr-2" />
+                        See all {overview.homework.completed} handed in
+                      </Button>
+                    </Link>
+                  )}
                 </div>
 
                 {/* Said plainly, because the school keeps no attendance
@@ -486,12 +521,28 @@ export default function ParentDashboard() {
                 )}
                 <div className="space-y-3">
                   {feedback.map((m, i) => (
-                    <div key={i} className="rounded-md border p-3" data-testid={`row-feedback-${i}`}>
-                      <p className="text-xs text-muted-foreground mb-1">
-                        {subjectLabel(m.subject)} · {m.title}
-                      </p>
-                      <p className="text-sm">{m.feedback}</p>
-                    </div>
+                    // Reading a comment is usually the moment a parent wants to
+                    // see the work it is about, so these open it too.
+                    <Link
+                      key={i}
+                      href={`/parent/work/${m.submissionId}`}
+                      data-testid={`link-feedback-${m.submissionId}`}
+                    >
+                      <div
+                        className="rounded-md border p-3 hover-elevate active-elevate-2 cursor-pointer"
+                        data-testid={`row-feedback-${i}`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs text-muted-foreground mb-1">
+                              {subjectLabel(m.subject)} · {m.title}
+                            </p>
+                            <p className="text-sm">{m.feedback}</p>
+                          </div>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 mt-1" />
+                        </div>
+                      </div>
+                    </Link>
                   ))}
                 </div>
               </CardContent>

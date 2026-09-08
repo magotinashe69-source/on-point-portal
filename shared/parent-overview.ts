@@ -24,6 +24,11 @@ export type SubjectAverage = {
 
 /** One piece of marked work, as a parent sees it. */
 export type RecentMark = {
+  // Which piece of work this mark is for, so the row can be tapped to open it
+  // question by question (/parent/work/:submissionId). The server still checks
+  // the id belongs to this parent's child before answering — see
+  // requireParentSubmission — so this is a convenience, never a permission.
+  submissionId: number;
   subject: string;
   title: string;          // the assignment's title
   score: number;          // marks scored

@@ -183,6 +183,12 @@ address to tamper with.
 - `GET /api/parent/weekly-report` — the week just gone (see above).
 - `GET /api/parent/completed-work`, `GET /api/parent/support-report` — see
   "Completed work, and the one id a parent can edit" below.
+
+The dashboard is a way IN to that work, not a dead end: every recent mark and
+every teacher comment is a link to that piece opened question by question
+(`RecentMark.submissionId` carries the id). The "still to hand in" rows are
+deliberately NOT links — that work has not been handed in, so there are no
+answers to open and a tappable row would promise a page that cannot exist.
 - `GET /api/parent/overview` — the fuller picture: the current average across
   all marked work, marks by subject, recent marks with the teacher's written
   feedback, homework set against handed in with what is still outstanding, days

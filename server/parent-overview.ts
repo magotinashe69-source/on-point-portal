@@ -89,6 +89,7 @@ export async function buildParentOverview(student: Student): Promise<ParentOverv
     bySubject.set(assignment.subject, row);
 
     recent.push({
+      submissionId: submission.id,
       subject: assignment.subject,
       title: assignment.title,
       score: mark.totalScore,
