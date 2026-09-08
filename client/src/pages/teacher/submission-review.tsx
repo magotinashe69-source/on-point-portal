@@ -23,6 +23,9 @@ interface QReview {
   index: number;
   questionId: string;
   questionText: string;
+  // Written questions only: the teacher's own model answer, when they wrote
+  // one. Empty string when they did not.
+  modelAnswer?: string;
   imageUrls: string[];
   type: string;
   autoMarkable: boolean;
@@ -253,6 +256,20 @@ function SubmissionReviewContent() {
                           </div>
                         )}
                       </div>
+
+                      {/* The model answer, for a written question that has
+                          one. It sits where the correct answer sits for an
+                          auto-marked question, so the eye finds it in the same
+                          place — but it is a reminder, not a mark scheme. */}
+                      {isWritten && q.modelAnswer?.trim() && (
+                        <div
+                          className="rounded-lg border-l-4 border-primary bg-primary/5 p-3"
+                          data-testid={`model-answer-${q.index}`}
+                        >
+                          <div className="text-xs font-medium text-primary mb-1">Model answer</div>
+                          <p className="text-sm whitespace-pre-wrap break-words">{q.modelAnswer}</p>
+                        </div>
+                      )}
 
                       {/* Correct answer (auto-markable types only). */}
                       {q.autoMarkable && (

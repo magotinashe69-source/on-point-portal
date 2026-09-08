@@ -1674,6 +1674,10 @@ export async function registerRoutes(
           studentAnswerDisplay: displayStudentAnswer(q, answer?.answerText ?? ""),
           studentAnswerImages: answer?.imageUrls || [],
           correctAnswerDisplay: auto ? marked.correctAnswerDisplay : "",
+          // A written question has no answer key, but the teacher may have
+          // written a model answer when they set the work. Worth having in
+          // front of them while they check or change a mark.
+          modelAnswer: !auto ? (q.modelAnswer?.trim() || "") : "",
           acceptedAnswers: q.type === "short_text" ? (q.acceptedAnswers || []) : undefined,
           tolerance: q.type === "numeric" ? (q.tolerance ?? 0) : undefined,
           score,

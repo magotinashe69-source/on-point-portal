@@ -378,6 +378,30 @@ export default function MarkSubmission() {
                           )}
                         </div>
 
+                        {/* The model answer this teacher wrote when they set
+                            the work. Only on questions that have one, and only
+                            ever a reminder — it is not a mark scheme and
+                            nothing is checked against it. The same words are
+                            what the child's parent sees on their portal, which
+                            is worth knowing while marking. */}
+                        {question.modelAnswer?.trim() && (
+                          <div
+                            className="rounded-md border-l-4 border-primary bg-primary/5 p-3"
+                            data-testid={`panel-model-answer-${index}`}
+                          >
+                            <p className="text-sm font-semibold text-primary mb-1">
+                              Model answer
+                            </p>
+                            <p className="text-sm whitespace-pre-wrap" data-testid={`text-model-answer-${index}`}>
+                              {question.modelAnswer}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-2">
+                              Your own note from when you set this question — a reminder, not a mark
+                              scheme. Parents see it beside their child's answer.
+                            </p>
+                          </div>
+                        )}
+
                         <div className="grid gap-4 sm:grid-cols-2">
                           <FormField
                             control={form.control}

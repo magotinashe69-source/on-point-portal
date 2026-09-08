@@ -252,6 +252,14 @@ the same way.** `ReviewedQuestion.correctAnswerKind` says which one it is:
 The model answer is optional everywhere, so questions saved before it existed
 simply have none. It is a field on the questions JSON, so there is no migration.
 
+**The teacher sees it too, on both marking screens.** On `/teacher/mark/:id` it
+sits between the child's answer and the score box — read the question, read what
+they wrote, remind yourself what you were looking for, award the mark. On
+`/teacher/submissions/:id` it sits exactly where the correct answer sits for an
+auto-marked question, so the eye finds it in the same place. It is labelled a
+reminder rather than a mark scheme in both: nothing is checked against it, and
+the teacher is still marking by hand.
+
 **Attendance:** still none. `attendance.recorded` is hard-coded `false` and the
 only figure offered is days active on homework, labelled in plain words as not
 being a record of school attendance. See the weekly report section above.
