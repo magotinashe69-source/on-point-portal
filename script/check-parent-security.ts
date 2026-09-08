@@ -310,6 +310,47 @@ async function main() {
   await mustBeRefused(anon, "GET", `/api/parent/students/${childA.id}`, "a pupil by id while logged out");
   await mustBeRefused(anon, "GET", "/api/students", "the register while logged out");
 
+  // --- The login pages must not log the parent straight back out ----------
+  //
+  // This one reads the source rather than the server, because the server was
+  // never wrong. The parent portal once failed completely, with every
+  // /api/parent/... request coming back 401, and the cause was in the browser:
+  // the login page called logout() right after a successful login "to clear
+  // any teacher or student", and logout() posts to /api/auth/parent/logout,
+  // which destroys the session the login had just created. The browser still
+  // remembered the parent, so the dashboard looked logged in while nothing on
+  // it could load.
+  //
+  // A login page never needs to log anything out on the server: every login
+  // goes through setSessionRole(), which already clears the other two roles.
+  // It only needs forgetRememberedLogins(), which touches the browser alone.
+
+  console.log("\nNo login page logs itself out again");
+  const { readFileSync } = await import("node:fs");
+  for (const page of ["parent", "student", "teacher"]) {
+    const file = `client/src/pages/${page}/login.tsx`;
+    let source = "";
+    try {
+      source = readFileSync(file, "utf8");
+    } catch {
+      check(false, `the ${page} login page could be read`, file);
+      continue;
+    }
+
+    // A real call to logout(), not the word in a comment explaining why not to.
+    const offending = source
+      .split("\n")
+      .map(line => line.trim())
+      .filter(line => !line.startsWith("//") && !line.startsWith("*"))
+      .filter(line => /(^|[^.\w])logout\s*\(\s*\)/.test(line));
+
+    check(
+      offending.length === 0,
+      `the ${page} login page does not call logout()`,
+      offending.length ? `${file}: ${offending[0]} — this destroys the session the login just created` : "",
+    );
+  }
+
   // --- Tidy up -------------------------------------------------------------
 
   await teacher.delete(`/api/parents/${parentAId}`);

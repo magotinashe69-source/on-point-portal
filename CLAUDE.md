@@ -68,6 +68,10 @@ appears nowhere in what parent A is sent, that a made-up pupil id is refused
 with 403 rather than 404 (a 404 would reveal which ids exist), and that a
 logged-out caller gets nothing. It tidies up the accounts it made.
 
+It ends with one check that reads the source rather than the server: no login
+page may call `logout()`, which would destroy the session it had just created
+(see "A login page must never call `logout()`" below).
+
 Run it after touching anything under `/api/parent/`, any guard in
 `server/routes.ts`, or the parents table. All checks must pass.
 
@@ -269,6 +273,35 @@ script/
   form cannot be used to discover which usernames exist.
 - **Note:** passwords are currently stored as plain text for **all three roles** —
   this should be improved (hashing) before any real production use.
+
+### A login page must never call `logout()`
+
+This one cost a whole working portal. The parent dashboard loaded but every
+section failed, with `/api/parent/child`, `/api/parent/overview` and both
+weekly reports answering **401** to a parent who had just logged in
+successfully.
+
+The server was never at fault. The login page, wanting to clear any teacher or
+student the browser was remembering, called `logout()` — and `logout()` posts to
+`/api/auth/teacher/logout`, `/api/auth/student/logout` **and**
+`/api/auth/parent/logout`, each of which calls `req.session.destroy()`. So the
+page destroyed the parent session it had created a moment earlier. The browser
+still remembered the parent, so the dashboard rendered and looked logged in
+while nothing on it could load.
+
+`client/src/lib/auth.tsx` now offers two separate things, and the names say
+which is which:
+
+- **`forgetRememberedLogins()`** — clears the browser's copy only (state and
+  `localStorage`). This is what a **login page** uses. It is all a login page
+  needs, because `setSessionRole()` on the server already clears the other two
+  roles as part of logging in.
+- **`logout()`** — forgets the browser's copy *and* ends the session on the
+  server. Only a **logout button** should use this.
+
+All four login paths (teacher, student form, student card scan, parent) now use
+`forgetRememberedLogins()`. `npm run check:parents` reads the three login pages
+and fails if any of them calls `logout()` again.
 
 ## Database notes
 

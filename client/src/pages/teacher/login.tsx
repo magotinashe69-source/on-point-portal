@@ -17,7 +17,7 @@ import logoPath from "@assets/logo.webp";
 
 export default function TeacherLogin() {
   const [location, setLocation] = useLocation();
-  const { teacher, setTeacher } = useAuth();
+  const { teacher, setTeacher, forgetRememberedLogins } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -47,6 +47,10 @@ export default function TeacherLogin() {
           title: "Logged in",
           description: `Logged in as ${data.teacher.fullName}`,
         });
+        // Forget any student or parent this browser is remembering. The
+        // server has already dropped those roles; this keeps the browser's
+        // copy in step. Not logout(), which would destroy the new session.
+        forgetRememberedLogins();
         setTeacher(data.teacher);
       } else {
         toast({

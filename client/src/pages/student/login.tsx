@@ -18,7 +18,7 @@ import logoPath from "@assets/logo.webp";
 
 export default function StudentLoginPage() {
   const [location, setLocation] = useLocation();
-  const { student, setStudent, logout } = useAuth();
+  const { student, setStudent, forgetRememberedLogins } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -72,6 +72,10 @@ export default function StudentLoginPage() {
       const data = await res.json().catch(() => ({}));
       if (!data.success) return data.message || "Card not recognised. Ask your teacher to check it.";
 
+      // Same as the form login below: forget any teacher or parent this
+      // browser is remembering, without posting a logout that would destroy
+      // the session the scan has just created.
+      forgetRememberedLogins();
       setStudent(data.student);
       setScanOpen(false);
       toast({ title: `Welcome, ${String(data.student.fullName || "").split(" ")[0]}` });
@@ -89,8 +93,11 @@ export default function StudentLoginPage() {
       const data = await response.json();
       
       if (data.success) {
-        // Clear any stale teacher session before setting student
-        logout();
+        // Clear any teacher or parent remembered in this browser before
+        // setting the student. Not logout(): that would post to
+        // /api/auth/student/logout and destroy the session this login had just
+        // created, leaving every request 401 afterwards.
+        forgetRememberedLogins();
         const message = data.isFirstLogin 
           ? "Your password is set. Use it next time you log in."
           : `Welcome back, ${data.student.fullName}!`;

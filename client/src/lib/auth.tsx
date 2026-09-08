@@ -9,6 +9,7 @@ type AuthContextType = {
   setTeacher: (teacher: Teacher | null) => void;
   setStudent: (student: Student | null) => void;
   setParent: (parent: Parent | null) => void;
+  forgetRememberedLogins: () => void;
   logout: () => void;
 };
 
@@ -147,11 +148,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     queryClient.clear();
   }, [identityKey]);
 
-  const logout = () => {
-    // Destroy whichever server-side session exists (fire-and-forget).
-    fetch("/api/auth/teacher/logout", { method: "POST" }).catch(() => {});
-    fetch("/api/auth/student/logout", { method: "POST" }).catch(() => {});
-    fetch("/api/auth/parent/logout", { method: "POST" }).catch(() => {});
+  // Forget whoever this browser is remembering, WITHOUT telling the server
+  // anything. This is what a LOGIN page needs after a successful login.
+  //
+  // The server has already dropped the other two roles by itself: every login
+  // goes through setSessionRole(), which sets one of teacher/student/parent
+  // and clears the other two. So the only thing left to do is bring the
+  // browser's copy into step.
+  //
+  // Calling logout() here instead would post to /api/auth/parent/logout, which
+  // destroys the session — the very session the login had just created a
+  // moment earlier. The browser would still remember the parent, so the
+  // dashboard looked logged in while every /api/parent/... request came back
+  // 401. That is the bug this function exists to prevent.
+  const forgetRememberedLogins = () => {
     setTeacher(null);
     setStudent(null);
     setParent(null);
@@ -160,8 +170,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("onpoint-parent");
   };
 
+  // Logging out for real: end the session on the server as well as forgetting
+  // it here. Only a logout button should use this.
+  const logout = () => {
+    // Destroy whichever server-side session exists (fire-and-forget).
+    fetch("/api/auth/teacher/logout", { method: "POST" }).catch(() => {});
+    fetch("/api/auth/student/logout", { method: "POST" }).catch(() => {});
+    fetch("/api/auth/parent/logout", { method: "POST" }).catch(() => {});
+    forgetRememberedLogins();
+  };
+
   return (
-    <AuthContext.Provider value={{ teacher, student, parent, setTeacher, setStudent, setParent, logout }}>
+    <AuthContext.Provider value={{ teacher, student, parent, setTeacher, setStudent, setParent, forgetRememberedLogins, logout }}>
       {children}
     </AuthContext.Provider>
   );

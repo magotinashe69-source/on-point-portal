@@ -16,7 +16,7 @@ import logoPath from "@assets/logo.webp";
 
 export default function ParentLoginPage() {
   const [, setLocation] = useLocation();
-  const { parent, setParent, logout } = useAuth();
+  const { parent, setParent, forgetRememberedLogins } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -54,7 +54,11 @@ export default function ParentLoginPage() {
         // Clear any teacher or student remembered in this browser before
         // saving the parent. The server has already dropped those sessions;
         // this keeps the browser's copy in step.
-        logout();
+        //
+        // It must NOT be logout(): that posts to /api/auth/parent/logout and
+        // would destroy the parent session the line above had just created,
+        // leaving a dashboard that looks logged in while every request 401s.
+        forgetRememberedLogins();
         setParent(data.parent);
         toast({
           title: "Logged in",
