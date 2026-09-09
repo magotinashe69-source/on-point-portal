@@ -1,21 +1,47 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
+// The three portals, and what the browser remembers about who signed in to
+// each one. Kept as one list so a rule below is written once, not three times.
+const PORTALS = [
+  { prefix: "/parent/", remembered: "onpoint-parent", login: "/parent/login" },
+  { prefix: "/teacher/", remembered: "onpoint-teacher", login: "/teacher/login" },
+  { prefix: "/student/", remembered: "onpoint-student", login: "/student/login" },
+] as const;
+
 // A 401 means the server-side login has ended (most often because the server
-// restarted). The browser may still be remembering the teacher, which used to
+// restarted — in SQLite mode sessions are kept in memory, so a restart forgets
+// everyone). The browser may still be remembering the person, which used to
 // leave them on a page where everything silently failed to load. Forget the
 // remembered login and send them to the login page once, so the cause is
 // obvious instead of looking like missing data.
-function handleExpiredTeacherLogin() {
-  if (!localStorage.getItem("onpoint-teacher")) return;
-  localStorage.removeItem("onpoint-teacher");
-  if (!window.location.pathname.startsWith("/teacher/login")) {
-    window.location.href = "/teacher/login?expired=1";
+//
+// This used to rescue the teacher only. A parent hit exactly the same trap and
+// had it worse: their dashboard loaded, then every section — their child, the
+// weekly report, the overview — showed "try again in a moment" for ever,
+// because queries never retry and never go stale. Nothing sent them back to
+// the login page, so there was no way out of it.
+function handleExpiredLogin() {
+  const path = window.location.pathname;
+
+  // Whichever portal the person is actually in decides whose login to forget.
+  // Every teacher, parent and student page lives under one of these prefixes;
+  // on a shared page (the landing page, say) fall back to the teacher, which
+  // is what this did before.
+  const portal =
+    PORTALS.find((p) => path.startsWith(p.prefix)) ??
+    PORTALS.find((p) => p.prefix === "/teacher/");
+  if (!portal) return;
+
+  if (!localStorage.getItem(portal.remembered)) return;
+  localStorage.removeItem(portal.remembered);
+  if (!path.startsWith(portal.login)) {
+    window.location.href = `${portal.login}?expired=1`;
   }
 }
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
-    if (res.status === 401) handleExpiredTeacherLogin();
+    if (res.status === 401) handleExpiredLogin();
     const text = (await res.text()) || res.statusText;
     throw new Error(`${res.status}: ${text}`);
   }

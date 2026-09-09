@@ -144,6 +144,31 @@ single gate on that prefix. They are still registered only when
 `NODE_ENV !== "production"`; the gate is because a dev server is often reachable
 on the office network, and `sim-date` moves the clock for everyone using it.
 
+### An expired session leads back to the right login page
+
+A 401 means the server-side login has ended — in SQLite mode sessions are kept
+in memory, so a restart of the server is enough to cause it. The browser may
+still be remembering the person, which leaves them on a page where everything
+fails silently.
+
+The rescue is in `client/src/lib/queryClient.ts`, and it used to know about the
+**teacher only**. A parent hit exactly the same trap and had it worse: their
+dashboard loaded, then every section showed "try again in a moment" for ever,
+because queries never retry and never go stale (`staleTime: Infinity`). Nothing
+sent them back to the login page, so there was no way out of it.
+
+`handleExpiredLogin()` now works out which portal the person is in from the
+path, forgets that portal's remembered login, and sends them to that portal's
+login page once. `QueryError` takes `role="parent"` so "Log in" leads to the
+parent's own login — sending a parent to the teacher login would read as the app
+confusing them with a member of staff.
+
+**A failed request must never render as empty.** An empty parent dashboard reads
+as "your child has done nothing", which is a different and much worse message
+than "this did not load". Every section uses `QueryError`, and
+`npm run check:parents` counts the panels so a section added later without one
+is caught.
+
 ### The weekly parent report
 
 Each linked child gets a short weekly summary, in two places that must always

@@ -67,7 +67,7 @@ interface Props {
   /** "page" fills the main area; "panel" sits inside a card. */
   variant?: "page" | "panel";
   /** Where "sign in again" should lead when the login has expired. */
-  role?: "teacher" | "student";
+  role?: "teacher" | "student" | "parent";
   "data-testid"?: string;
 }
 
@@ -81,7 +81,10 @@ export function QueryError({
 }: Props) {
   const status = statusOf(error);
   const expired = status === "401";
-  const loginHref = role === "teacher" ? "/teacher/login" : "/student/login";
+  // Each portal has its own login page, and a parent must land on theirs —
+  // sending a parent to the teacher login would look like the app had mixed
+  // them up with a member of staff.
+  const loginHref = `/${role}/login`;
 
   // A page-level failure gets more room to breathe than one inside a card.
   const pad = variant === "page" ? "py-16" : "py-8";

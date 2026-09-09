@@ -647,6 +647,69 @@ async function main() {
     );
   }
 
+  // --- An expired parent session must lead back to the parent login --------
+  //
+  // Reads the source rather than the server, like the check above, because the
+  // server was never wrong here either. A parent whose session had ended sat on
+  // a dashboard where every section failed for ever: queries never retry and
+  // never go stale, so nothing put it right and nothing sent them back to log
+  // in again. The rescue existed, but it knew about the teacher only.
+  //
+  // This guards the shape of the fix rather than its wording: whichever portal
+  // the person is in decides which login they are sent to.
+
+  console.log("\nAn expired session leads back to the right login page");
+
+  {
+    const { readFileSync } = await import("node:fs");
+    let source = "";
+    try {
+      source = readFileSync("client/src/lib/queryClient.ts", "utf8");
+    } catch {
+      check(false, "client/src/lib/queryClient.ts could be read");
+    }
+
+    if (source) {
+      check(/\/parent\/login/.test(source),
+        "the 401 rescue knows about the parent login");
+      check(/\/teacher\/login/.test(source),
+        "and still knows about the teacher login");
+      check(/\/student\/login/.test(source),
+        "and the student login");
+      check(/onpoint-parent/.test(source),
+        "and forgets the remembered PARENT when their session has ended",
+        "without this a parent is redirected but still looks signed in");
+    }
+
+    // The shared error panel must send a parent to their own login. Sending
+    // them to the teacher's would read as the app confusing them with staff.
+    let errorSource = "";
+    try {
+      errorSource = readFileSync("client/src/components/QueryError.tsx", "utf8");
+    } catch {
+      check(false, "client/src/components/QueryError.tsx could be read");
+    }
+    if (errorSource) {
+      check(/"parent"/.test(errorSource),
+        "the error panel can point a parent at their own login");
+    }
+
+    // The parent dashboard's sections must SAY a request failed rather than
+    // rendering empty, which reads as "your child has nothing".
+    let dashSource = "";
+    try {
+      dashSource = readFileSync("client/src/pages/parent/dashboard.tsx", "utf8");
+    } catch {
+      check(false, "client/src/pages/parent/dashboard.tsx could be read");
+    }
+    if (dashSource) {
+      const panels = (dashSource.match(/<QueryError/g) || []).length;
+      check(panels >= 4,
+        "every section of the parent dashboard shows a failure rather than nothing",
+        `found ${panels} QueryError panels, expected one per section`);
+    }
+  }
+
   // --- Tidy up -------------------------------------------------------------
 
   await teacher.delete(`/api/parents/${parentAId}`);

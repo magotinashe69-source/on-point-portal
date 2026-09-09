@@ -112,6 +112,14 @@ export default function ParentLoginPage() {
             <CardDescription>
               Enter the username and password the school gave you
             </CardDescription>
+            {/* Shown when we sent the parent here because their login had
+                quietly ended — otherwise it just looks like the app logged
+                them out for no reason. */}
+            {window.location.search.includes("expired=1") && (
+              <p className="mt-3 rounded-md bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-sm text-amber-800 dark:text-amber-200" data-testid="text-session-expired">
+                Your login had expired. Log in again to carry on.
+              </p>
+            )}
           </CardHeader>
           <CardContent>
             <Form {...form}>

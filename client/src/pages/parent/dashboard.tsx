@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { QueryError } from "@/components/QueryError";
 import { REPORT_TEXT, subjectLabel, type WeeklyReport } from "@shared/weekly-report";
 import { OVERVIEW_TEXT, type ParentOverview } from "@shared/parent-overview";
 import { WORK_TEXT } from "@shared/parent-work";
@@ -64,7 +65,7 @@ export default function ParentDashboard() {
   // Note there is no id in either address. The server works out which child to
   // send from the parent's own account, so this page has no way to ask for
   // anybody else's child even if it wanted to.
-  const { data, isLoading, isError } = useQuery<{ success: boolean; child: Child }>({
+  const { data, isLoading, isError, error, refetch } = useQuery<{ success: boolean; child: Child }>({
     queryKey: ["/api/parent/child"],
     enabled: !!parent,
   });
@@ -73,6 +74,8 @@ export default function ParentDashboard() {
     data: reportData,
     isLoading: reportLoading,
     isError: reportError,
+    error: reportErrorValue,
+    refetch: refetchReport,
   } = useQuery<{ success: boolean; report: WeeklyReport }>({
     queryKey: ["/api/parent/weekly-report", { week }],
     enabled: !!parent,
@@ -88,6 +91,8 @@ export default function ParentDashboard() {
     data: overviewData,
     isLoading: overviewLoading,
     isError: overviewError,
+    error: overviewErrorValue,
+    refetch: refetchOverview,
   } = useQuery<{ success: boolean; overview: ParentOverview }>({
     queryKey: ["/api/parent/overview"],
     enabled: !!parent,
@@ -98,6 +103,9 @@ export default function ParentDashboard() {
   const {
     data: playsData,
     isLoading: playsLoading,
+    isError: playsError,
+    error: playsErrorValue,
+    refetch: refetchPlays,
   } = useQuery<{ success: boolean; plays: ParentPlays }>({
     queryKey: ["/api/parent/plays"],
     enabled: !!parent,
@@ -168,9 +176,13 @@ export default function ParentDashboard() {
             )}
 
             {isError && (
-              <p className="text-sm text-destructive" data-testid="text-parent-child-error">
-                We could not load your child's details just now. Try again in a moment.
-              </p>
+              <QueryError
+                error={error}
+                what="your child's details"
+                onRetry={() => refetch()}
+                role="parent"
+                data-testid="text-parent-child-error"
+              />
             )}
 
             {child && (
@@ -243,9 +255,13 @@ export default function ParentDashboard() {
             )}
 
             {reportError && (
-              <p className="text-sm text-destructive" data-testid="text-report-error">
-                We could not load the weekly report just now. Try again in a moment.
-              </p>
+              <QueryError
+                error={reportErrorValue}
+                what="the weekly report"
+                onRetry={() => refetchReport()}
+                role="parent"
+                data-testid="text-report-error"
+              />
             )}
 
             {report && (
@@ -332,9 +348,15 @@ export default function ParentDashboard() {
         )}
 
         {overviewError && (
-          <p className="text-sm text-destructive mt-6" data-testid="text-overview-error">
-            We could not load the rest of your child's information just now. Try again in a moment.
-          </p>
+          <div className="mt-6">
+            <QueryError
+              error={overviewErrorValue}
+              what="the rest of your child's information"
+              onRetry={() => refetchOverview()}
+              role="parent"
+              data-testid="text-overview-error"
+            />
+          </div>
         )}
 
         {overview && (
@@ -538,15 +560,29 @@ export default function ParentDashboard() {
                   </div>
                 )}
 
+                {/* A failure must not read as "your child earned nothing".
+                    Without this the card simply rendered empty, which is the
+                    same trap the other three sections were pulled out of. */}
+                {playsError && (
+                  <QueryError
+                    error={playsErrorValue}
+                    what="your child's game plays"
+                    onRetry={() => refetchPlays()}
+                    role="parent"
+                    variant="panel"
+                    data-testid="text-plays-error"
+                  />
+                )}
+
                 {/* Forms 1-2 do not have the games. Said plainly, because a row
                     of zeros would read as "your child has earned nothing". */}
-                {!playsLoading && plays && !plays.available && (
+                {!playsLoading && !playsError && plays && !plays.available && (
                   <p className="text-sm text-muted-foreground" data-testid="text-plays-not-available">
                     {PLAYS_PARENT_TEXT.notAvailable}
                   </p>
                 )}
 
-                {!playsLoading && plays?.available && (
+                {!playsLoading && !playsError && plays?.available && (
                   <>
                     <div className="grid grid-cols-3 gap-3">
                       {/* All three count BOTH games, so they read against each
