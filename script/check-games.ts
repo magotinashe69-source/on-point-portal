@@ -361,6 +361,8 @@ async function main() {
 
   // The same rule in Penalty Shootout, including across subjects.
   const pPlays = (await pupil.get(`/api/students/${child.id}/plays`)).body?.plays?.penalty?.left ?? 0;
+  check(pPlays > 0, "there is a penalty play left to test resuming with",
+    "if this fails the checks below are SKIPPED, not passing");
   if (pPlays > 0) {
     const pGame = await pupil.post(`/api/students/${child.id}/penalty/start`, { subject: "MATHS" });
     const pShots = pGame.body?.shots || [];
@@ -531,10 +533,15 @@ async function main() {
   const pastView = await teacher.get(`/api/reports/plays?form=Stage%203&date=${yesterday}`);
   check(pastView.body?.plays?.isToday === false, "a past day is not today",
     `got ${pastView.body?.plays?.isToday}`);
+  const pastRows = pastView.body?.plays?.rows || [];
+  // Asserted first: `every` on an empty list is true, so without this the check
+  // below would pass by having nothing to look at.
+  check(pastRows.length > 0, "the past day comes back with rows to check",
+    `got ${pastRows.length}`);
   check(
-    (pastView.body?.plays?.rows || []).every((r: any) => r.playsLeft === null),
+    pastRows.length > 0 && pastRows.every((r: any) => r.playsLeft === null),
     "and a past day never claims plays are left to spend",
-    JSON.stringify((pastView.body?.plays?.rows || []).map((r: any) => r.playsLeft)),
+    JSON.stringify(pastRows.map((r: any) => r.playsLeft)),
   );
 
   // A secondary class has no games. Said plainly rather than as a class of

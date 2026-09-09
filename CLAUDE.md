@@ -408,6 +408,32 @@ that a teacher still gets everything. 34 checks.
 Run it after touching `assignmentForStudent()`, anything that returns an
 assignment, or the questions schema.
 
+### A check that is SKIPPED looks exactly like a check that passed
+
+Two bugs of this shape have been found in these scripts, and both reported
+themselves as green for weeks.
+
+**The response shape.** Some endpoints answer with a **bare array or object** —
+`/api/students`, `/api/students/:id`, `/api/assignments`, `/api/assignments/:id`,
+`/api/submissions`, `/api/parents`, `/api/resources`, `/api/announcements`,
+`/api/lessons`. Everything else answers `{ success, ... }`. Reading
+`body.assignments` off one of the bare ones gives `undefined`, and in
+`check:games` that quietly disabled a whole block: the assignment it created was
+never cleaned up, and the two checks inside it had never run since being
+written.
+
+**The unasserted guard.** `if (thing) { ...checks... }` where `thing` came from a
+response. When it is undefined the block is skipped, nothing fails, and the run
+is green with fewer checks than anyone thinks.
+
+So: **every guard of that shape must be preceded by a `check()` that it exists**,
+with a detail line saying the checks below are skipped rather than passing. The
+same goes for `array.every(...)`, which is **true for an empty array** — assert
+the length first or the check passes by having nothing to look at.
+
+When adding a check script, prefer taking a created object from the **POST's own
+reply** rather than fetching it again and guessing the wrapper.
+
 ### Never call `process.exit()` in a check script
 
 Both check scripts set `process.exitCode` and let the process end by itself.

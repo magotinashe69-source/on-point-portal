@@ -266,6 +266,8 @@ async function main() {
     studentId: `MS0-${stamp}`, fullName: `Mastery Empty Child ${stamp}`,
     gender: "Male", form: "Stage 4",
   })).body?.student;
+  check(!!fresh, "a pupil with no work is created",
+    "if this fails the checks below are SKIPPED, not passing");
   if (fresh) {
     const freshPupil = new Session();
     await freshPupil.post("/api/auth/student/login", { fullName: fresh.fullName, password: "masterypw2" });
@@ -285,6 +287,8 @@ async function main() {
     studentId: `MSX-${stamp}`, fullName: `Mastery Other Child ${stamp}`,
     gender: "Male", form: "Stage 4",
   })).body?.student;
+  check(!!other, "a second pupil is created to try reading someone else's map",
+    "if this fails the checks below are SKIPPED, not passing");
   if (other) {
     const otherPupil = new Session();
     await otherPupil.post("/api/auth/student/login", { fullName: other.fullName, password: "masterypw3" });

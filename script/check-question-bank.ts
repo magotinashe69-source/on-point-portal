@@ -552,6 +552,8 @@ async function main() {
           studentId: `QB-${stamp}`, fullName: `Bank Paper Child ${stamp}`,
           gender: "Female", form: "Form 2",
         })).body?.student;
+        check(!!learner, "a pupil is created to answer the paper",
+          "if this fails the checks below are SKIPPED, not passing");
 
         if (learner) {
           const pupil = new Session();
