@@ -1,4 +1,4 @@
-import { eq, and, inArray, or, isNull, desc } from "drizzle-orm";
+import { eq, and, inArray, or, isNull, desc, gte, lte } from "drizzle-orm";
 // The database connection AND the table objects come from ./db, which picks
 // the right database (SQLite or PostgreSQL) at runtime.
 import {
@@ -123,6 +123,8 @@ export interface IStorage {
   // Plays earned by doing homework. Keyed by student, CAT day and game, so a
   // new day simply has no row and yesterday's is left behind.
   getGamePlays(studentId: number, day: string, game: string): Promise<GamePlays | undefined>;
+  /** Every play row for a group of children across a range of days. */
+  getGamePlaysForStudents(studentIds: number[], dayFrom: string, dayTo: string): Promise<GamePlays[]>;
   upsertGamePlays(row: InsertGamePlays): Promise<GamePlays>;
   // Target Blaster's record. One row per child, not per subject.
   getBlasterBest(studentId: number): Promise<BlasterBest | undefined>;
@@ -680,6 +682,28 @@ export class DatabaseStorage implements IStorage {
       and(eq(gamePlays.studentId, studentId), eq(gamePlays.day, day), eq(gamePlays.game, game)),
     );
     return row || undefined;
+  }
+
+  /**
+   * Every play row for a whole class at once.
+   *
+   * One query rather than one per child per day per game: a class of thirty
+   * over a week would otherwise be four hundred round trips for a single page.
+   *
+   * Days are YYYY-MM-DD strings, which sort the same way they compare, so a
+   * plain string range is a real date range here.
+   */
+  async getGamePlaysForStudents(
+    studentIds: number[], dayFrom: string, dayTo: string,
+  ): Promise<GamePlays[]> {
+    if (studentIds.length === 0) return [];
+    return db.select().from(gamePlays).where(
+      and(
+        inArray(gamePlays.studentId, studentIds),
+        gte(gamePlays.day, dayFrom),
+        lte(gamePlays.day, dayTo),
+      ),
+    );
   }
 
   async upsertGamePlays(row: InsertGamePlays): Promise<GamePlays> {

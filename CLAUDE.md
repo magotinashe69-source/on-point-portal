@@ -496,6 +496,47 @@ closing the tab at round four neither banks a four-round game nor loses it; and
 a finished game has no stored questions left, so a winning result cannot be sent
 up twice.
 
+### What a teacher sees about the games
+
+`GET /api/reports/plays?form=Stage%203` — a whole class at once: who is earning
+their game plays and who the reward is not reaching. Shapes and wording in
+`shared/teacher-plays.ts`, figures in `server/teacher-plays.ts`, page at
+`/teacher/game-plays`.
+
+Teacher-only, because it hands out every child's name in a class. It takes the
+same parameters as the daily report on purpose (`form`, plus either `date` or
+`dateFrom`+`dateTo`) so the two pages behave the same way, and answers for
+**today** when no dates are given.
+
+**It is deliberately not the parent's card with more rows in it.** The two are
+asking different questions:
+
+| | asks |
+|---|---|
+| a parent, about one child | "is the phone being earned, or just used?" |
+| a teacher, about a class | "is this reward pulling homework in, and who is it not reaching?" |
+
+So the class is split into the four groups a teacher can act on — **earned and
+played**, **earned, not played yet**, **played, earned nothing**, and
+**neither** — and the last group is listed **first**. That group is the point
+of the page; nobody should have to scroll a class of thirty to find it.
+
+Three rules it follows:
+
+1. **Plays earned are recounted, never stored** — the same rule the child and
+   the parent see. Earned is derived from the assignments handed in over the
+   days being looked at.
+2. **"Left" is only shown for today.** Plays do not carry over, so "3 left" on
+   last Tuesday would describe something nobody can spend. `playsLeft` is
+   `null` for any range that is not today alone.
+3. **Forms 1-2 get told plainly** — `available: false` and a sentence, never a
+   class of zeros, which would read as "nobody in Form 1 does their homework".
+
+A whole class is read in a fixed number of queries: the register, the
+submissions, and one bulk read of the play rows
+(`storage.getGamePlaysForStudents`). A loop of "one query per child per day per
+game" would be four hundred round trips for a class of thirty over a week.
+
 ### The two games are deliberately different
 
 |            | Penalty Shootout      | Target Blaster                  |
@@ -528,7 +569,15 @@ Penalty Shootout picking another subject returns the game in flight. It then
 runs the pages' own arithmetic (`readProgress`/`scoreProgress`, imported from
 `shared/game-plays.ts`) over the server's real reply, so a change to what a
 child is shown on coming back breaks this test rather than their game.
-73 checks.
+
+Finally it checks the teacher's class view: it adds a second Stage 3 pupil who
+does nothing at all, so there is somebody in the "neither" group to find — a
+class where everyone has worked would not test the thing that page exists for.
+It then checks the teacher's figures match the ledger, that the groups are
+right, that the children the reward is not reaching are listed first, that a
+past day never claims plays are left to spend, that a Form class is told the
+games do not apply, and that neither a pupil nor a logged-out caller can read
+it. 94 checks.
 
 Run it after touching either game, the plays ledger, or anything under
 `/api/students/:id/plays`.
@@ -592,6 +641,7 @@ shared/
   weekly-report.ts # Weekly parent report: shape, week maths, WhatsApp message
   parent-overview.ts # The parent's fuller view of their child: shapes + wording
   parent-plays.ts  # The parent's view of game plays: shapes + wording
+  teacher-plays.ts # The teacher's class view of game plays: shapes + wording
   parent-work.ts   # Completed work, question by question, areas to practise
 script/
   check-parent-security.ts  # npm run check:parents — the parent security test

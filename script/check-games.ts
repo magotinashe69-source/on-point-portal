@@ -451,6 +451,106 @@ async function main() {
     check(false, "the dev clock helper moved the day", `status ${simulated.status}, body ${JSON.stringify(simulated.body).slice(0, 80)}`);
   }
 
+  // =========================================================================
+  section("The teacher's class view of game plays");
+  // =========================================================================
+  //
+  // A teacher asks a different question from a parent: not "is my child
+  // earning it?" but "who is this reward not reaching?". So the class is split
+  // into four groups and the children who handed nothing in and played nothing
+  // are listed first.
+
+  // A second Stage 3 pupil who does NOTHING, so there is somebody in the
+  // "neither" group to find. A class where everyone has worked would not test
+  // the thing this page exists for.
+  const idleChild = (await teacher.post("/api/students", {
+    studentId: `G3I-${stamp}`, fullName: `Idle Test Child ${stamp}`, gender: "Male", form: "Stage 3",
+  })).body?.student;
+
+  const classView = await teacher.get(`/api/reports/plays?form=Stage%203`);
+  check(classView.status === 200 && classView.body?.success === true,
+    "a teacher can read the class view", `status ${classView.status}`);
+
+  const cp = classView.body?.plays;
+  check(cp?.available === true, "Stage 3 has the games", `got ${cp?.available}`);
+  check(cp?.isToday === true, "with no dates it answers for today", `got ${cp?.isToday}`);
+
+  const rows = cp?.rows || [];
+  const worked = rows.find((r: any) => r.studentId === child.id);
+  const idle = rows.find((r: any) => r.studentId === idleChild?.id);
+
+  check(!!worked && !!idle, "every child in the class has a row",
+    `worked ${!!worked}, idle ${!!idle}`);
+
+  // The child who did the homework. Their figures must match the ledger: five
+  // assignments handed in today, so ten plays across the two games.
+  const ledger = (await pupil.get(`/api/students/${child.id}/plays`)).body?.plays;
+  const ledgerEarned = (ledger?.blaster?.earned ?? 0) + (ledger?.penalty?.earned ?? 0);
+  const ledgerUsed = (ledger?.blaster?.used ?? 0) + (ledger?.penalty?.used ?? 0);
+  check(worked?.playsEarned === ledgerEarned,
+    "the teacher sees the same plays earned as the ledger",
+    `teacher ${worked?.playsEarned} vs ledger ${ledgerEarned}`);
+  check(worked?.playsUsed === ledgerUsed,
+    "and the same plays used",
+    `teacher ${worked?.playsUsed} vs ledger ${ledgerUsed}`);
+  check(worked?.group === "earnedAndPlayed",
+    "a child who did the work and played is grouped as earned-and-played",
+    `got ${worked?.group}`);
+
+  // The child who did nothing at all — the group the page exists to surface.
+  check(idle?.playsEarned === 0 && idle?.playsUsed === 0,
+    "a child who did nothing has nothing", JSON.stringify(idle));
+  check(idle?.group === "neither", "and is grouped as neither", `got ${idle?.group}`);
+  check(rows[0]?.group === "neither",
+    "the children the reward is not reaching are listed FIRST",
+    `first row is ${rows[0]?.group}`);
+
+  check(cp?.summary?.neither >= 1, "the summary counts them",
+    JSON.stringify(cp?.summary));
+  check(cp?.summary?.children === rows.length, "the summary counts the whole class",
+    `${cp?.summary?.children} vs ${rows.length}`);
+  check(
+    cp?.summary?.totalEarned === rows.reduce((n: number, r: any) => n + r.playsEarned, 0),
+    "and the totals are the rows added up", JSON.stringify(cp?.summary),
+  );
+
+  // "Left" only means something today: plays do not carry over, so a past day
+  // has no leftovers anybody could spend.
+  check(typeof worked?.playsLeft === "number", "today's rows say how many plays are left",
+    `got ${worked?.playsLeft}`);
+
+  const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const pastView = await teacher.get(`/api/reports/plays?form=Stage%203&date=${yesterday}`);
+  check(pastView.body?.plays?.isToday === false, "a past day is not today",
+    `got ${pastView.body?.plays?.isToday}`);
+  check(
+    (pastView.body?.plays?.rows || []).every((r: any) => r.playsLeft === null),
+    "and a past day never claims plays are left to spend",
+    JSON.stringify((pastView.body?.plays?.rows || []).map((r: any) => r.playsLeft)),
+  );
+
+  // A secondary class has no games. Said plainly rather than as a class of
+  // zeros, which would read as "nobody in Form 1 does their homework".
+  const formView = await teacher.get(`/api/reports/plays?form=Form%201`);
+  check(formView.body?.plays?.available === false,
+    "a Form class is told the games do not apply", `got ${formView.body?.plays?.available}`);
+  check((formView.body?.plays?.rows || []).length === 0,
+    "with no rows at all", JSON.stringify(formView.body?.plays?.rows?.length));
+
+  // Teacher-only: this hands out every child's name in a class.
+  const pupilPeek = await pupil.get(`/api/reports/plays?form=Stage%203`);
+  check(pupilPeek.status === 401 || pupilPeek.status === 403,
+    "a pupil cannot read the class view", `got ${pupilPeek.status}`);
+  const anonPeek = await new Session().get(`/api/reports/plays?form=Stage%203`);
+  check(anonPeek.status === 401 || anonPeek.status === 403,
+    "nor can a logged-out caller", `got ${anonPeek.status}`);
+
+  // A class must be named — without one there is nothing to report on.
+  const noForm = await teacher.get(`/api/reports/plays`);
+  check(noForm.status === 400, "asking without a class is refused", `got ${noForm.status}`);
+
+  if (idleChild) await teacher.delete(`/api/students/${idleChild.id}`);
+
   // --- Tidy up -------------------------------------------------------------
   for (const a of [a1, a2, a3, a4]) await teacher.delete(`/api/assignments/${a.id}`);
   await teacher.delete(`/api/students/${child.id}`);

@@ -18,6 +18,7 @@ import { awardRandomCollectible } from "./rewards";
 import { buildWeeklyReport } from "./weekly-report";
 import { buildParentOverview } from "./parent-overview";
 import { buildParentPlays } from "./parent-plays";
+import { buildTeacherPlays } from "./teacher-plays";
 import { buildCompletedWork, buildSubmissionReview, buildSupportReport } from "./parent-work";
 import { buildWhatsAppReport } from "@shared/weekly-report";
 import { awardXp, adjustXp, xpProgress, XP_PER_CORRECT, XP_COMPLETION_BONUS, XP_IMPROVEMENT_BONUS } from "./xp";
@@ -3274,6 +3275,49 @@ export async function registerRoutes(
       });
     } catch (error) {
       console.error("Daily report error:", error);
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
+    }
+  });
+
+  // ─── Games and homework, for a whole class ────────────────────────────────
+  //
+  // The teacher's side of the plays ledger: who is earning their game plays and
+  // who the reward is not reaching. Teacher-only — it returns every child's
+  // name in the class, so it must not be readable without a login.
+  //
+  // Takes the same parameters as the daily report on purpose (`form` plus
+  // either `date` or `dateFrom`+`dateTo`), so the two pages behave the same
+  // way. With no dates it answers for today.
+  app.get("/api/reports/plays", async (req, res) => {
+    try {
+      if (!(await requireTeacher(req, res))) return;
+
+      const { form, date, dateFrom: qFrom, dateTo: qTo } = req.query as {
+        form?: string;
+        date?: string;
+        dateFrom?: string;
+        dateTo?: string;
+      };
+
+      if (!form) {
+        return res.status(400).json({ success: false, message: "Choose a class first." });
+      }
+
+      // Default to today, which is what a teacher opening this page wants.
+      // streakToday() is the same CAT day the games and the streak use, so this
+      // page can never disagree with them about which day it is.
+      const today = streakToday();
+      const dateFrom = date || qFrom || today;
+      const dateTo = date || qTo || today;
+
+      if (dateFrom > dateTo) {
+        return res.status(400).json({ success: false, message: "That date range starts after it ends." });
+      }
+
+      const plays = await buildTeacherPlays(form, dateFrom, dateTo);
+      res.json({ success: true, plays });
+    } catch (error) {
+      console.error("Teacher plays report error:", error);
       res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });

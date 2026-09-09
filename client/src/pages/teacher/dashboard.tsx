@@ -32,7 +32,8 @@ import {
   ChevronUp,
   ClipboardList,
   XCircle,
-  Pencil
+  Pencil,
+  Gamepad2
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -616,6 +617,20 @@ export default function TeacherDashboard() {
                 <div>
                   <h3 className="font-semibold">Daily Report</h3>
                   <p className="text-sm text-muted-foreground">WhatsApp-ready submission snapshot</p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link href="/teacher/game-plays" data-testid="link-game-plays">
+            <Card className="hover-elevate cursor-pointer h-full">
+              <CardContent className="flex items-center gap-4 py-6">
+                <div className="p-3 rounded-md bg-secondary/10">
+                  <Gamepad2 className="h-6 w-6 text-secondary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold">Games and homework</h3>
+                  <p className="text-sm text-muted-foreground">Who is earning their game plays</p>
                 </div>
               </CardContent>
             </Card>
