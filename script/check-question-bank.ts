@@ -210,10 +210,21 @@ async function main() {
   // The tags describe where a question sits in the LIBRARY. On a paper the
   // subject and class come from the assignment itself, and a second copy on
   // each question would be one more thing to disagree with it.
+  // Subject and class describe something the PAPER already knows, so a second
+  // copy on each question would be one more thing to disagree with it.
   check(!("subject" in asAssignment), "the subject tag is NOT carried onto the paper");
-  check(!("topic" in asAssignment), "nor the topic");
+  check(!("form" in asAssignment), "nor the class level");
   check(!("difficulty" in asAssignment), "nor the difficulty");
   check(!("id" in asAssignment), "and no link back to the bank row is kept");
+
+  // The TOPIC is the exception, and deliberately so: it says something the
+  // paper does not already know. An assignment has one topic, but a "Revision"
+  // paper can hold one question about fractions and another about angles — and
+  // the skills map (shared/mastery.ts) is built per question, so that finer
+  // topic is exactly what it needs.
+  check(asAssignment.topic === mcq.topic,
+    "the topic DOES come across, so the question can feed the skills map",
+    `got ${asAssignment.topic}, expected ${mcq.topic}`);
 
   // A converted question must be markable straight away — that is the point.
   check(markAnswer({ ...asAssignment, id: asAssignment.qid } as any, "1").correct === true,

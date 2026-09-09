@@ -152,6 +152,14 @@ export const assignments = pgTable("assignments", {
     // a blank where the correct answer would be. Optional: a question saved
     // before this existed simply has none, and the parent view says so.
     modelAnswer?: string;
+    // What this ONE question is about, when it is known more precisely than the
+    // assignment's own topic. A question copied out of the Question Bank brings
+    // its topic with it; a question typed straight onto the paper has none and
+    // falls back to the assignment's.
+    //
+    // Optional everywhere, so every question saved before this existed simply
+    // has none. It is a label, never part of marking. See shared/mastery.ts.
+    topic?: string;
   }>>().notNull(),
   attachments: jsonb("attachments").$type<Array<{
     name: string;

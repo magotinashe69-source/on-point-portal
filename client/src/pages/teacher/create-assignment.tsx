@@ -57,6 +57,10 @@ const questionSchema = z.object({
   explanation: z.string().optional(),
   // written only: what a good answer looks like. Never marked against.
   modelAnswer: z.string().optional(),
+  // What this one question is about. Comes across when a question is copied
+  // from the Question Bank, and feeds the child's skills map. Listed here or
+  // zod strips it on the way out, exactly as it would on the way in.
+  topic: z.string().optional(),
 });
 
 // A short unique id for a brand-new question.
@@ -80,6 +84,9 @@ const newQuestion = () => ({
   acceptedAnswers: [""],
   explanation: "",
   modelAnswer: "",
+  // Empty: a question typed straight onto the paper has no topic of its own and
+  // falls back to the assignment's. One pulled from the bank arrives with one.
+  topic: "",
 });
 
 // --- Bulk paste ---------------------------------------------------------

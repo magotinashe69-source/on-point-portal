@@ -23,8 +23,7 @@ import {
   Video,
   Map,
   CircleDot,
-  Target,
-} from "lucide-react";
+  Target, Sparkles } from "lucide-react";
 import type { Assignment, Announcement } from "@shared/schema";
 import { isPrimaryForm } from "@shared/schema";
 import { XpLevelBar } from "@/components/XpLevelBar";
@@ -42,6 +41,9 @@ interface EnrichedSubmission {
   assignmentTitle?: string;
   totalMarks?: number;
 }
+
+import { MasteryMap } from "@/components/MasteryMap";
+import { MASTERY_TEXT, type MasteryMap as MasteryMapData } from "@shared/mastery";
 
 export default function StudentDashboard() {
   const [, setLocation] = useLocation();
@@ -86,6 +88,15 @@ export default function StudentDashboard() {
 
   const { data: statsData, isLoading: statsLoading } = useQuery<{ success: boolean; stats: StudentStats }>({
     queryKey: ["/api/students", student?.id, "stats"],
+    enabled: !!student,
+  });
+
+  // The child's own skills, worked out from marks already stored. Nothing here
+  // marks anything — it reads what has already happened and groups it by topic.
+  const { data: masteryData, isLoading: masteryLoading } = useQuery<{
+    success: boolean; mastery: MasteryMapData;
+  }>({
+    queryKey: ["/api/students", student?.id, "mastery"],
     enabled: !!student,
   });
 
@@ -233,6 +244,36 @@ export default function StudentDashboard() {
               <p className="text-xs text-muted-foreground">across all marked work</p>
             </CardContent>
           </Card>
+        </div>
+
+        {/* The skills map: what this child has shown they can do, from work
+            already marked. Placed above announcements because it is about them,
+            and below the totals because those answer "how am I doing?" first. */}
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-1">
+            <Sparkles className="h-5 w-5 text-primary" />
+            <h2 className="text-lg font-semibold">{MASTERY_TEXT.title}</h2>
+          </div>
+          <p className="text-sm text-muted-foreground mb-3">{MASTERY_TEXT.subtitle}</p>
+
+          {masteryLoading ? (
+            <Card>
+              <CardContent className="py-8 flex items-center justify-center">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </CardContent>
+            </Card>
+          ) : masteryData?.mastery ? (
+            <MasteryMap map={masteryData.mastery} />
+          ) : (
+            // The request failed. Said as an invitation rather than as an error,
+            // because on a child's own page a red box about their skills reads
+            // like something is wrong with THEM.
+            <Card>
+              <CardContent className="py-8 text-center text-sm text-muted-foreground" data-testid="text-mastery-unavailable">
+                {MASTERY_TEXT.empty}
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {announcements && announcements.length > 0 && (

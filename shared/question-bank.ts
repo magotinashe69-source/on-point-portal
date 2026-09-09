@@ -280,6 +280,8 @@ export interface AssignmentQuestionDraft {
   acceptedAnswers: string[];
   explanation: string;
   modelAnswer: string;
+  /** What this question is about — carried over so it can feed the skills map. */
+  topic: string;
 }
 
 /**
@@ -333,10 +335,17 @@ export function bankQuestionToAssignmentQuestion(
     // A model answer belongs to a written question, and the bank holds none.
     modelAnswer: "",
 
-    // The tags (subject, topic, form, difficulty) are deliberately NOT carried
-    // over. They describe where a question lives in the LIBRARY. On a paper the
-    // subject and class come from the assignment itself, and a second copy on
-    // each question would be one more thing to disagree with it.
+    // The TOPIC does come across, because it is the one tag that says something
+    // the paper does not already know. An assignment has a single topic, but a
+    // "Revision" paper can hold one question about fractions and another about
+    // angles — and the skills map is built per question, so that difference is
+    // exactly what it needs.
+    topic: q.topic,
+
+    // The other tags (subject, form, difficulty) are deliberately NOT carried
+    // over. They describe where a question lives in the LIBRARY, and the paper
+    // already knows its own subject and class — a second copy on each question
+    // would be one more thing to disagree with it.
   };
 }
 

@@ -12,6 +12,7 @@
     "check:answers": "tsx script/check-answer-key.ts",
     "check:games": "tsx script/check-games.ts",
     "check:bank": "tsx script/check-question-bank.ts",
+    "check:mastery": "tsx script/check-mastery.ts",
     "db:push": "drizzle-kit push"
   },
   "dependencies": {

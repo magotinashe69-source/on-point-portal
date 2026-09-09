@@ -19,6 +19,7 @@ import { buildWeeklyReport } from "./weekly-report";
 import { buildParentOverview } from "./parent-overview";
 import { buildParentPlays } from "./parent-plays";
 import { buildTeacherPlays } from "./teacher-plays";
+import { buildMastery } from "./mastery";
 import {
   validateBankQuestion, isDifficulty, isBankType,
   type BankType, type Difficulty,
@@ -1502,6 +1503,14 @@ export async function registerRoutes(
     // written only: the teacher's own model answer. Never used for marking —
     // it is shown to a parent beside their child's answer.
     modelAnswer: z.string().optional(),
+    // What this one question is about, when it is known more precisely than the
+    // assignment's topic — a question copied out of the Question Bank brings
+    // its topic with it. Feeds the mastery map; never used for marking.
+    //
+    // It has to be listed HERE or zod strips it: an object schema drops keys it
+    // does not name, so a topic sent by the form would vanish on the way in and
+    // the map would quietly stay empty.
+    topic: z.string().optional(),
   });
 
   const createAssignmentSchema = z.object({
@@ -2657,6 +2666,32 @@ export async function registerRoutes(
       res.json({ success: true, ...result });
     } catch (error) {
       console.error("Penalty finish error:", error);
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
+    }
+  });
+
+  // ─── The mastery map ──────────────────────────────────────────────────────
+  //
+  // What a child has shown they can do, skill by skill, worked out from marks
+  // already stored. Nothing here marks anything or changes a score.
+  //
+  // requireTeacherOrSelf: a child may see their own map, and their teacher may
+  // see it. Nobody else — it is a list of what one named child is weakest at,
+  // which is not something another pupil should be able to read.
+  app.get("/api/students/:id/mastery", async (req, res) => {
+    try {
+      const studentId = parseInt(req.params.id);
+      if (!(await requireTeacherOrSelf(req, res, studentId))) return;
+
+      const student = await storage.getStudent(studentId);
+      if (!student) {
+        return res.status(404).json({ success: false, message: "Student not found" });
+      }
+
+      const mastery = await buildMastery(student);
+      res.json({ success: true, mastery });
+    } catch (error) {
+      console.error("Mastery error:", error);
       res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });

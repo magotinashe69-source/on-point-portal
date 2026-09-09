@@ -726,10 +726,16 @@ then **rewords the saved question, changes its answer and deletes it outright**,
 and checks the paper still asks what it asked — then has a child answer it and
 confirms the mark comes from the paper, not from the library.
 
-**The tags do not come across.** `subject`, `topic`, `form` and `difficulty`
-describe where a question sits in the **library**. On a paper the subject and
-class come from the assignment itself, and a second copy on every question would
-be one more thing to disagree with it.
+**Most tags do not come across.** `subject`, `form` and `difficulty` describe
+where a question sits in the **library**, and the paper already knows its own
+subject and class — a second copy on every question would be one more thing to
+disagree with it.
+
+**The `topic` is the exception**, and deliberately so: it is the one tag that
+says something the paper does not already know. An assignment has a single
+topic, but a "Revision" paper can hold one question about fractions and another
+about angles — and the Learner Mastery Map is built **per question**, so that
+finer topic is exactly what it needs.
 
 **Unused answer-key fields arrive with the same empty defaults a brand-new
 question has**, rather than as `undefined`. A teacher who pulls in a numeric
@@ -771,6 +777,81 @@ checked to have not moved — with a child's submission marked against it to
 prove the point.
 
 111 checks. It removes everything it creates.
+
+## The Learner Mastery Map
+
+What a child has shown they can do, skill by skill, on their own dashboard.
+Worked out **entirely from marks already stored** — no AI, no new marking, and
+nothing in it changes how anything is marked. It reads what has already happened
+and groups it by what the work was about.
+
+- `shared/mastery.ts` — the bands, the calculation and the wording. Pure.
+- `server/mastery.ts` — gathers a child's marked questions and resolves each
+  one's topic.
+- `client/src/components/MasteryMap.tsx` — the map as a child sees it.
+- `GET /api/students/:id/mastery`, behind `requireTeacherOrSelf`.
+
+### Where a skill comes from
+
+A skill is a **topic**, and a topic is found in this order:
+
+1. **The question's own topic**, when it has one. This is the finer of the two —
+   a "Revision" paper can hold one question about fractions and another about
+   angles. A question copied out of the Question Bank brings its topic with it.
+2. **The assignment's topic**. Every assignment has one (optional, usually
+   filled in), and it covers homework set long before the bank existed.
+3. **Neither → not a skill.** The question is counted as `untagged` and left out
+   of the map. It is never shown as an empty band and never counted as a
+   failure: a child must not be shown red for something nobody ever labelled.
+
+That is why `assignments.questions[].topic` exists. It is optional, is never
+used for marking, and had to be added to **three** places or it would have been
+silently stripped: the schema, the server's `createAssignmentSchema`, and the
+form's own `questionSchema`. A zod object drops keys it does not name, so a
+topic sent by the form would have vanished on the way in and the map would have
+quietly stayed empty.
+
+### Why the rate is marks, not a count of right answers
+
+A hand-marked written answer can score 3 out of 5. Counting that as "wrong"
+would be untrue, and this map exists to encourage. Marks scored over marks
+available handles partial credit honestly — and it is the **same formula** the
+weekly report, the Reports page, the Grade Book and the parent overview use, so
+a child's mastery can never disagree with their own subject average. For
+auto-marked questions the two are identical anyway: those score full marks or
+none.
+
+### The bands, and the words
+
+80%+ **Got it**, 50–79% **Getting there**, below 50% **Keep practising**. Two
+rules run through the wording and the styling:
+
+1. **Never say "failed".** A child reading this is being shown their weakest
+   work, which is a vulnerable thing. Every band names what to do next, and the
+   weakest one reads "Keep practising — everyone has some of these".
+2. **Colour is never the only signal.** Each band carries its own words and its
+   own icon, so a colour-blind child reads exactly the same information.
+
+Two thresholds stop the map lying about thin data. A topic needs
+`MIN_MARKS_FOR_A_TOPIC` marks behind it before it is shown at all — one question
+answered badly is not a weak skill, it is one question — and a child with
+nothing yet sees "Do more homework to build your mastery map" rather than a
+screen of 0%.
+
+### Proving it — `npm run check:mastery`
+
+`script/check-mastery.ts`, in two halves. The first checks the calculation on
+its own, **exactly on the band boundaries**, because an off-by-one there quietly
+tells a child they are failing something they have nearly mastered. The second
+builds a real Stage 4 pupil with five marked papers — one landing in each band,
+one whose questions carry their own topics, and one with no topic at all — and
+reads the map back over HTTP.
+
+It checks the colours are right, that subjects group correctly and do not bleed
+into each other, that a question's own topic beats the paper's, that untagged
+work is counted but never shown and never breaks the map, that a child with
+nothing gets an invitation rather than zeros, and that one pupil cannot read
+another pupil's map. 40 checks.
 
 ## Classes (forms)
 
@@ -830,6 +911,7 @@ shared/
   schema.ts       # Drizzle tables, TypeScript types, login schemas
   weekly-report.ts # Weekly parent report: shape, week maths, WhatsApp message
   parent-overview.ts # The parent's fuller view of their child: shapes + wording
+  mastery.ts       # The learner mastery map: bands, calculation, wording
   parent-plays.ts  # The parent's view of game plays: shapes + wording
   teacher-plays.ts # The teacher's class view of game plays: shapes + wording
   parent-work.ts   # Completed work, question by question, areas to practise
