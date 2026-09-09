@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, timestamp, jsonb, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, timestamp, jsonb, boolean, doublePrecision } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -509,6 +509,72 @@ export const blasterBest = pgTable("blaster_best", {
 export const insertBlasterBestSchema = createInsertSchema(blasterBest).omit({ id: true, updatedAt: true });
 export type BlasterBest = typeof blasterBest.$inferSelect;
 export type InsertBlasterBest = z.infer<typeof insertBlasterBestSchema>;
+
+// The Question Bank — a library of reusable questions (see shared/question-bank.ts).
+//
+// A NEW table beside the assignments, not a change to them. A question inside
+// an assignment lives in that assignment's `questions` JSON column and vanishes
+// with the paper; a bank question exists on its own and is meant to be used
+// many times, so it needs its own row and its own tags to be found by.
+//
+// The answer-key columns carry the SAME names as the fields inside an
+// assignment's question, so a later stage can copy one into the other without
+// renaming anything and markAnswer() can mark it unchanged.
+export const questionBank = pgTable("question_bank", {
+  id: serial("id").primaryKey(),
+
+  questionText: text("question_text").notNull(),
+  // One of the four auto-markable types. Never "written": a written question
+  // has no answer key, so it is not a reusable question-with-an-answer.
+  type: text("type").notNull(),
+  maxScore: integer("max_score").notNull().default(1),
+
+  // --- The answer key. Which columns matter depends on `type`. ---
+  options: jsonb("options").$type<string[]>(),        // multiple_choice: the choices
+  correctOption: integer("correct_option"),           // multiple_choice: 0-based index
+  correctBool: boolean("correct_bool"),               // true_false
+  correctNumber: doublePrecision("correct_number"),   // numeric: the right value
+  tolerance: doublePrecision("tolerance"),            // numeric: how far off still counts
+  acceptedAnswers: jsonb("accepted_answers").$type<string[]>(), // short_text
+  explanation: text("explanation"),                   // the one-line note shown afterwards
+
+  // --- Tags: what the question is ABOUT, which is how it is found again. ---
+  subject: text("subject").notNull(),
+  topic: text("topic").notNull(),
+  // The class level. Called `form` because that is the word the whole app
+  // already uses for "Stage 3" … "Form 2"; naming it `grade` here would make
+  // this the one place that says it differently.
+  form: text("form").notNull(),
+  difficulty: text("difficulty").notNull(), // easy | medium | hard
+
+  // Who saved it, and when. Taken from the teacher's session, never from the
+  // browser — the same rule as everything else that records an author.
+  createdById: integer("created_by_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type QuestionBankRow = typeof questionBank.$inferSelect;
+
+// Written out by hand rather than derived. createInsertSchema turns the JSON
+// array columns into a shape TypeScript will not accept back as plain
+// string[], and these rows are only ever written by our own code.
+export type InsertQuestionBankRow = {
+  questionText: string;
+  type: string;
+  maxScore: number;
+  options?: string[] | null;
+  correctOption?: number | null;
+  correctBool?: boolean | null;
+  correctNumber?: number | null;
+  tolerance?: number | null;
+  acceptedAnswers?: string[] | null;
+  explanation?: string | null;
+  subject: string;
+  topic: string;
+  form: string;
+  difficulty: string;
+  createdById: number;
+};
 
 // Login schemas
 export const teacherLoginSchema = z.object({

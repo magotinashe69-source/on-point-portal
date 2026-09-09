@@ -3,7 +3,7 @@ import { eq, and, inArray, or, isNull, desc, gte, lte } from "drizzle-orm";
 // the right database (SQLite or PostgreSQL) at runtime.
 import {
   db,
-  teachers, students, parents, assignments, submissions, marks, resources, announcements, lessons, exportLogs, studentRewards, studentXp, studentStreaks, dreamWorld, penaltyBest, gamePlays, blasterBest,
+  teachers, students, parents, assignments, submissions, marks, resources, announcements, lessons, exportLogs, studentRewards, studentXp, studentStreaks, dreamWorld, penaltyBest, gamePlays, blasterBest, questionBank,
 } from "./db";
 // The TypeScript types are the same for both databases, so they come from the shared schema.
 import {
@@ -24,8 +24,14 @@ import {
   type PenaltyBest, type InsertPenaltyBest,
   type GamePlays, type InsertGamePlays,
   type BlasterBest, type InsertBlasterBest,
+  type QuestionBankRow,
   MASTER_PASSWORD
 } from "@shared/schema";
+// The Question Bank's shapes and rules are pure, so they live in shared/.
+import {
+  validateBankQuestion, DEFAULT_BANK_LIMIT,
+  type BankFilters, type BankQuestion, type NewBankQuestion,
+} from "@shared/question-bank";
 
 export interface IStorage {
   // Teachers
@@ -122,6 +128,16 @@ export interface IStorage {
   updatePenaltyBest(studentId: number, subject: string, data: Partial<InsertPenaltyBest>): Promise<PenaltyBest>;
   // Plays earned by doing homework. Keyed by student, CAT day and game, so a
   // new day simply has no row and yesterday's is left behind.
+  // --- The Question Bank: a library of reusable questions ---
+  /** Save one question to the library. Refuses one that could not be marked. */
+  createBankQuestion(question: NewBankQuestion): Promise<BankQuestion>;
+  /** Find saved questions by what they are about. */
+  getBankQuestions(filters?: BankFilters): Promise<BankQuestion[]>;
+  /** One saved question by its id. */
+  getBankQuestion(id: number): Promise<BankQuestion | undefined>;
+  /** Remove one saved question from the library. */
+  deleteBankQuestion(id: number): Promise<void>;
+
   getGamePlays(studentId: number, day: string, game: string): Promise<GamePlays | undefined>;
   /** Every play row for a group of children across a range of days. */
   getGamePlaysForStudents(studentIds: number[], dayFrom: string, dayTo: string): Promise<GamePlays[]>;
@@ -676,6 +692,123 @@ export class DatabaseStorage implements IStorage {
   // Only what has been USED is stored. What a child EARNED is counted from the
   // assignments they handed in today (server/game-plays.ts), so nothing here
   // needs clearing overnight: tomorrow is a different `day` and finds no row.
+
+  // ---------------------------------------------------------------------
+  // The Question Bank
+  //
+  // A library of reusable questions, stored on its own rather than inside an
+  // assignment. Nothing reads from it yet — assignments will draw from it in a
+  // later stage. See shared/question-bank.ts for the shapes and the rules.
+  // ---------------------------------------------------------------------
+
+  /**
+   * Turn a database row into the shape the rest of the app uses.
+   *
+   * The two differ in ways worth smoothing over here rather than at every call
+   * site: the table holds nulls where the type says "absent", and SQLite hands
+   * back a Date for created_at while the shape wants a plain ISO string.
+   */
+  private toBankQuestion(row: QuestionBankRow): BankQuestion {
+    return {
+      id: row.id,
+      questionText: row.questionText,
+      type: row.type as BankQuestion["type"],
+      maxScore: row.maxScore,
+      options: (row.options as string[] | null) ?? undefined,
+      correctOption: row.correctOption ?? undefined,
+      correctBool: row.correctBool ?? undefined,
+      correctNumber: row.correctNumber ?? undefined,
+      tolerance: row.tolerance ?? undefined,
+      acceptedAnswers: (row.acceptedAnswers as string[] | null) ?? undefined,
+      explanation: row.explanation ?? undefined,
+      subject: row.subject,
+      topic: row.topic,
+      form: row.form,
+      difficulty: row.difficulty as BankQuestion["difficulty"],
+      createdById: row.createdById,
+      createdAt: new Date(row.createdAt).toISOString(),
+    };
+  }
+
+  /**
+   * Save one question to the library.
+   *
+   * Validated BEFORE it is written, and refused rather than saved broken. A
+   * question with no options, or a correct answer pointing past the end of the
+   * list, marks every child wrong — and a bank question is meant to be used
+   * many times, so one bad row does that damage over and over, on papers set
+   * months apart by teachers who never saw it go in. Better to refuse once.
+   */
+  async createBankQuestion(question: NewBankQuestion): Promise<BankQuestion> {
+    const problems = validateBankQuestion(question);
+    if (problems.length > 0) {
+      throw new Error(`That question cannot be saved: ${problems.join(" ")}`);
+    }
+
+    const [created] = await db.insert(questionBank).values({
+      questionText: question.questionText.trim(),
+      type: question.type,
+      maxScore: question.maxScore,
+      options: question.options ?? null,
+      correctOption: question.correctOption ?? null,
+      correctBool: question.correctBool ?? null,
+      correctNumber: question.correctNumber ?? null,
+      tolerance: question.tolerance ?? null,
+      acceptedAnswers: question.acceptedAnswers ?? null,
+      explanation: question.explanation ?? null,
+      subject: question.subject,
+      topic: question.topic.trim(),
+      form: question.form,
+      difficulty: question.difficulty,
+      createdById: question.createdById,
+    }).returning();
+
+    return this.toBankQuestion(created);
+  }
+
+  /**
+   * Find saved questions by what they are about.
+   *
+   * The tag filters narrow together — subject AND topic AND class AND
+   * difficulty — and are done in the database so the whole library is never
+   * pulled into memory. `search` is applied afterwards in code: it is a
+   * convenience for a teacher who remembers the wording but not the tags, and
+   * doing it here keeps the query the same on SQLite and PostgreSQL, which
+   * disagree about case-insensitive matching.
+   *
+   * Newest first, so a question just saved is at the top where it is looked for.
+   */
+  async getBankQuestions(filters: BankFilters = {}): Promise<BankQuestion[]> {
+    const where = [];
+    if (filters.subject) where.push(eq(questionBank.subject, filters.subject));
+    if (filters.topic) where.push(eq(questionBank.topic, filters.topic));
+    if (filters.form) where.push(eq(questionBank.form, filters.form));
+    if (filters.difficulty) where.push(eq(questionBank.difficulty, filters.difficulty));
+    if (filters.type) where.push(eq(questionBank.type, filters.type));
+
+    const rows = await (where.length > 0
+      ? db.select().from(questionBank).where(and(...where))
+      : db.select().from(questionBank));
+
+    let out = rows.map(row => this.toBankQuestion(row));
+
+    if (filters.search && filters.search.trim()) {
+      const needle = filters.search.trim().toLowerCase();
+      out = out.filter(q => q.questionText.toLowerCase().includes(needle));
+    }
+
+    out.sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id - a.id);
+    return out.slice(0, filters.limit ?? DEFAULT_BANK_LIMIT);
+  }
+
+  async getBankQuestion(id: number): Promise<BankQuestion | undefined> {
+    const [row] = await db.select().from(questionBank).where(eq(questionBank.id, id));
+    return row ? this.toBankQuestion(row) : undefined;
+  }
+
+  async deleteBankQuestion(id: number): Promise<void> {
+    await db.delete(questionBank).where(eq(questionBank.id, id));
+  }
 
   async getGamePlays(studentId: number, day: string, game: string): Promise<GamePlays | undefined> {
     const [row] = await db.select().from(gamePlays).where(

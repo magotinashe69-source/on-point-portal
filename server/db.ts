@@ -83,6 +83,28 @@ CREATE TABLE IF NOT EXISTS blaster_best (
   games_played INTEGER NOT NULL DEFAULT 0,
   updated_at TIMESTAMP NOT NULL DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS question_bank (
+  id SERIAL PRIMARY KEY,
+  question_text TEXT NOT NULL,
+  type TEXT NOT NULL,
+  max_score INTEGER NOT NULL DEFAULT 1,
+  options JSONB,
+  correct_option INTEGER,
+  correct_bool BOOLEAN,
+  correct_number DOUBLE PRECISION,
+  tolerance DOUBLE PRECISION,
+  accepted_answers JSONB,
+  explanation TEXT,
+  subject TEXT NOT NULL,
+  topic TEXT NOT NULL,
+  form TEXT NOT NULL,
+  difficulty TEXT NOT NULL,
+  created_by_id INTEGER NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT now()
+);
+-- Looked up by what a question is ABOUT, so the tags carry an index. Without
+-- it every filtered fetch is a full scan of the whole library.
+CREATE INDEX IF NOT EXISTS question_bank_tags ON question_bank (subject, form, topic, difficulty);
 CREATE TABLE IF NOT EXISTS dream_world (
   id SERIAL PRIMARY KEY,
   student_id INTEGER NOT NULL,
@@ -292,4 +314,5 @@ export const {
   penaltyBest,
   gamePlays,
   blasterBest,
+  questionBank,
 } = (usePostgres ? pgSchema : sqliteSchema) as typeof pgSchema;

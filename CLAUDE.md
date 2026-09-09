@@ -582,6 +582,70 @@ it. 94 checks.
 Run it after touching either game, the plays ledger, or anything under
 `/api/students/:id/plays`.
 
+## The Question Bank (Stage 1)
+
+A library of **reusable questions**, saved once and found again by what they
+are about. Stage 1 is the store itself: the table, and the internal way to save
+and fetch. **Nothing reads from it yet** — assignments will draw from it in a
+later stage, and the teacher screen is the stage after this one.
+
+- `shared/question-bank.ts` — the shapes, the tag vocabulary, and the validator.
+  Pure, no database access.
+- `server/storage.ts` — `createBankQuestion`, `getBankQuestions`,
+  `getBankQuestion`, `deleteBankQuestion`.
+- The table is `question_bank`, defined in `shared/schema.ts` (PostgreSQL) and
+  `shared/schema.sqlite.ts` (SQLite), with the usual create-if-missing safety
+  net in `server/db.ts`.
+
+**It is a NEW table beside the assignments, not a change to them.** A question
+inside an assignment lives in that assignment's `questions` JSON column, has no
+life of its own, and disappears with the paper. A bank question exists on its
+own, is meant to be used many times, and has to be findable by what it is about.
+Existing assignments are untouched, and `npm run check:bank` proves saving to
+the bank creates no assignment and puts nothing into an existing one.
+
+**The answer-key columns carry the same names as an assignment question's own
+fields** — `options`, `correctOption`, `correctBool`, `correctNumber`,
+`tolerance`, `acceptedAnswers`, `explanation`, `maxScore`. That is deliberate: a
+later stage can copy a bank question into an assignment without renaming
+anything, and `markAnswer()` marks it unchanged. New names here would have cost
+a translation layer in every stage that follows. The check proves it by marking
+a row straight out of the bank.
+
+**Tags are how a question is found:** `subject`, `topic`, `form` (the class
+level — called `form` because that is the word the rest of the app uses, so this
+is not the one place that says `grade`), and `difficulty` (easy / medium /
+hard). Plus `createdById` and `createdAt`, so it is always known who saved a
+question and when.
+
+**Only the four auto-markable types**, never `written`. A written question has
+no answer key, so it is not a reusable question-with-an-answer — it is a prompt
+marked by hand. Letting one in would mean the bank held rows that cannot be
+marked, which is the one thing a question bank must not do.
+
+**A question is validated before it is saved, not when it is used.** A
+multiple-choice question with no options, or a correct answer pointing past the
+end of the list, marks every child wrong — and a bank question is reused many
+times, so one bad row does that damage over and over, on papers set months apart
+by teachers who never saw it go in. `validateBankQuestion()` returns the
+problems in plain words so a screen can show a teacher what to fix, and
+`createBankQuestion()` refuses rather than writing a broken row.
+
+### Proving it — `npm run check:bank`
+
+`script/check-question-bank.ts`. Unlike the other check scripts it does **not**
+need a running server: there are no HTTP endpoints for the bank yet, so it runs
+in-process against storage, which is the "internal way" this stage is about. It
+calls `ensureSchema()` first, which is what makes "was the table created?"
+answerable.
+
+It saves one question of each of the four types and reads them back from the
+table, checks every part of the answer key and every tag survives, marks a row
+straight out of the bank with the real auto-marker, filters by subject, topic,
+class, difficulty and type (singly and combined), searches the wording, checks
+twelve kinds of broken question are refused, checks the bank is separate from
+assignments, and removes everything it created. 58 checks.
+
 ## Classes (forms)
 
 Assignments and students are grouped by class:
@@ -643,6 +707,7 @@ shared/
   parent-plays.ts  # The parent's view of game plays: shapes + wording
   teacher-plays.ts # The teacher's class view of game plays: shapes + wording
   parent-work.ts   # Completed work, question by question, areas to practise
+  question-bank.ts # The reusable question library: shapes, tags, validation
 script/
   check-parent-security.ts  # npm run check:parents — the parent security test
 ```

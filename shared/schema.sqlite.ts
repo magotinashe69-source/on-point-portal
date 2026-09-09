@@ -7,7 +7,7 @@
 // The TypeScript types (Teacher, Student, ...) still come from `schema.ts` —
 // this file only provides the table objects that database queries run against.
 
-import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
 import type { SlotProgress } from "./game-plays";
 
 // Small helper: a "created/updated at" timestamp that defaults to "now".
@@ -293,6 +293,37 @@ export const blasterBest = sqliteTable("blaster_best", {
   updatedAt: timestamp("updated_at").notNull().$defaultFn(() => new Date()),
 });
 
+// The Question Bank — a library of reusable questions. A new table beside the
+// assignments, not a change to them. See shared/question-bank.ts.
+export const questionBank = sqliteTable("question_bank", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+
+  questionText: text("question_text").notNull(),
+  type: text("type").notNull(),
+  maxScore: integer("max_score").notNull().default(1),
+
+  // The answer key, named exactly as the fields inside an assignment's
+  // question so one can be copied into the other with no renaming.
+  options: text("options", { mode: "json" }).$type<string[]>(),
+  correctOption: integer("correct_option"),
+  // SQLite has one numeric type; real() keeps decimals, which a numeric answer
+  // and its tolerance both need.
+  correctBool: integer("correct_bool", { mode: "boolean" }),
+  correctNumber: real("correct_number"),
+  tolerance: real("tolerance"),
+  acceptedAnswers: text("accepted_answers", { mode: "json" }).$type<string[]>(),
+  explanation: text("explanation"),
+
+  // Tags — what the question is about.
+  subject: text("subject").notNull(),
+  topic: text("topic").notNull(),
+  form: text("form").notNull(),
+  difficulty: text("difficulty").notNull(),
+
+  createdById: integer("created_by_id").notNull(),
+  createdAt: timestamp("created_at").notNull().$defaultFn(() => new Date()),
+});
+
 // Plain SQL that creates every table above if it does not exist yet.
 // We run this once on startup so a fresh SQLite database is ready to use
 // with no manual migration step.
@@ -494,4 +525,26 @@ CREATE TABLE IF NOT EXISTS blaster_best (
   games_played INTEGER NOT NULL DEFAULT 0,
   updated_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS question_bank (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  question_text TEXT NOT NULL,
+  type TEXT NOT NULL,
+  max_score INTEGER NOT NULL DEFAULT 1,
+  options TEXT,
+  correct_option INTEGER,
+  correct_bool INTEGER,
+  correct_number REAL,
+  tolerance REAL,
+  accepted_answers TEXT,
+  explanation TEXT,
+  subject TEXT NOT NULL,
+  topic TEXT NOT NULL,
+  form TEXT NOT NULL,
+  difficulty TEXT NOT NULL,
+  created_by_id INTEGER NOT NULL,
+  created_at INTEGER NOT NULL
+);
+-- Looked up by what a question is ABOUT, so the tags carry an index. Without
+-- it every filtered fetch is a full scan of the whole library.
+CREATE INDEX IF NOT EXISTS question_bank_tags ON question_bank (subject, form, topic, difficulty);
 `;
