@@ -301,6 +301,158 @@ async function main() {
   const anon = await new Session().get(`/api/students/${child.id}/mastery`);
   check(anon.status === 401, "a logged-out caller cannot", `got ${anon.status}`);
 
+  // =======================================================================
+  section("The class view a teacher sees");
+  // =======================================================================
+  //
+  // The one thing this view must not do is hide a split class. So two topics
+  // are built that BOTH sit at 50% for the class as a whole — one where every
+  // child is at 50%, and one where half the class has it perfectly and half has
+  // none of it. The average cannot tell them apart. The spread must.
+
+  const classForm = "Stage 5";
+  const kidA = (await teacher.post("/api/students", {
+    studentId: `MC-A${stamp}`, fullName: `Class Mastery A ${stamp}`,
+    gender: "Female", form: classForm,
+  })).body?.student;
+  const kidB = (await teacher.post("/api/students", {
+    studentId: `MC-B${stamp}`, fullName: `Class Mastery B ${stamp}`,
+    gender: "Male", form: classForm,
+  })).body?.student;
+  check(!!kidA && !!kidB, "two pupils are created in one class");
+
+  const classPapers: any[] = [];
+  if (kidA && kidB) {
+    const splitQs = [q("s1", 2, 2), q("s2", 3, 3), q("s3", 4, 4), q("s4", 5, 5)];
+    const togetherQs = [q("t1", 2, 2), q("t2", 3, 3), q("t3", 4, 4), q("t4", 5, 5)];
+    const strongQs = [q("g1", 2, 2), q("g2", 3, 3), q("g3", 4, 4), q("g4", 5, 5)];
+
+    const mk = (subject: string, topic: string, title: string, questions: any[]) => ({
+      subject, topic, form: classForm, title,
+      instructions: "Answer all questions.",
+      dueDate: "2026-12-01", totalMarks: questions.length, createdById: 1, questions,
+    });
+
+    const splitPaper = (await teacher.post("/api/assignments",
+      mk("MATHS", `Split ${stamp}`, `Split paper ${stamp}`, splitQs))).body?.assignment;
+    const togetherPaper = (await teacher.post("/api/assignments",
+      mk("SCIENCE", `Together ${stamp}`, `Together paper ${stamp}`, togetherQs))).body?.assignment;
+    const strongPaper = (await teacher.post("/api/assignments",
+      mk("ENGLISH", `Strong ${stamp}`, `Strong paper ${stamp}`, strongQs))).body?.assignment;
+    classPapers.push(splitPaper, togetherPaper, strongPaper);
+
+    const sessionFor = async (kid: any, password: string) => {
+      const sess = new Session();
+      await sess.post("/api/auth/student/login", { fullName: kid.fullName, password });
+      return sess;
+    };
+    const aSess = await sessionFor(kidA, "classpw1");
+    const bSess = await sessionFor(kidB, "classpw2");
+
+    // Split: A gets everything, B gets nothing. Class lands on 50%.
+    await aSess.post("/api/submissions", {
+      assignmentId: splitPaper.id, studentId: kidA.id, answers: answers(splitQs, 4),
+    });
+    await bSess.post("/api/submissions", {
+      assignmentId: splitPaper.id, studentId: kidB.id, answers: answers(splitQs, 0),
+    });
+
+    // Together: both get half. Class lands on 50% as well.
+    await aSess.post("/api/submissions", {
+      assignmentId: togetherPaper.id, studentId: kidA.id, answers: answers(togetherQs, 2),
+    });
+    await bSess.post("/api/submissions", {
+      assignmentId: togetherPaper.id, studentId: kidB.id, answers: answers(togetherQs, 2),
+    });
+
+    // Strong: both get everything.
+    await aSess.post("/api/submissions", {
+      assignmentId: strongPaper.id, studentId: kidA.id, answers: answers(strongQs, 4),
+    });
+    await bSess.post("/api/submissions", {
+      assignmentId: strongPaper.id, studentId: kidB.id, answers: answers(strongQs, 4),
+    });
+
+    const classRes = await teacher.get(`/api/reports/mastery?form=${encodeURIComponent(classForm)}`);
+    check(classRes.body?.success === true, "a teacher can read the class view", `status ${classRes.status}`);
+    const cm = classRes.body?.mastery;
+
+    const classTopic = (name: string) =>
+      (cm?.topics || []).find((t: any) => t.topic === name);
+
+    const split = classTopic(`Split ${stamp}`);
+    const together = classTopic(`Together ${stamp}`);
+    const strong = classTopic(`Strong ${stamp}`);
+
+    check(!!split && !!together && !!strong, "all three topics appear for the class");
+
+    // --- The two 50%s that mean completely different things --------------
+    check(split?.percent === 50, "the split topic reads 50% for the class", String(split?.percent));
+    check(together?.percent === 50, "and so does the even topic", String(together?.percent));
+
+    check(split?.mastered === 1 && split?.practise === 1,
+      "but the SPREAD shows the split: one pupil has it, one does not",
+      JSON.stringify({ m: split?.mastered, d: split?.developing, p: split?.practise }));
+    check(together?.developing === 2 && together?.mastered === 0 && together?.practise === 0,
+      "while the even topic shows both pupils in the same band",
+      JSON.stringify({ m: together?.mastered, d: together?.developing, p: together?.practise }));
+
+    check(split?.children === 2 && together?.children === 2,
+      "both topics count both pupils");
+
+    // --- Weakest first ---------------------------------------------------
+    const mineInOrder = (cm?.topics || [])
+      .filter((t: any) => t.topic.endsWith(stamp))
+      .map((t: any) => t.percent);
+    check(
+      mineInOrder.every((p: number, i: number) => i === 0 || mineInOrder[i - 1] <= p),
+      "the class list is WEAKEST first — the opposite of a child's own map",
+      JSON.stringify(mineInOrder),
+    );
+    check(strong?.percent === 100 && mineInOrder[mineInOrder.length - 1] === 100,
+      "so the topic they have all mastered is last");
+
+    // --- The teacher's figure IS the children's figure -------------------
+    const aMap = (await teacher.get(`/api/students/${kidA.id}/mastery`)).body?.mastery;
+    const aSplit = (aMap?.subjects || []).flatMap((x: any) => x.topics)
+      .find((t: any) => t.topic === `Split ${stamp}`);
+    check(aSplit?.percent === 100,
+      "pupil A's own map shows the split topic at 100%", String(aSplit?.percent));
+    check(aSplit?.band === "mastered",
+      "and counts towards the class's 'mastered' tally", aSplit?.band);
+
+    // --- Who needs a hand ------------------------------------------------
+    const support = (cm?.needSupport || []);
+    const bSupport = support.find((c: any) => c.studentId === kidB.id);
+    const aSupport = support.find((c: any) => c.studentId === kidA.id);
+    check(!!bSupport, "the pupil who got nothing right is flagged for support");
+    check(!aSupport, "and the pupil who did well is not");
+    check((bSupport?.topics || []).some((t: any) => t.topic === `Split ${stamp}`),
+      "with the topic they are stuck on named",
+      JSON.stringify(bSupport?.topics));
+    check(!(bSupport?.topics || []).some((t: any) => t.topic === `Strong ${stamp}`),
+      "and a topic they have mastered is not held against them");
+
+    check(cm?.children >= 2, "the class total counts the pupils on the register",
+      String(cm?.children));
+    check(cm?.withWork >= 2, "and how many have marked work", String(cm?.withWork));
+
+    // --- Teacher-only ----------------------------------------------------
+    // It names children and says what each is weakest at.
+    const pupilPeek = await aSess.get(`/api/reports/mastery?form=${encodeURIComponent(classForm)}`);
+    check(pupilPeek.status === 401 || pupilPeek.status === 403,
+      "a pupil cannot read the class view", `got ${pupilPeek.status}`);
+    const anonPeek = await new Session().get(`/api/reports/mastery?form=${encodeURIComponent(classForm)}`);
+    check(anonPeek.status === 401, "nor can a logged-out caller", `got ${anonPeek.status}`);
+
+    const noForm = await teacher.get(`/api/reports/mastery`);
+    check(noForm.status === 400, "asking without a class is refused", `got ${noForm.status}`);
+  }
+
+  for (const a of classPapers) if (a) await teacher.delete(`/api/assignments/${a.id}`);
+  if (kidA) await teacher.delete(`/api/students/${kidA.id}`);
+  if (kidB) await teacher.delete(`/api/students/${kidB.id}`);
+
   // --- Tidy up ----------------------------------------------------------
   for (const a of Object.values(created)) {
     if (a) await teacher.delete(`/api/assignments/${a.id}`);

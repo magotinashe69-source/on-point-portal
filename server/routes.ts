@@ -19,7 +19,7 @@ import { buildWeeklyReport } from "./weekly-report";
 import { buildParentOverview } from "./parent-overview";
 import { buildParentPlays } from "./parent-plays";
 import { buildTeacherPlays } from "./teacher-plays";
-import { buildMastery } from "./mastery";
+import { buildMastery, buildClassMastery } from "./mastery";
 import {
   validateBankQuestion, isDifficulty, isBankType,
   type BankType, type Difficulty,
@@ -3314,6 +3314,33 @@ export async function registerRoutes(
       });
     } catch (error) {
       console.error("Daily report error:", error);
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
+    }
+  });
+
+  // ─── Class skills, for a whole class ──────────────────────────────────────
+  //
+  // The teacher's side of the mastery map: which topics the class is weakest at
+  // and which children need a hand. Worked out from marks already stored —
+  // nothing here marks anything.
+  //
+  // Teacher-only. It names children and says what each is weakest at, which is
+  // not something another pupil should be able to read.
+  //
+  // Takes `form` like the other class reports, so the pages behave alike.
+  app.get("/api/reports/mastery", async (req, res) => {
+    try {
+      if (!(await requireTeacher(req, res))) return;
+
+      const form = (req.query.form as string | undefined) || "";
+      if (!form) {
+        return res.status(400).json({ success: false, message: "Choose a class first." });
+      }
+
+      const mastery = await buildClassMastery(form);
+      res.json({ success: true, mastery });
+    } catch (error) {
+      console.error("Class mastery error:", error);
       res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });

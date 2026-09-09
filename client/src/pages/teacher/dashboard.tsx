@@ -33,7 +33,8 @@ import {
   ClipboardList,
   XCircle,
   Pencil,
-  Gamepad2
+  Gamepad2,
+  GraduationCap
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -617,6 +618,20 @@ export default function TeacherDashboard() {
                 <div>
                   <h3 className="font-semibold">Daily Report</h3>
                   <p className="text-sm text-muted-foreground">WhatsApp-ready submission snapshot</p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link href="/teacher/class-mastery" data-testid="link-class-mastery">
+            <Card className="hover-elevate cursor-pointer h-full">
+              <CardContent className="flex items-center gap-4 py-6">
+                <div className="p-3 rounded-md bg-secondary/10">
+                  <GraduationCap className="h-6 w-6 text-secondary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold">Class skills</h3>
+                  <p className="text-sm text-muted-foreground">What to reteach, and who needs help</p>
                 </div>
               </CardContent>
             </Card>

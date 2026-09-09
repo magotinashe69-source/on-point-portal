@@ -330,8 +330,16 @@ async function main() {
     `got ${across.body?.plays?.left}`);
 
   // A game already paid for is still yours to finish when the balance is empty.
-  await teacher.post("/api/assignments", quizAssignment("MATHS", "More adding", `More ${stamp}`, ["x1", "x2"]));
-  const extra = (await teacher.get("/api/assignments")).body?.assignments?.find((a: any) => a.title === `More ${stamp}`);
+  // Taken from the POST's own reply, like every other assignment in this file.
+  // It used to be looked up again with a GET and read as `body.assignments` —
+  // but that endpoint answers with a BARE ARRAY, so `extra` was always
+  // undefined, the whole block below was silently skipped, and the two checks
+  // in it never ran while the assignment above was left behind on every run.
+  const extra = (await teacher.post(
+    "/api/assignments", quizAssignment("MATHS", "More adding", `More ${stamp}`, ["x1", "x2"]),
+  )).body?.assignment;
+  check(!!extra, "an extra assignment is created to earn one more play",
+    "if this fails the checks below are being skipped, not passing");
   if (extra) {
     await pupil.post("/api/submissions", {
       assignmentId: extra.id, studentId: child.id,
@@ -552,7 +560,13 @@ async function main() {
   if (idleChild) await teacher.delete(`/api/students/${idleChild.id}`);
 
   // --- Tidy up -------------------------------------------------------------
-  for (const a of [a1, a2, a3, a4]) await teacher.delete(`/api/assignments/${a.id}`);
+  // `extra` belongs here too. It was left out when this section was written,
+  // and every run of this check quietly added one more assignment to a live
+  // register — a test that dirties the database it is pointed at is worse than
+  // no test.
+  for (const a of [a1, a2, a3, a4, extra]) {
+    if (a) await teacher.delete(`/api/assignments/${a.id}`);
+  }
   await teacher.delete(`/api/students/${child.id}`);
   await teacher.delete(`/api/students/${formChild.id}`);
   console.log("\nTest pupils and assignments removed.");

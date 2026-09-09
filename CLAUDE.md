@@ -838,6 +838,37 @@ answered badly is not a weak skill, it is one question — and a child with
 nothing yet sees "Do more homework to build your mastery map" rather than a
 screen of 0%.
 
+### What a teacher sees — class skills
+
+`GET /api/reports/mastery?form=Stage%205`, page at `/teacher/class-mastery`.
+Teacher-only: it names children and says what each is weakest at.
+
+**Deliberately not the child's map with more names in it.** The two ask opposite
+questions, and it shows in the ordering:
+
+| | asks | ordered |
+|---|---|---|
+| a child | "what am I good at?" | strongest first, to encourage |
+| a teacher | "what must I reteach?" | **weakest first**, to act on |
+
+**The one thing this page must not do is hide a split class.** A topic sitting
+at 65% could be every child at 65%, or half the class at 100% and half at 30% —
+and those need completely different lessons. So every topic carries the
+**spread** as well as the figure: how many children are in each band. A
+genuinely split topic (some mastered, some needing practice) says so in words.
+`npm run check:mastery` builds two topics that BOTH read 50% for the class, one
+even and one split, and checks the spread tells them apart.
+
+**A teacher's figure is the child's figure.** The class view is built from each
+child's own `buildMasteryMap()`, from the same `answeredFrom()` reduction their
+dashboard uses — so a teacher and a child can never be looking at different
+numbers for the same topic. The check compares the two endpoints against each
+other rather than against numbers typed into the test.
+
+Read in **bulk** — the register, every submission, their marks and the
+assignments behind them — then worked out per child in memory. Calling
+`buildMastery()` thirty times would be ninety round trips for one page.
+
 ### Proving it — `npm run check:mastery`
 
 `script/check-mastery.ts`, in two halves. The first checks the calculation on
@@ -851,7 +882,13 @@ It checks the colours are right, that subjects group correctly and do not bleed
 into each other, that a question's own topic beats the paper's, that untagged
 work is counted but never shown and never breaks the map, that a child with
 nothing gets an invitation rather than zeros, and that one pupil cannot read
-another pupil's map. 40 checks.
+another pupil's map.
+
+It then builds a two-pupil class for the teacher's view, with two topics that
+both read 50% — one where both pupils sit at 50%, one where one has it perfectly
+and the other has none of it — and checks the spread tells them apart, that the
+list is weakest-first, that the struggling pupil is flagged and the strong one
+is not, and that a pupil cannot read the class view. 61 checks.
 
 ## Classes (forms)
 
