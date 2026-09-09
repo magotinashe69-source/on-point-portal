@@ -380,9 +380,40 @@ day it is) is part of the row's key, so tomorrow finds no row: used starts at 0
 and earned is recounted. Unused plays cannot carry over because there is nothing
 to carry, and no overnight job can fail to run.
 
-A play is spent when a game **starts**, like a coin in an arcade machine.
-Walking away halfway does not refund it — otherwise a child could restart until
-the questions suited them and the record they are chasing would mean nothing.
+A play is spent when a game **starts**, like a coin in an arcade machine. What
+it buys, though, is the whole game — not "the game as long as you stay on the
+page".
+
+### Walking out of a game does not cost the play
+
+A child whose battery dies, whose tab is closed by a parent, or who mis-taps
+"back" in round two has not had their play. Telling them they have is how a
+reward turns into a punishment.
+
+So an unfinished game is **kept, not refunded**. Come back and you are put back
+into the *same* game, at the round you had reached, with the rounds you already
+played still marked as they were.
+
+Keeping it rather than refunding it is what makes this safe to give away:
+
+* The questions are the ones already issued, so quitting cannot be used to
+  **re-roll** until an easy set comes up.
+* The rounds already played keep their marks, so a child cannot quit a game they
+  are **losing** and start it again for a better score.
+* A round is played once and stays played, so answering, being shown the right
+  answer, quitting and coming back cannot be used to **learn the answers**.
+
+How it works: `game_plays.active_answers` holds one slot per question issued,
+`null` until that round is played. `recordSlot()` fills a slot in as the round
+happens and **refuses to overwrite one already filled**. `activeGame()` reads
+back the first unplayed slot, which is where the child is put. Starting a game
+checks for one in flight *before* it looks at the balance — a game already paid
+for can be finished even when no plays are left. In Penalty Shootout a game in
+flight also beats the subject just tapped, so quitting a subject that is going
+badly cannot be used to start a fresh one.
+
+Nothing has to be cleared up and no timer has to expire: the half-finished game
+sits in the same row as the day's plays, and tomorrow's row is a different key.
 
 ### Both games are built from work already handed in
 
@@ -402,11 +433,17 @@ whole shuffled pack, then shuffles and deals again.
 used to refuse to count the same question twice, which stopped ten copies of one
 known-correct answer scoring ten. A game may now legitimately repeat a question,
 so that rule would have robbed an honest child. Instead **the issued game is
-stored** (`game_plays.active_refs`) when the play is spent, and the finish is
-marked **slot by slot** against it: the answer in position 3 is marked against
-whatever was actually asked in position 3. Nothing the browser sends decides
-which question is being answered, and a finished game has no stored questions
-left, so a winning result cannot be sent up twice.
+stored** (`game_plays.active_refs`) when the play is spent, and each round is
+marked and **written down as it is played** (`game_plays.active_answers`),
+identified by its **slot** rather than by its question — the ref alone is
+ambiguous once repeats are allowed.
+
+The finish then simply adds up what the server already recorded. **The browser
+has no say in the score at all**, and cannot be given one by sending a different
+set of answers up. A finish is only accepted once every slot has been played, so
+closing the tab at round four neither banks a four-round game nor loses it; and
+a finished game has no stored questions left, so a winning result cannot be sent
+up twice.
 
 ### The two games are deliberately different
 
@@ -430,7 +467,17 @@ both games build from completed work and never from an assignment left undone,
 checks the answer key never reaches the browser, checks a finished game cannot
 be replayed to score twice, checks Treasure Island still earns chests, checks
 Forms get 403 from all of it, and moves the clock to tomorrow to prove unused
-plays do not carry over. 44 checks.
+plays do not carry over.
+
+It also walks out of a game half-played and comes back: the play is not spent
+twice, the same questions come back, a round already played cannot be played
+again or re-marked, the game cannot be finished early, the score covers both
+sittings, a game already paid for can be picked up with no plays left, and in
+Penalty Shootout picking another subject returns the game in flight. It then
+runs the pages' own arithmetic (`readProgress`/`scoreProgress`, imported from
+`shared/game-plays.ts`) over the server's real reply, so a change to what a
+child is shown on coming back breaks this test rather than their game.
+73 checks.
 
 Run it after touching either game, the plays ledger, or anything under
 `/api/students/:id/plays`.

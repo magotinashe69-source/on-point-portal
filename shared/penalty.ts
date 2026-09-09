@@ -87,7 +87,12 @@ export interface Shot {
   // hands this back untouched.
   ref: string;
   round: Round;
-  index: number;        // 0-4 within its round
+  index: number;        // 0-4 within its round — what the child is shown
+  // Where this shot sits in the game as a whole (0-9). This, not `ref`, is what
+  // says which shot is being answered: a game may ask the same question twice,
+  // so the reference alone is ambiguous. It is also how a half-finished game
+  // knows where to pick up.
+  slot: number;
   questionText: string;
   options: ShotOption[];
 }

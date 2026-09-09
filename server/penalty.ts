@@ -10,6 +10,9 @@
 //      work they still have to do. The server marks every shot.
 //   2. Children can only ever be asked questions from assignments meant for
 //      them — their own form, and their own targeted assignments.
+//   3. A game walked out of is kept, not thrown away. Leaving does not use up
+//      the play — come back and the same game is waiting at the shot it had
+//      reached, with the shots already taken still marked.
 
 import { storage } from "./storage";
 import type { Student, Assignment } from "@shared/schema";
@@ -23,8 +26,8 @@ import {
 } from "@shared/penalty";
 import { awardXp, type XpAward } from "./xp";
 import { recordActivity } from "./streaks";
-import { activeGame, clearActiveGame, getPlayState, spendPlay } from "./game-plays";
-import type { PlayState } from "@shared/game-plays";
+import { activeGame, clearActiveGame, getPlayState, recordSlot, spendPlay } from "./game-plays";
+import type { PlayState, SlotProgress } from "@shared/game-plays";
 
 // One question a student may be asked, tied to the assignment it came from.
 interface PoolItem {
@@ -168,24 +171,73 @@ export async function buildGame(student: Student, subject: string): Promise<Game
     ref: p.item.ref,
     round: (i < SHOTS_PER_ROUND ? "striker" : "keeper") as Round,
     index: i % SHOTS_PER_ROUND,
+    slot: i,
     questionText: p.item.question.questionText,
     options: p.options,
   }));
   return { subject, perRound: SHOTS_PER_ROUND, shots };
 }
 
+/**
+ * Rebuild the game already issued, from the refs stored with the play.
+ *
+ * Used to hand back a game the child walked out of. The questions are exactly
+ * the ones they were asked, which is why quitting cannot be used to re-roll for
+ * an easier set. A shot whose question has since gone (the teacher deleted the
+ * assignment) is left out and counts as a miss.
+ */
+export async function rebuildGame(
+  student: Student, subject: string, refs: string[],
+): Promise<{ game: Game; missing: number[] }> {
+  const pool = await questionPool(student);
+  const numbers = numericPoolFor(pool, subject);
+  const shots: Shot[] = [];
+  const missing: number[] = [];
+
+  refs.forEach((ref, i) => {
+    const found = findByRef(pool, subject, ref);
+    const options = found ? buildShotOptions(found.question, numbers) : null;
+    if (!found || !options) { missing.push(i); return; }
+    shots.push({
+      ref,
+      round: (i < SHOTS_PER_ROUND ? "striker" : "keeper") as Round,
+      index: i % SHOTS_PER_ROUND,
+      slot: i,
+      questionText: found.question.questionText,
+      options,
+    });
+  });
+
+  return { game: { subject, perRound: SHOTS_PER_ROUND, shots }, missing };
+}
+
 /** A game, together with what the child has left after paying for it. */
 export interface StartedGame {
   game: Game;
   plays: PlayState;
+  /** True when this is a game they had already started and walked away from. */
+  resumed: boolean;
+  /** What has happened so far, one entry per shot. Empty for a new game. */
+  progress: SlotProgress;
+  /** The shot to put them back on. 0 for a new game. */
+  resumeSlot: number;
 }
 
 /**
- * Start a game: check they have a play, build it, then spend the play.
+ * Start a game — or hand back the one they walked away from.
  *
- * In that order on purpose. Building first and charging afterwards would take a
- * play off a child whose subject turned out to have nothing in it, and charging
- * first would lose them a play for the same reason.
+ * Resuming comes FIRST, before the subject or the play balance is looked at. A
+ * child who left a game half-played has already paid for it, so they are put
+ * back into it whatever their balance says. It also ignores the subject they
+ * just picked: an unfinished Maths game is returned even if they tapped
+ * English, because letting them start a new subject would be a free re-roll of
+ * the one they are losing. The page tells them which game they are going back
+ * to.
+ *
+ * Only when there is nothing to go back to is a new game built and a play
+ * spent, and in that order on purpose. Building first and charging afterwards
+ * would take a play off a child whose subject turned out to have nothing in it,
+ * and charging first would lose them a play for the same reason.
  *
  * `outOfPlays` is a refusal, not an error — the page turns it into "come back
  * tomorrow", not something that looks broken.
@@ -194,6 +246,30 @@ export async function startGame(
   student: Student, subject: string,
 ): Promise<StartedGame | { outOfPlays: true; plays: PlayState } | null> {
   const plays = await getPlayState(student, "penalty");
+
+  // A game left half-finished: give it straight back, at the shot they reached.
+  const active = await activeGame(student, "penalty");
+  if (active.resumable && active.subject) {
+    const { game, missing } = await rebuildGame(student, active.subject, active.refs);
+
+    // A shot whose question has gone since the game was issued — the teacher
+    // deleted the assignment while it sat half-played. Written down as a miss
+    // now, so the game can still be finished instead of waiting for ever on a
+    // shot that can no longer be shown. The child is not asked it.
+    for (const slot of missing) {
+      await recordSlot(student, "penalty", slot, { answerText: "", correct: false });
+    }
+
+    const now = missing.length ? await activeGame(student, "penalty") : active;
+    return {
+      game,
+      plays,
+      resumed: true,
+      progress: now.progress,
+      resumeSlot: now.resumeSlot,
+    };
+  }
+
   if (plays.left <= 0) return { outOfPlays: true, plays };
 
   const game = await buildGame(student, subject);
@@ -204,24 +280,49 @@ export async function startGame(
   const spent = await spendPlay(student, "penalty", game.shots.map((sh) => sh.ref), subject);
   if (!spent) return { outOfPlays: true, plays };
 
-  return { game, plays: spent };
+  return { game, plays: spent, resumed: false, progress: [], resumeSlot: 0 };
 }
 
-// Mark ONE shot, for the instant feedback the game needs (ball in the net, or
-// the keeper saving it). Marking is the existing auto-marker, untouched.
-// Returns null if the question isn't one this child is allowed to be asked.
+/**
+ * Mark ONE shot, for the instant feedback the game needs (ball in the net, or
+ * the keeper saving it), and write the result down before replying.
+ *
+ * Identified by SLOT, not by question: a game may legitimately ask the same
+ * question twice, so the ref alone cannot say which shot is being answered. The
+ * ref is still checked against the slot, so an answer meant for one shot cannot
+ * be applied to another.
+ *
+ * Writing the mark down as it happens is what makes walking away safe — the
+ * shot is already saved, so it survives the tab closing. It also means a shot
+ * can only be taken once: replaying one whose answer has already been shown
+ * returns what happened the first time and changes nothing.
+ *
+ * Marking itself is the existing auto-marker, untouched. Returns null if this
+ * is not a shot the child is currently being asked.
+ */
 export async function markShot(
-  student: Student, subject: string, ref: string, answerText: string,
-): Promise<{ correct: boolean; correctAnswerDisplay: string; explanation?: string } | null> {
+  student: Student, subject: string, slot: number, ref: string, answerText: string,
+): Promise<{ correct: boolean; correctAnswerDisplay: string; explanation?: string; alreadyPlayed?: boolean } | null> {
+  const active = await activeGame(student, "penalty");
+  if (active.subject !== subject) return null;
+  if (slot < 0 || slot >= active.refs.length) return null;
+  if (active.refs[slot] !== ref) return null; // this answer is not for this shot
+
   const pool = await questionPool(student);
   const found = findByRef(pool, subject, ref);
   if (!found) return null;
 
   const result = markAnswer(found.question, answerText);
-  return {
+  const stored = await recordSlot(student, "penalty", slot, {
+    answerText,
     correct: result.correct,
+  });
+
+  return {
+    correct: stored ? result.correct : (active.progress[slot]?.correct ?? result.correct),
     correctAnswerDisplay: result.correctAnswerDisplay,
     explanation: result.explanation,
+    alreadyPlayed: !stored,
   };
 }
 
@@ -230,6 +331,10 @@ export interface GameResult {
   outOf: number;      // always 10 — the server's fixed game length
   perRound: number;   // always 5
   playable?: boolean; // false when the subject no longer has enough questions
+  /** True when shots are still to take — the game was left, not finished. */
+  unfinished?: boolean;
+  /** The shot to come back to, when unfinished. */
+  resumeSlot?: number;
   strikerScore: number;
   keeperScore: number;
   bestScore: number;
@@ -251,28 +356,37 @@ export interface SubmittedAnswer {
   round?: Round;
 }
 
-// Finish a game: re-mark every answer on the server (the browser is never
-// trusted with the score), save a new personal best, award XP through the
-// existing capped system, and count the game towards the daily streak.
+// Finish a game: score it from the server's own record of what happened, save a
+// new personal best, award XP through the existing capped system, and count the
+// game towards the daily streak.
 //
-// HOW CHEATING IS STOPPED, and why it had to change.
+// HOW CHEATING IS STOPPED, and why it has changed twice.
 //
-// This used to refuse to count the same question twice: ten copies of one
+// It used to refuse to count the same question twice: ten copies of one
 // known-correct answer scored 1, not 10. That worked while every shot in a game
 // was a different question — but a game may now legitimately repeat one, and
 // that rule would have quietly robbed an honest child of the marks.
 //
-// So the game itself is the record now. Its questions were stored, in order,
-// when the play was spent (server/game-plays.ts). The answer in position 3 is
-// marked against whatever question was actually asked in position 3, and the
-// round comes from that position too. Nothing the browser sends decides which
-// question is being answered, so a replayed answer lands in a slot that is
-// asking something else.
+// It was replaced by marking the browser's answers slot by slot against the
+// questions actually stored for the game. Now even that is gone: the shots are
+// marked and WRITTEN DOWN as they are taken (markShot), and the finish simply
+// adds up what the server already recorded. The browser has no say in the score
+// at all, and cannot be given one by sending a different set of answers up.
 //
-// A game that has already been finished has no stored questions left, so
-// sending the same winning game up twice scores nothing the second time.
+// That is also what lets a game survive being walked out of. The marks are
+// already saved, so a game played across two sittings scores exactly what it
+// earned, and a shot that has already been taken cannot be taken again —
+// answering, seeing the right answer, quitting and coming back gets the child
+// the shot they already played, not a second go at it.
+//
+// A finish is only accepted once every shot has been taken. A game with shots
+// still to play is left exactly where it is rather than scored early, so
+// closing the tab at shot four neither banks a four-shot game nor loses it.
+//
+// A game already finished has no stored questions left, so sending the same
+// winning game up twice scores nothing the second time.
 export async function finishGame(
-  student: Student, subject: string, answers: SubmittedAnswer[],
+  student: Student, subject: string, _answers: SubmittedAnswer[] = [],
 ): Promise<GameResult> {
   const pool = await questionPool(student);
   const perRound = SHOTS_PER_ROUND;
@@ -296,22 +410,20 @@ export async function finishGame(
     return empty();
   }
 
+  // Still shots to take: this is a game being walked out of, not finished.
+  // Leave it exactly where it is so they can come back to it.
+  if (active.resumable) {
+    return { ...empty(), playable: true, unfinished: true, resumeSlot: active.resumeSlot };
+  }
+
   let strikerScore = 0;
   let keeperScore = 0;
 
-  // Slot by slot. The child's Nth answer is marked against the Nth question
-  // they were asked, and a missing answer is simply a miss.
-  active.refs.slice(0, outOf).forEach((ref, slot) => {
-    const answer = answers[slot];
-    if (!answer) return;
-
-    const found = findByRef(pool, subject, ref);
-    if (!found) return; // the assignment went away mid-game
-
-    if (!markAnswer(found.question, answer.answerText ?? "").correct) return;
-
-    // Which half of the game this slot belongs to is decided here, not by the
-    // browser: the first five are penalties taken, the rest are saves.
+  // Added up from what the server marked at the time, shot by shot. Which half
+  // of the game a shot belongs to is decided by its position, not by the
+  // browser: the first five are penalties taken, the rest are saves.
+  active.progress.slice(0, outOf).forEach((played, slot) => {
+    if (!played?.correct) return;
     if (slot < perRound) strikerScore++;
     else keeperScore++;
   });

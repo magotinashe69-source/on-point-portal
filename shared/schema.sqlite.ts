@@ -8,6 +8,7 @@
 // this file only provides the table objects that database queries run against.
 
 import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import type { SlotProgress } from "./game-plays";
 
 // Small helper: a "created/updated at" timestamp that defaults to "now".
 // In SQLite we store timestamps as numbers, and Drizzle converts them
@@ -274,6 +275,9 @@ export const gamePlays = sqliteTable("game_plays", {
   game: text("game").notNull(), // "penalty" | "blaster"
   used: integer("used").notNull().default(0),
   activeRefs: text("active_refs", { mode: "json" }).$type<string[]>().$defaultFn(() => []),
+  // Progress through that game, one entry per question above. Lets a child who
+  // walked away resume the SAME game rather than lose the play.
+  activeAnswers: text("active_answers", { mode: "json" }).$type<SlotProgress>().$defaultFn(() => []),
   activeSubject: text("active_subject"),
   updatedAt: timestamp("updated_at").notNull().$defaultFn(() => new Date()),
 });
@@ -478,6 +482,7 @@ CREATE TABLE IF NOT EXISTS game_plays (
   game TEXT NOT NULL,
   used INTEGER NOT NULL DEFAULT 0,
   active_refs TEXT NOT NULL DEFAULT '[]',
+  active_answers TEXT NOT NULL DEFAULT '[]',
   active_subject TEXT,
   updated_at INTEGER NOT NULL
 );

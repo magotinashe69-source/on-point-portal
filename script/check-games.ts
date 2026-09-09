@@ -2,9 +2,15 @@
 //
 // Complete 3 assignments -> 3 plays of each game -> play them down to 0 ->
 // confirm both games build rounds from COMPLETED work with no "not ready" ->
+// confirm walking out of a game does not cost the play ->
 // confirm Treasure Island still works -> confirm tomorrow resets the plays.
 //
 // Run against a live server: npx tsx <this file>
+
+// The same helpers the two game pages import. Used below to work out exactly
+// what a child would be shown when they come back to a half-finished game, so
+// a change to that logic breaks this test rather than a child's game.
+import { readProgress, scoreProgress } from "../shared/game-plays";
 
 const BASE = "http://localhost:5000";
 const TEACHER = { email: "onpointeducationcentremoza@gmail.com", password: "onpoint123" };
@@ -51,6 +57,16 @@ function quizAssignment(subject: string, topic: string, title: string, ids: stri
   };
 }
 
+/**
+ * The answer to "Adding question 1: what is 4 + 4?", worked out from the
+ * question text. The browser is never told the answer, so the test cannot be
+ * told it either — it does what a child does and reads the question.
+ */
+function answerTo(questionText: string): string {
+  const m = /what is (\d+) \+ (\d+)\?/.exec(questionText);
+  return m ? String(Number(m[1]) + Number(m[2])) : "";
+}
+
 async function main() {
   const teacher = new Session();
   const login = await teacher.post("/api/auth/teacher/login", TEACHER);
@@ -74,6 +90,25 @@ async function main() {
   const pupil = new Session();
   const pupilLogin = await pupil.post("/api/auth/student/login", { fullName: child.fullName, password: "gamepw123" });
   check(pupilLogin.body?.success === true, "the pupil can log in");
+
+  // Playing a round is now what records it. The server marks and saves each
+  // round as it is played and adds them up at the end, so a game has to be
+  // PLAYED rather than posted in one lump at the finish.
+  const blastRound = (r: any, answerText?: string) =>
+    pupil.post(`/api/students/${child.id}/blaster/answer`, {
+      slot: r.index, ref: r.ref, answerText: answerText ?? answerTo(r.questionText),
+    });
+  const penaltyShot = (subject: string, sh: any, answerText?: string) =>
+    pupil.post(`/api/students/${child.id}/penalty/answer`, {
+      subject, slot: sh.slot, ref: sh.ref, answerText: answerText ?? answerTo(sh.questionText),
+    });
+  /** Play a blast right through, so it can be finished and the play used up. */
+  const playBlastOut = async () => {
+    const g = await pupil.post(`/api/students/${child.id}/blaster/start`);
+    if (!g.body?.success) return g;
+    for (const r of g.body.rounds || []) await blastRound(r);
+    return pupil.post(`/api/students/${child.id}/blaster/finish`, { answers: [] });
+  };
 
   // =========================================================================
   section("Before any homework: no plays, and nothing to play");
@@ -129,23 +164,29 @@ async function main() {
   check(!blast.text.includes("correctNumber") && !blast.text.includes("correctOption"),
     "no answer key is sent to the browser");
 
-  // Answer them all correctly. The right answer is in the question text
+  // Play them all correctly. The right answer is in the question text
   // ("what is 4 + 4?"), which the server marks — the browser is never told.
-  const blastAnswers = rounds.map((r: any) => {
-    const m = /what is (\d+) \+ (\d+)\?/.exec(r.questionText);
-    const value = m ? String(Number(m[1]) + Number(m[2])) : "";
-    return { ref: r.ref, answerText: value };
-  });
-  const blastResult = await pupil.post(`/api/students/${child.id}/blaster/finish`, { answers: blastAnswers });
+  for (const r of rounds) await blastRound(r);
+
+  // The finish sends NO answers: the score is the server's own record of the
+  // rounds as they were played, not anything the browser hands up.
+  const blastResult = await pupil.post(`/api/students/${child.id}/blaster/finish`, { answers: [] });
   check(blastResult.body?.score === 6, "all six answered right scores 6", `got ${blastResult.body?.score}`);
   check(blastResult.body?.newRecord === true, "a first game sets a record");
   check(blastResult.body?.xp?.awarded > 0, "XP is awarded", JSON.stringify(blastResult.body?.xp));
   check(blastResult.body?.plays?.left === 2, "the play stays spent after finishing", `got ${blastResult.body?.plays?.left}`);
 
   // Sending the same winning game again must score nothing.
-  const replay = await pupil.post(`/api/students/${child.id}/blaster/finish`, { answers: blastAnswers });
+  const replay = await pupil.post(`/api/students/${child.id}/blaster/finish`, { answers: [] });
   check(replay.body?.score === 0, "the same finished game cannot be sent up twice to score again",
     `got ${replay.body?.score}`);
+
+  // The browser cannot talk its way to a score it did not earn.
+  const madeUp = await pupil.post(`/api/students/${child.id}/blaster/finish`, {
+    answers: rounds.map((r: any) => ({ ref: r.ref, answerText: answerTo(r.questionText) })),
+  });
+  check(madeUp.body?.score === 0, "a made-up set of answers scores nothing on a finished game",
+    `got ${madeUp.body?.score}`);
 
   // =========================================================================
   section("Penalty Shootout: no 'not ready', questions from completed work");
@@ -169,11 +210,8 @@ async function main() {
   check(shootout.body?.plays?.left === 2, "it spends a penalty play (3 -> 2)", `got ${shootout.body?.plays?.left}`);
   check(!shootout.text.includes("correctNumber"), "no answer key is sent to the browser");
 
-  const shotAnswers = shots.map((sh: any) => {
-    const m = /what is (\d+) \+ (\d+)\?/.exec(sh.questionText);
-    return { ref: sh.ref, answerText: m ? String(Number(m[1]) + Number(m[2])) : "", round: sh.round };
-  });
-  const shootResult = await pupil.post(`/api/students/${child.id}/penalty/finish`, { subject: "MATHS", answers: shotAnswers });
+  for (const sh of shots) await penaltyShot("MATHS", sh);
+  const shootResult = await pupil.post(`/api/students/${child.id}/penalty/finish`, { subject: "MATHS", answers: [] });
   check(shootResult.body?.score === 10, "all ten right scores 10, repeats included",
     `got ${shootResult.body?.score} — a repeated question must still score each time it is asked`);
 
@@ -181,13 +219,9 @@ async function main() {
   section("Playing down to zero, then the wall");
   // =========================================================================
 
-  // Two blaster plays left. Spend both.
-  for (let i = 0; i < 2; i++) {
-    const g = await pupil.post(`/api/students/${child.id}/blaster/start`);
-    if (g.body?.success) {
-      await pupil.post(`/api/students/${child.id}/blaster/finish`, { answers: [] });
-    }
-  }
+  // Two blaster plays left. Play both right through — a game merely walked out
+  // of would be waiting to be picked up, not spent.
+  for (let i = 0; i < 2; i++) await playBlastOut();
   const spentOut = await pupil.get(`/api/students/${child.id}/plays`);
   check(spentOut.body?.plays?.blaster?.left === 0, "all three blaster plays spent", `got ${spentOut.body?.plays?.blaster?.left}`);
 
@@ -206,6 +240,143 @@ async function main() {
   const earnedMore = await pupil.get(`/api/students/${child.id}/plays`);
   check(earnedMore.body?.plays?.blaster?.left === 1, "finishing another assignment earns another play",
     `got ${earnedMore.body?.plays?.blaster?.left}`);
+
+  // =========================================================================
+  section("Walking out of a game does not cost the play");
+  // =========================================================================
+  //
+  // The rule: a game left half-played is KEPT, not refunded and not thrown
+  // away. Come back and the same game is waiting at the round it reached. That
+  // is what stops quitting being both a punishment and a loophole.
+
+  const playsBefore = (await pupil.get(`/api/students/${child.id}/plays`)).body?.plays?.blaster?.left;
+  const walked = await pupil.post(`/api/students/${child.id}/blaster/start`);
+  check(walked.body?.success === true, "a blast starts with the newly earned play",
+    JSON.stringify(walked.body).slice(0, 120));
+  const walkedRounds = walked.body?.rounds || [];
+  check(walked.body?.plays?.left === playsBefore - 1, "starting it spends the play",
+    `${playsBefore} -> ${walked.body?.plays?.left}`);
+
+  // Play two rounds, one right and one wrong, then walk away — close the tab,
+  // flat battery, tapped "back". Nothing else is sent.
+  await blastRound(walkedRounds[0]);
+  await blastRound(walkedRounds[1], "definitely wrong");
+
+  const midStatus = await pupil.get(`/api/students/${child.id}/blaster`);
+  check(midStatus.body?.resumable === true, "the half-finished game is waiting to be picked up");
+  check(midStatus.body?.resumeSlot === 2, "waiting at the round they had reached",
+    `got ${midStatus.body?.resumeSlot}`);
+
+  // Coming back.
+  const resumeA = await pupil.post(`/api/students/${child.id}/blaster/start`);
+  check(resumeA.body?.resumed === true, "coming back picks the same game up rather than starting a new one");
+  check(resumeA.body?.plays?.left === playsBefore - 1, "and does NOT spend a second play",
+    `got ${resumeA.body?.plays?.left}, expected ${playsBefore - 1}`);
+  check(resumeA.body?.resumeSlot === 2, "back at the round they left", `got ${resumeA.body?.resumeSlot}`);
+
+  // The shape the PAGE reads to work out which rounds are still to play. If
+  // this drifts, a child would be asked rounds they have already played.
+  const prog = resumeA.body?.progress;
+  check(Array.isArray(prog) && prog.length === 6, "progress comes back, one entry per round",
+    JSON.stringify(prog));
+  check(prog?.[0]?.correct === true, "the round they got right is recorded as right",
+    JSON.stringify(prog?.[0]));
+  check(prog?.[1]?.correct === false, "the round they got wrong is recorded as wrong",
+    JSON.stringify(prog?.[1]));
+  check([2, 3, 4, 5].every((i) => prog?.[i] === null), "the rounds not yet played are empty",
+    JSON.stringify(prog?.slice(2)));
+
+  const resumedRounds = resumeA.body?.rounds || [];
+  const sameQuestions = resumedRounds.every((r: any) => r.ref === walkedRounds[r.index]?.ref);
+  check(sameQuestions, "the questions are the SAME ones — quitting cannot re-roll for an easier set");
+  check(resumedRounds.filter((r: any) => r.index >= 2).length === 4,
+    "the four rounds still to play come back",
+    `got ${resumedRounds.filter((r: any) => r.index >= 2).length}`);
+
+  // The round they got wrong stays wrong. Otherwise "answer, see the right
+  // answer, quit, come back" would be a way to farm a perfect score.
+  const retry = await blastRound(walkedRounds[1]);
+  check(retry.body?.alreadyPlayed === true, "a round already played cannot be played again");
+  check(retry.body?.correct === false, "and keeps the mark it got the first time",
+    `got ${retry.body?.correct}`);
+
+  // What the PAGE does with all that. This is the page's own arithmetic, run
+  // over the server's real answer: which rounds it puts in front of the child,
+  // and the score it starts them on.
+  const pageProgress = readProgress(resumeA.body?.progress, 6);
+  const pageTodo = (resumeA.body?.rounds || []).filter((r: any) => !pageProgress[r.index]);
+  check(pageTodo.length === 4, "the page would offer exactly the four rounds still to play",
+    `got ${pageTodo.length}`);
+  check(pageTodo.every((r: any) => r.index >= 2), "and none they have already played",
+    JSON.stringify(pageTodo.map((r: any) => r.index)));
+  check(scoreProgress(pageProgress) === 1, "and would start them on the score they had earned",
+    `got ${scoreProgress(pageProgress)}`);
+  check(pageTodo[0]?.index === 2, "starting at the round they walked out of",
+    `got ${pageTodo[0]?.index}`);
+
+  // Finishing early must not bank a short game, nor lose it.
+  const early = await pupil.post(`/api/students/${child.id}/blaster/finish`, { answers: [] });
+  check(early.body?.unfinished === true, "a game with rounds still to play cannot be finished early");
+  const stillThere = await pupil.get(`/api/students/${child.id}/blaster`);
+  check(stillThere.body?.resumable === true, "and is still waiting afterwards, not thrown away");
+
+  // Play it out. The score must cover BOTH sittings: 1 right before walking
+  // away, 4 right after, and the one they got wrong staying wrong.
+  for (const r of resumedRounds) await blastRound(r);
+  const across = await pupil.post(`/api/students/${child.id}/blaster/finish`, { answers: [] });
+  check(across.body?.score === 5, "a game played across two sittings scores what it earned",
+    `got ${across.body?.score}, expected 5 (1 before + 4 after, 1 wrong)`);
+  check(across.body?.plays?.left === playsBefore - 1, "and the play is spent exactly once",
+    `got ${across.body?.plays?.left}`);
+
+  // A game already paid for is still yours to finish when the balance is empty.
+  await teacher.post("/api/assignments", quizAssignment("MATHS", "More adding", `More ${stamp}`, ["x1", "x2"]));
+  const extra = (await teacher.get("/api/assignments")).body?.assignments?.find((a: any) => a.title === `More ${stamp}`);
+  if (extra) {
+    await pupil.post("/api/submissions", {
+      assignmentId: extra.id, studentId: child.id,
+      answers: [{ questionId: "x1", answerText: "4" }, { questionId: "x2", answerText: "6" }],
+    });
+    const paidFor = await pupil.post(`/api/students/${child.id}/blaster/start`);
+    const paidRounds = paidFor.body?.rounds || [];
+    await blastRound(paidRounds[0]);
+    const stranded = await pupil.get(`/api/students/${child.id}/plays`);
+    check(stranded.body?.plays?.blaster?.left === 0, "the balance is empty while a game is still open",
+      `got ${stranded.body?.plays?.blaster?.left}`);
+    const rescued = await pupil.post(`/api/students/${child.id}/blaster/start`);
+    check(rescued.body?.resumed === true,
+      "a game already paid for can still be picked up with no plays left",
+      JSON.stringify(rescued.body).slice(0, 120));
+    for (const r of rescued.body?.rounds || []) await blastRound(r);
+    await pupil.post(`/api/students/${child.id}/blaster/finish`, { answers: [] });
+  }
+
+  // The same rule in Penalty Shootout, including across subjects.
+  const pPlays = (await pupil.get(`/api/students/${child.id}/plays`)).body?.plays?.penalty?.left ?? 0;
+  if (pPlays > 0) {
+    const pGame = await pupil.post(`/api/students/${child.id}/penalty/start`, { subject: "MATHS" });
+    const pShots = pGame.body?.shots || [];
+    await penaltyShot("MATHS", pShots[0]);
+
+    // Picking a DIFFERENT subject must not start a fresh game — that would be
+    // a free re-roll out of one that is going badly.
+    const switched = await pupil.post(`/api/students/${child.id}/penalty/start`, { subject: "ENGLISH" });
+    check(switched.body?.resumed === true && switched.body?.subject === "MATHS",
+      "picking another subject goes back to the game in flight, not a new one",
+      `got ${switched.body?.subject}, resumed=${switched.body?.resumed}`);
+    check(switched.body?.plays?.left === pGame.body?.plays?.left,
+      "and spends no extra play", `${pGame.body?.plays?.left} -> ${switched.body?.plays?.left}`);
+
+    const pSubjects = await pupil.get(`/api/students/${child.id}/penalty/subjects`);
+    check(pSubjects.body?.resumable === true && pSubjects.body?.resumeSubject === "MATHS",
+      "the subject picker offers to carry on with it",
+      JSON.stringify({ r: pSubjects.body?.resumable, s: pSubjects.body?.resumeSubject }));
+
+    for (const sh of switched.body?.shots || []) await penaltyShot("MATHS", sh);
+    const pDone = await pupil.post(`/api/students/${child.id}/penalty/finish`, { subject: "MATHS", answers: [] });
+    check(pDone.body?.score === 10, "the shootout finishes across two sittings with every shot counted",
+      `got ${pDone.body?.score}`);
+  }
 
   // =========================================================================
   section("Treasure Island still works, untouched");
@@ -250,6 +421,10 @@ async function main() {
   // The dev-only clock helper moves "today" for the streak, and the plays
   // ledger reads the same CAT day, so this is a real day-change test.
   const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  // Today's state, to compare against after the clock has been and come back.
+  // Compared rather than hard-coded: how many plays are left here depends on
+  // how many the sections above spent, which is not what this test is about.
+  const todayState = (await pupil.get(`/api/students/${child.id}/plays`)).body?.plays?.blaster;
   const simulated = await teacher.post("/api/dev/streak/sim-date", { date: tomorrow });
   if (simulated.body?.success === true && simulated.body?.today === tomorrow) {
     const nextDay = await pupil.get(`/api/students/${child.id}/plays`);
@@ -261,9 +436,17 @@ async function main() {
       `got ${nextDay.body?.plays?.blaster?.completedToday}`);
     await teacher.post("/api/dev/streak/sim-date", { date: null });
     const backToToday = await pupil.get(`/api/students/${child.id}/plays`);
-    check(backToToday.body?.plays?.blaster?.left === 1,
+    const back = backToToday.body?.plays?.blaster;
+    check(
+      back?.earned === todayState?.earned &&
+      back?.used === todayState?.used &&
+      back?.left === todayState?.left &&
+      back?.completedToday === todayState?.completedToday,
       "and today's plays are still there when the clock comes back",
-      `got ${backToToday.body?.plays?.blaster?.left}`);
+      `was ${JSON.stringify(todayState)}, came back as ${JSON.stringify(back)}`);
+    check((todayState?.completedToday ?? 0) > 0,
+      "today really did have homework in it, so that comparison means something",
+      `completedToday ${todayState?.completedToday}`);
   } else {
     check(false, "the dev clock helper moved the day", `status ${simulated.status}, body ${JSON.stringify(simulated.body).slice(0, 80)}`);
   }

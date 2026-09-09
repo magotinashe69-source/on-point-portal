@@ -2,6 +2,7 @@ import { pgTable, text, serial, integer, timestamp, jsonb, boolean } from "drizz
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import type { SlotProgress } from "./game-plays";
 
 // Enums
 export const subjectEnum = z.enum(["MATHS", "ENGLISH", "SCIENCE", "PHYSICS", "CHEMISTRY", "BIOLOGY", "ECONOMICS", "BUSINESS_STUDIES", "GEOGRAPHY", "COMPUTER_SCIENCE", "HISTORY", "ACCOUNTING"]);
@@ -469,6 +470,11 @@ export const gamePlays = pgTable("game_plays", {
   // The questions of the game currently being played, in order, as
   // "assignmentId:questionId" refs. Empty when no game is in flight.
   activeRefs: jsonb("active_refs").$type<string[]>().default([]),
+  // What has happened in that game so far, one entry per question above and in
+  // the same order: null until a round is played, then how it went. This is
+  // what lets a child who walked away be put back into the SAME game at the
+  // round they reached, instead of losing the play. See shared/game-plays.ts.
+  activeAnswers: jsonb("active_answers").$type<SlotProgress>().default([]),
   activeSubject: text("active_subject"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -485,6 +491,7 @@ export type InsertGamePlays = {
   game: string;
   used?: number;
   activeRefs?: string[];
+  activeAnswers?: SlotProgress;
   activeSubject?: string | null;
 };
 

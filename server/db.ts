@@ -71,6 +71,7 @@ CREATE TABLE IF NOT EXISTS game_plays (
   game TEXT NOT NULL,
   used INTEGER NOT NULL DEFAULT 0,
   active_refs JSONB NOT NULL DEFAULT '[]'::jsonb,
+  active_answers JSONB NOT NULL DEFAULT '[]'::jsonb,
   active_subject TEXT,
   updated_at TIMESTAMP NOT NULL DEFAULT now()
 );
@@ -139,6 +140,15 @@ const PENALTY_BEST_ADDED_COLUMNS: { name: string; type: string }[] = [
   { name: "best_out_of", type: "INTEGER NOT NULL DEFAULT 0" },
 ];
 
+// Columns added to game_plays after it first shipped, handled the same way.
+const GAME_PLAYS_ADDED_COLUMNS: { name: string; type: string }[] = [
+  // Added when an unfinished game stopped costing a play. Progress through the
+  // game in flight, so a child who walked away is put back into the same game
+  // at the round they reached. Existing rows default to '[]', which reads as
+  // "no game in flight" — exactly right for a row written before this shipped.
+  { name: "active_answers", type: "JSONB NOT NULL DEFAULT '[]'::jsonb" },
+];
+
 // Columns added to assignments after it first shipped, handled the same way.
 const ASSIGNMENTS_ADDED_COLUMNS: { name: string; type: string }[] = [
   // Draft & Publish. Existing assignments default to "published" (1 / true), so
@@ -184,6 +194,9 @@ if (usePostgres) {
     for (const col of PENALTY_BEST_ADDED_COLUMNS) {
       await pgPoolInstance!.query(`ALTER TABLE penalty_best ADD COLUMN IF NOT EXISTS ${col.name} ${col.type}`);
     }
+    for (const col of GAME_PLAYS_ADDED_COLUMNS) {
+      await pgPoolInstance!.query(`ALTER TABLE game_plays ADD COLUMN IF NOT EXISTS ${col.name} ${col.type}`);
+    }
     for (const col of ASSIGNMENTS_ADDED_COLUMNS) {
       await pgPoolInstance!.query(`ALTER TABLE assignments ADD COLUMN IF NOT EXISTS ${col.name} ${col.type}`);
     }
@@ -217,6 +230,12 @@ if (usePostgres) {
     }
     for (const col of PENALTY_BEST_ADDED_COLUMNS) {
       try { await client.execute(`ALTER TABLE penalty_best ADD COLUMN ${col.name} ${col.type}`); }
+      catch { /* column already present */ }
+    }
+    for (const col of GAME_PLAYS_ADDED_COLUMNS) {
+      // SQLite has no JSONB — the JSON is held as TEXT, as active_refs is.
+      const type = col.type.replace("JSONB", "TEXT").replace("::jsonb", "");
+      try { await client.execute(`ALTER TABLE game_plays ADD COLUMN ${col.name} ${type}`); }
       catch { /* column already present */ }
     }
     for (const col of ASSIGNMENTS_ADDED_COLUMNS) {

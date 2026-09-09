@@ -16,6 +16,12 @@
 // do on the GPU). It also respects "reduce motion" in the phone's settings.
 //
 // The browser is never told the answers — every shot is marked by the server.
+//
+// Walking away does not cost the play. Every shot is written down on the server
+// as it is taken, so closing the tab, running out of battery or tapping "back"
+// leaves the game exactly where it was — coming back drops the child into the
+// SAME game at the shot they had reached. The shots they already took keep
+// their marks and are never asked again.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, Link } from "wouter";
@@ -29,7 +35,10 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { PageErrorBoundary } from "@/components/ErrorBoundary";
 import { ArrowLeft, Loader2, Trophy } from "lucide-react";
 import { isPrimaryForm } from "@shared/schema";
-import { PLAYS_TEXT, playsMessage, type PlayState } from "@shared/game-plays";
+import {
+  PLAYS_TEXT, RESUME_TEXT, playsMessage, readProgress, scoreProgress,
+  type PlayState, type SlotProgress,
+} from "@shared/game-plays";
 import {
   ANSWER_REVEAL_MS, CORNERS, MIN_QUESTIONS, SHOTS_PER_ROUND, TOTAL_SHOTS,
   scoreLine, type Corner, type Shot,
@@ -86,8 +95,12 @@ function PenaltyShootoutContent() {
   const { student } = useAuth();
 
   const [subject, setSubject] = useState<string>("");
+  // The shots still to take, in order. On a fresh game that is all ten; on one
+  // being picked up again it is only the shots not yet taken, so a shot whose
+  // answer has already been seen is never asked twice.
   const [shots, setShots] = useState<Shot[]>([]);
   const [shotNo, setShotNo] = useState(0);
+  const [resumed, setResumed] = useState(false);
   const [phase, setPhase] = useState<Phase>("subject");
   const [starting, setStarting] = useState(false);
 
@@ -109,7 +122,13 @@ function PenaltyShootoutContent() {
     if (!isPrimaryForm(student.form)) setLocation("/student/dashboard");
   }, [student, setLocation]);
 
-  const { data: subjectData, isLoading: subjectsLoading } = useQuery<{ success: boolean; subjects: SubjectChoice[] }>({
+  const { data: subjectData, isLoading: subjectsLoading } = useQuery<{
+    success: boolean;
+    subjects: SubjectChoice[];
+    // A game they walked out of, waiting to be picked up.
+    resumable?: boolean;
+    resumeSubject?: string | null;
+  }>({
     queryKey: ["/api/students", student?.id, "penalty", "subjects"],
     enabled: !!student && isPrimaryForm(student?.form ?? ""),
   });
@@ -123,6 +142,8 @@ function PenaltyShootoutContent() {
   const plays = playsData?.plays?.penalty ?? null;
 
   const subjects = subjectData?.subjects ?? [];
+  const canResume = !!subjectData?.resumable;
+  const resumeSubject = subjectData?.resumeSubject ?? "";
   const shot = shots[shotNo];
   const round = shot?.round ?? "striker";
   const isKeeperRound = round === "keeper";
@@ -147,12 +168,31 @@ function PenaltyShootoutContent() {
         setErrorText(body.message || "Couldn't start the game.");
         return;
       }
-      setSubject(chosen);
-      setShots(body.shots);
-      setShotNo(0);
-      setScore(0);
+      // A game being picked up again: the server hands back the one they
+      // walked out of, which may be in a different subject from the one just
+      // tapped. Keep only the shots still to take, and start from the score
+      // already earned — the server marked those shots when they were taken.
+      const all: Shot[] = body.shots ?? [];
+      const progress: SlotProgress = readProgress(body.progress, TOTAL_SHOTS);
+      const todo = body.resumed ? all.filter((sh) => !progress[sh.slot]) : all;
+
+      setSubject(body.subject ?? chosen);
+      setResumed(!!body.resumed);
+      setScore(body.resumed ? scoreProgress(progress) : 0);
       answersRef.current = [];
       setResult(null);
+
+      // Every shot already taken: nothing left to ask, so score it and show the
+      // result rather than starting a game with no shots in it.
+      if (todo.length === 0) {
+        setShots(all);
+        setShotNo(0);
+        await finishGame();
+        return;
+      }
+
+      setShots(todo);
+      setShotNo(0);
       setPhase("question");
     } catch {
       setErrorText("Couldn't start the game. Please check your connection and try again.");
@@ -174,7 +214,7 @@ function PenaltyShootoutContent() {
     let correctText = "";
     try {
       const res = await apiRequest("POST", `/api/students/${student!.id}/penalty/answer`, {
-        subject, ref: shot.ref, answerText: value,
+        subject, slot: shot.slot, ref: shot.ref, answerText: value,
       });
       const body = await res.json();
       correct = !!body.correct;
@@ -254,6 +294,7 @@ function PenaltyShootoutContent() {
     setShotNo(0);
     setResult(null);
     setSubject("");
+    setResumed(false);
   };
 
   if (!student || !isPrimaryForm(student.form)) return null;
@@ -354,14 +395,32 @@ function PenaltyShootoutContent() {
                     {plays ? playsMessage(plays) : ""}
                   </p>
                   <p className="text-xs text-muted-foreground mt-2">{PLAYS_TEXT.resetNote}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{RESUME_TEXT.noCost}</p>
                 </div>
 
-                <p className="text-sm font-medium">Pick a subject:</p>
+                {/* A game they walked out of. Offered on its own, above the
+                    subjects, because picking any subject goes back to it —
+                    the server will not start a second game while one is open. */}
+                {canResume && (
+                  <button
+                    onClick={() => startGame(resumeSubject)}
+                    disabled={starting}
+                    className="w-full text-left rounded-xl border-2 border-primary bg-primary/10 px-4 py-4 hover:bg-primary/15 active:scale-[0.99] transition-transform disabled:opacity-60"
+                    data-testid="button-resume-game"
+                  >
+                    <div className="font-semibold text-lg">Carry on with {resumeSubject}</div>
+                    <div className="text-xs text-muted-foreground mt-1" data-testid="text-resume-banner">
+                      {RESUME_TEXT.banner}
+                    </div>
+                  </button>
+                )}
+
+                <p className="text-sm font-medium">{canResume ? "Or pick a subject:" : "Pick a subject:"}</p>
                 {subjects.map((s) => (
                   <button
                     key={s.subject}
                     onClick={() => startGame(s.subject)}
-                    disabled={starting || (plays?.left ?? 0) <= 0}
+                    disabled={starting || (!canResume && (plays?.left ?? 0) <= 0)}
                     className="w-full text-left rounded-xl border-2 border-primary/25 bg-primary/5 px-4 py-4 hover:bg-primary/10 active:scale-[0.99] transition-transform disabled:opacity-60"
                     data-testid={`subject-${s.subject}`}
                   >
@@ -402,6 +461,11 @@ function PenaltyShootoutContent() {
                 <div className="text-xs text-muted-foreground">
                   {isKeeperRound ? "Save" : "Shot"} {shot.index + 1} of {SHOTS_PER_ROUND} · {subject}
                 </div>
+                {resumed && (
+                  <div className="text-xs text-muted-foreground" data-testid="text-resumed-note">
+                    {RESUME_TEXT.where("shot", shot.slot + 1, TOTAL_SHOTS, score)}
+                  </div>
+                )}
               </div>
               <div className="text-right">
                 <div className="text-2xl font-bold tabular-nums" data-testid="live-score">{score}</div>

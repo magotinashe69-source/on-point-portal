@@ -17,6 +17,9 @@
 //   3. The game that was issued is what gets marked. Its questions are stored
 //      when the play is spent, and the finish is scored slot by slot against
 //      them, so nothing the browser sends decides which question was asked.
+//   4. A game walked out of is kept, not thrown away. Leaving does not use up
+//      the play — come back and the same game is waiting at the round it had
+//      reached, with the rounds already played still marked.
 
 import { storage } from "./storage";
 import type { Student, Assignment } from "@shared/schema";
@@ -29,8 +32,8 @@ import {
 } from "@shared/blaster";
 import { awardXp, type XpAward } from "./xp";
 import { recordActivity } from "./streaks";
-import { activeGame, clearActiveGame, getPlayState, spendPlay } from "./game-plays";
-import type { PlayState } from "@shared/game-plays";
+import { activeGame, clearActiveGame, getPlayState, recordSlot, spendPlay } from "./game-plays";
+import { scoreProgress, type PlayState, type SlotProgress } from "@shared/game-plays";
 
 // One question a child may be asked, tied to the assignment it came from.
 interface PoolItem {
@@ -133,21 +136,93 @@ export async function buildGame(student: Student): Promise<BlastGame | null> {
   return { rounds, secondsPerRound: SECONDS_PER_ROUND };
 }
 
+/**
+ * Rebuild the game that was already issued, from the refs stored with the play.
+ *
+ * Used to hand a half-finished game back to the child who walked out of it. The
+ * questions are exactly the ones they were asked — that is the whole point, and
+ * why quitting cannot be used to re-roll for an easier set.
+ *
+ * A round whose question has since gone (the teacher deleted the assignment) is
+ * left out of the rebuilt game and its slot reported in `missing`, so the
+ * caller can write it down as a miss rather than leave the game unfinishable.
+ */
+export async function rebuildGame(
+  student: Student, refs: string[],
+): Promise<{ game: BlastGame; missing: number[] }> {
+  const pool = await questionPool(student);
+  const numbers = numericPool(pool);
+  const rounds: BlastRound[] = [];
+  const missing: number[] = [];
+
+  refs.forEach((ref, i) => {
+    const found = findByRef(pool, ref);
+    const targets = found ? buildShotOptions(found.question, numbers) : null;
+    if (!found || !targets) { missing.push(i); return; }
+    rounds.push({
+      ref,
+      index: i,
+      subject: found.subject,
+      questionText: found.question.questionText,
+      targets,
+      seconds: SECONDS_PER_ROUND,
+    });
+  });
+
+  return { game: { rounds, secondsPerRound: SECONDS_PER_ROUND }, missing };
+}
+
 export interface StartedBlast {
   game: BlastGame;
   plays: PlayState;
+  /** True when this is a game they had already started and walked away from. */
+  resumed: boolean;
+  /** What has happened so far, one entry per round. Empty for a new game. */
+  progress: SlotProgress;
+  /** The round to put them back on. 0 for a new game. */
+  resumeSlot: number;
 }
 
 /**
- * Start a blast: check they have a play, build it, then spend the play.
+ * Start a blast — or hand back the one they walked away from.
  *
- * Same order and same reasoning as Penalty Shootout — a child must never be
- * charged for a game that could not be built.
+ * Resuming comes FIRST, before plays are even looked at. A child who left a
+ * game half-played has already paid for it, so they are put back into it
+ * whatever their balance says: the alternative is charging them twice for one
+ * game, or telling a child with an unfinished game that they are out of plays.
+ *
+ * Only when there is nothing to go back to is a new game built and a play
+ * spent, and in that order on purpose — a child must never be charged for a
+ * game that could not be built.
  */
 export async function startGame(
   student: Student,
 ): Promise<StartedBlast | { outOfPlays: true; plays: PlayState } | null> {
   const plays = await getPlayState(student, "blaster");
+
+  // A game left half-finished: give it straight back, at the round they reached.
+  const active = await activeGame(student, "blaster");
+  if (active.resumable) {
+    const { game, missing } = await rebuildGame(student, active.refs);
+
+    // A round whose question has gone since the game was issued — the teacher
+    // deleted the assignment while it sat half-played. Written down as a miss
+    // now, so the game can still be finished instead of waiting for ever on a
+    // round that can no longer be shown. The child is not asked it.
+    for (const slot of missing) {
+      await recordSlot(student, "blaster", slot, { answerText: "", correct: false, timedOut: true });
+    }
+
+    const now = missing.length ? await activeGame(student, "blaster") : active;
+    return {
+      game,
+      plays,
+      resumed: true,
+      progress: now.progress,
+      resumeSlot: now.resumeSlot,
+    };
+  }
+
   if (plays.left <= 0) return { outOfPlays: true, plays };
 
   const game = await buildGame(student);
@@ -156,25 +231,51 @@ export async function startGame(
   const spent = await spendPlay(student, "blaster", game.rounds.map((r) => r.ref), null);
   if (!spent) return { outOfPlays: true, plays };
 
-  return { game, plays: spent };
+  return { game, plays: spent, resumed: false, progress: [], resumeSlot: 0 };
 }
 
 /**
- * Mark ONE round, for the instant "hit!" or "missed" the game needs.
- * Marking is the existing auto-marker, untouched.
+ * Mark ONE round, for the instant "hit!" or "missed" the game needs, and write
+ * the result down before replying.
+ *
+ * Identified by SLOT, not by question: a game may legitimately ask the same
+ * question twice, so the ref alone cannot say which round is being answered.
+ * The ref is still checked against the slot, so an answer meant for one round
+ * cannot be applied to another.
+ *
+ * Writing the mark down as it happens is what makes walking away safe — the
+ * round is already saved, so it survives the tab closing. It also means a round
+ * can only be played once: replaying one whose answer has already been shown
+ * returns what happened the first time and changes nothing.
+ *
+ * Marking itself is the existing auto-marker, untouched.
  */
 export async function markRound(
-  student: Student, ref: string, answerText: string,
-): Promise<{ correct: boolean; correctAnswerDisplay: string; explanation?: string } | null> {
+  student: Student, slot: number, ref: string, answerText: string, timedOut = false,
+): Promise<{ correct: boolean; correctAnswerDisplay: string; explanation?: string; alreadyPlayed?: boolean } | null> {
+  const active = await activeGame(student, "blaster");
+  if (slot < 0 || slot >= active.refs.length) return null;
+  if (active.refs[slot] !== ref) return null; // this answer is not for this round
+
   const pool = await questionPool(student);
   const found = findByRef(pool, ref);
   if (!found) return null;
 
   const result = markAnswer(found.question, answerText);
+
+  // A round that timed out counts as played and wrong: the targets got away.
+  const correct = timedOut ? false : result.correct;
+  const stored = await recordSlot(student, "blaster", slot, {
+    answerText: timedOut ? "" : answerText,
+    correct,
+    timedOut,
+  });
+
   return {
-    correct: result.correct,
+    correct: stored ? correct : (active.progress[slot]?.correct ?? correct),
     correctAnswerDisplay: result.correctAnswerDisplay,
     explanation: result.explanation,
+    alreadyPlayed: !stored,
   };
 }
 
@@ -182,6 +283,10 @@ export interface BlastResult {
   score: number;
   outOf: number;
   playable?: boolean;
+  /** True when rounds are still to play — the game was left, not finished. */
+  unfinished?: boolean;
+  /** The round to come back to, when unfinished. */
+  resumeSlot?: number;
   bestScore: number;
   bestOutOf: number;
   previousBest: number;
@@ -193,17 +298,26 @@ export interface BlastResult {
 }
 
 /**
- * Finish a blast: re-mark everything on the server, save a new record, award XP
- * through the existing capped system, and count the game towards the streak.
+ * Finish a blast: score it from the server's own record of what happened, save
+ * the record, award XP through the existing capped system, and count the game
+ * towards the streak.
  *
- * Scored slot by slot against the questions that were actually issued, for the
- * same reason Penalty Shootout is: a game may legitimately repeat a question,
- * so "have I seen this one before?" cannot be used to catch a replayed answer.
+ * The score comes from the rounds as they were marked and written down at the
+ * time, NOT from anything the browser sends up at the end. That is what makes a
+ * game survive being walked out of: the marks were already saved round by
+ * round, so a game finished across two sittings scores exactly what it earned.
+ * It is also the strongest form of the old rule — the browser no longer gets a
+ * say in the score at all.
+ *
+ * A finish is only accepted once every round has been played. A game with
+ * rounds still to play is left alone rather than scored early, so closing the
+ * tab at round four cannot bank a four-round game and cannot lose it either.
+ *
  * A game already finished has no stored questions left, so sending a winning
  * result up twice scores nothing the second time.
  */
 export async function finishGame(
-  student: Student, answers: BlastAnswer[],
+  student: Student, _answers: BlastAnswer[] = [],
 ): Promise<BlastResult> {
   const pool = await questionPool(student);
   const outOf = ROUNDS_PER_GAME;
@@ -218,16 +332,14 @@ export async function finishGame(
   const active = await activeGame(student, "blaster");
   if (active.refs.length === 0) return empty();
 
-  let score = 0;
-  active.refs.slice(0, outOf).forEach((ref, slot) => {
-    const answer = answers[slot];
-    if (!answer) return;            // no answer sent for this round — a miss
-    if (answer.timedOut) return;    // the targets got away — also a miss
+  // Still rounds to play: this is a game being walked out of, not finished.
+  // Leave it exactly where it is so they can come back to it.
+  if (active.resumable) {
+    return { ...empty(), playable: true, unfinished: true, resumeSlot: active.resumeSlot };
+  }
 
-    const found = findByRef(pool, ref);
-    if (!found) return;
-    if (markAnswer(found.question, answer.answerText ?? "").correct) score++;
-  });
+  // Scored from what the server marked at the time, round by round.
+  const score = scoreProgress(active.progress);
 
   await clearActiveGame(student, "blaster");
 

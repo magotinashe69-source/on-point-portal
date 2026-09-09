@@ -9,6 +9,12 @@
 //
 // The answers never arrive in the browser. The server marks each round and
 // replies "hit" or "missed", exactly as Penalty Shootout does.
+//
+// Walking away does not cost the play. Every round is written down on the
+// server as it is played, so closing the tab, running out of battery or tapping
+// "back" leaves the game exactly where it was — coming back drops the child
+// into the SAME game at the round they had reached. The rounds they already
+// played keep their marks and are never asked again.
 
 import { useEffect, useRef, useState } from "react";
 import { useLocation, Link } from "wouter";
@@ -21,7 +27,10 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { isPrimaryForm } from "@shared/schema";
 import { subjectLabel } from "@shared/weekly-report";
 import { BLASTER_TEXT, ROUNDS_PER_GAME, type BlastRound } from "@shared/blaster";
-import { PLAYS_TEXT, playsMessage, type PlayState } from "@shared/game-plays";
+import {
+  PLAYS_TEXT, RESUME_TEXT, playsMessage, readProgress, scoreProgress,
+  type PlayState, type SlotProgress,
+} from "@shared/game-plays";
 import { ArrowLeft, Loader2, Target, Trophy, Zap } from "lucide-react";
 import logoPath from "@assets/logo.webp";
 
@@ -44,8 +53,13 @@ export default function TargetBlaster() {
   const [questionCount, setQuestionCount] = useState(0);
   const [best, setBest] = useState<{ score: number; outOf: number; games: number }>({ score: 0, outOf: 0, games: 0 });
 
+  // The rounds still to play, in order. On a fresh game that is all six; on one
+  // being picked up again it is only the rounds not yet played, so a round whose
+  // answer has already been seen is never asked twice.
   const [rounds, setRounds] = useState<BlastRound[]>([]);
   const [roundNo, setRoundNo] = useState(0);
+  const [resumed, setResumed] = useState(false);
+  const [canResume, setCanResume] = useState(false);
   const [score, setScore] = useState(0);
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [lastHit, setLastHit] = useState<boolean | null>(null);
@@ -74,6 +88,7 @@ export default function TargetBlaster() {
         setPlays(body.plays);
         setQuestionCount(body.questionCount);
         setBest({ score: body.bestScore, outOf: body.bestOutOf, games: body.gamesPlayed });
+        setCanResume(!!body.resumable);
       }
       setPhase("ready");
     } catch {
@@ -113,12 +128,31 @@ export default function TargetBlaster() {
         return;
       }
 
-      setRounds(body.rounds);
+      // A game being picked up again: keep only the rounds still to play, and
+      // start from the score already earned. The server decides both — the
+      // marks were written down as each round was played.
+      const all: BlastRound[] = body.rounds ?? [];
+      const progress: SlotProgress = readProgress(body.progress, ROUNDS_PER_GAME);
+      const todo = body.resumed ? all.filter((r) => !progress[r.index]) : all;
+
       setPlays(body.plays);
-      setRoundNo(0);
-      setScore(0);
+      setResumed(!!body.resumed);
+      setCanResume(false);
+      setScore(body.resumed ? scoreProgress(progress) : 0);
       answersRef.current = [];
       setResult(null);
+
+      // Every round already played: nothing left to ask, so score it and show
+      // the result rather than starting a game with no rounds in it.
+      if (todo.length === 0) {
+        setRounds(all);
+        setRoundNo(0);
+        await finishGame();
+        return;
+      }
+
+      setRounds(todo);
+      setRoundNo(0);
       setSecondsLeft(body.secondsPerRound ?? 12);
       setPhase("round");
     } catch {
@@ -133,24 +167,24 @@ export default function TargetBlaster() {
     const round = rounds[roundNo];
     if (!round || phase !== "round") return;
 
-    // Written down before anything can go wrong, so the array always has one
-    // entry per round in order.
+    // Kept for the local "too slow" wording only. The score is the server's:
+    // it marks and saves each round as it happens, and adds them up at the end.
     answersRef.current = [...answersRef.current, { ref: round.ref, answerText, timedOut }];
 
     let hit = false;
     let correctText = "";
-    if (!timedOut) {
-      try {
-        const res = await apiRequest("POST", `/api/students/${student!.id}/blaster/answer`, {
-          ref: round.ref, answerText,
-        });
-        const body = await res.json();
-        hit = !!body.correct;
-        correctText = body.correctAnswerDisplay || "";
-      } catch {
-        // A dropped connection counts as a miss rather than freezing the game.
-        hit = false;
-      }
+    // Sent even when the round timed out, so the server writes it down as
+    // played. Otherwise coming back to the game would ask it all over again.
+    try {
+      const res = await apiRequest("POST", `/api/students/${student!.id}/blaster/answer`, {
+        slot: round.index, ref: round.ref, answerText, timedOut,
+      });
+      const body = await res.json();
+      hit = !timedOut && !!body.correct;
+      correctText = body.correctAnswerDisplay || "";
+    } catch {
+      // A dropped connection counts as a miss rather than freezing the game.
+      hit = false;
     }
 
     if (hit) setScore((s) => s + 1);
@@ -260,6 +294,7 @@ export default function TargetBlaster() {
                 </div>
                 <p className="text-sm mt-3" data-testid="text-plays-message">{playsLine}</p>
                 <p className="text-xs text-muted-foreground mt-2">{PLAYS_TEXT.resetNote}</p>
+                <p className="text-xs text-muted-foreground mt-1">{RESUME_TEXT.noCost}</p>
               </CardContent>
             </Card>
 
@@ -275,16 +310,30 @@ export default function TargetBlaster() {
                 </CardContent>
               </Card>
             ) : (
-              <Button
-                size="lg"
-                className="w-full h-14 text-lg"
-                disabled={starting || (plays?.left ?? 0) <= 0}
-                onClick={startGame}
-                data-testid="button-start-blast"
-              >
-                {starting ? <Loader2 className="h-5 w-5 mr-2 animate-spin" /> : <Zap className="h-5 w-5 mr-2" />}
-                {BLASTER_TEXT.start}
-              </Button>
+              <>
+                {canResume && (
+                  <Card className="border-primary">
+                    <CardContent className="p-4">
+                      <p className="text-sm font-medium" data-testid="text-resume-banner">
+                        {RESUME_TEXT.banner}
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+                <Button
+                  size="lg"
+                  className="w-full h-14 text-lg"
+                  /* A game already paid for can always be picked up, whatever
+                     the balance says — charging for it twice is the bug this
+                     whole path exists to avoid. */
+                  disabled={starting || (!canResume && (plays?.left ?? 0) <= 0)}
+                  onClick={startGame}
+                  data-testid="button-start-blast"
+                >
+                  {starting ? <Loader2 className="h-5 w-5 mr-2 animate-spin" /> : <Zap className="h-5 w-5 mr-2" />}
+                  {canResume ? "Carry on" : BLASTER_TEXT.start}
+                </Button>
+              </>
             )}
           </div>
         )}
@@ -293,7 +342,7 @@ export default function TargetBlaster() {
         {(phase === "round" || phase === "feedback") && round && (
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-3 flex-wrap">
-              <Badge variant="outline">{BLASTER_TEXT.round(roundNo + 1, ROUNDS_PER_GAME)}</Badge>
+              <Badge variant="outline">{BLASTER_TEXT.round(round.index + 1, ROUNDS_PER_GAME)}</Badge>
               <Badge variant="secondary">{subjectLabel(round.subject)}</Badge>
               <span className="text-sm font-semibold" data-testid="text-score">Hit {score}/{ROUNDS_PER_GAME}</span>
               {phase === "round" && (
@@ -305,6 +354,12 @@ export default function TargetBlaster() {
                 </span>
               )}
             </div>
+
+            {resumed && (
+              <p className="text-xs text-muted-foreground" data-testid="text-resumed-note">
+                {RESUME_TEXT.where("round", round.index + 1, ROUNDS_PER_GAME, score)}
+              </p>
+            )}
 
             <Card>
               <CardContent className="p-4">
@@ -382,7 +437,7 @@ export default function TargetBlaster() {
               <Button
                 variant="outline"
                 disabled={(plays?.left ?? 0) <= 0}
-                onClick={() => { setPhase("ready"); loadStatus(); }}
+                onClick={() => { setResumed(false); setPhase("ready"); loadStatus(); }}
                 data-testid="button-play-again"
               >
                 {BLASTER_TEXT.playAgain}

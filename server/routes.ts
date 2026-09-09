@@ -36,7 +36,7 @@ import {
   finishGame as finishBlast,
   availableQuestions as blasterQuestionCount,
 } from "./blaster";
-import { getAllPlayStates, getPlayState } from "./game-plays";
+import { activeGame, getAllPlayStates, getPlayState } from "./game-plays";
 import { PLAYS_TEXT } from "@shared/game-plays";
 import { BLASTER_TEXT } from "@shared/blaster";
 import { z } from "zod";
@@ -2408,10 +2408,11 @@ export async function registerRoutes(
     try {
       const student = await requirePrimaryStudent(parseInt(req.params.id), req, res);
       if (!student) return;
-      const [plays, questionCount, best] = await Promise.all([
+      const [plays, questionCount, best, active] = await Promise.all([
         getPlayState(student, "blaster"),
         blasterQuestionCount(student),
         storage.getBlasterBest(student.id),
+        activeGame(student, "blaster"),
       ]);
       res.json({
         success: true,
@@ -2420,6 +2421,10 @@ export async function registerRoutes(
         bestScore: best?.bestScore ?? 0,
         bestOutOf: best?.bestOutOf ?? 0,
         gamesPlayed: best?.gamesPlayed ?? 0,
+        // A game they walked out of, waiting to be picked up. The start screen
+        // offers to carry on with it instead of starting a new one.
+        resumable: active.resumable,
+        resumeSlot: active.resumeSlot,
       });
     } catch (error) {
       console.error("Blaster status error:", error);
@@ -2429,6 +2434,9 @@ export async function registerRoutes(
 
   // Start a blast: six rounds of targets, with no answers attached. Spends one
   // play, and remembers the questions so the finish can be marked against them.
+  //
+  // Or, if they walked out of a game earlier, hands that one back at the round
+  // it had reached and spends nothing — leaving a game does not use up the play.
   app.post("/api/students/:id/blaster/start", async (req, res) => {
     try {
       const student = await requirePrimaryStudent(parseInt(req.params.id), req, res);
@@ -2455,7 +2463,14 @@ export async function registerRoutes(
         });
       }
 
-      res.json({ success: true, ...started.game, plays: started.plays });
+      res.json({
+        success: true,
+        ...started.game,
+        plays: started.plays,
+        resumed: started.resumed,
+        progress: started.progress,
+        resumeSlot: started.resumeSlot,
+      });
     } catch (error) {
       console.error("Blaster start error:", error);
       res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
@@ -2467,11 +2482,13 @@ export async function registerRoutes(
     try {
       const student = await requirePrimaryStudent(parseInt(req.params.id), req, res);
       if (!student) return;
-      const { ref, answerText } = req.body ?? {};
-      if (typeof ref !== "string") {
+      const { slot, ref, answerText, timedOut } = req.body ?? {};
+      if (typeof ref !== "string" || typeof slot !== "number") {
         return res.status(400).json({ success: false, message: "Missing question." });
       }
-      const result = await markBlastRound(student, ref, String(answerText ?? ""));
+      // Marked and written down by slot, so the round survives the tab closing
+      // and cannot be played a second time.
+      const result = await markBlastRound(student, slot, ref, String(answerText ?? ""), !!timedOut);
       if (!result) return res.status(404).json({ success: false, message: "That question isn't part of your game." });
       res.json({ success: true, ...result });
     } catch (error) {
@@ -2507,7 +2524,19 @@ export async function registerRoutes(
     try {
       const student = await requirePrimaryStudent(parseInt(req.params.id), req, res);
       if (!student) return;
-      res.json({ success: true, subjects: await listPenaltySubjects(student) });
+      const [subjects, active] = await Promise.all([
+        listPenaltySubjects(student),
+        activeGame(student, "penalty"),
+      ]);
+      // A game they walked out of, waiting to be picked up. The subject picker
+      // offers to carry on with it instead of choosing a new subject.
+      res.json({
+        success: true,
+        subjects,
+        resumable: active.resumable,
+        resumeSubject: active.resumable ? active.subject : null,
+        resumeSlot: active.resumeSlot,
+      });
     } catch (error) {
       console.error("Penalty subjects error:", error);
       res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
@@ -2515,6 +2544,11 @@ export async function registerRoutes(
   });
 
   // Start a game: 10 shots of questions-as-buttons, with no answers attached.
+  //
+  // Or, if they walked out of a game earlier, hands that one back at the shot it
+  // had reached and spends nothing — leaving a game does not use up the play.
+  // A game in flight wins over the subject just picked, so quitting a subject
+  // that is going badly cannot be used to start a fresh one.
   app.post("/api/students/:id/penalty/start", async (req, res) => {
     try {
       const student = await requirePrimaryStudent(parseInt(req.params.id), req, res);
@@ -2544,7 +2578,14 @@ export async function registerRoutes(
         });
       }
 
-      res.json({ success: true, ...started.game, plays: started.plays });
+      res.json({
+        success: true,
+        ...started.game,
+        plays: started.plays,
+        resumed: started.resumed,
+        progress: started.progress,
+        resumeSlot: started.resumeSlot,
+      });
     } catch (error) {
       console.error("Penalty start error:", error);
       res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
@@ -2556,11 +2597,13 @@ export async function registerRoutes(
     try {
       const student = await requirePrimaryStudent(parseInt(req.params.id), req, res);
       if (!student) return;
-      const { subject, ref, answerText } = req.body ?? {};
-      if (typeof subject !== "string" || typeof ref !== "string") {
+      const { subject, slot, ref, answerText } = req.body ?? {};
+      if (typeof subject !== "string" || typeof ref !== "string" || typeof slot !== "number") {
         return res.status(400).json({ success: false, message: "Missing subject or question." });
       }
-      const result = await markPenaltyShot(student, subject, ref, String(answerText ?? ""));
+      // Marked and written down by slot, so the shot survives the tab closing
+      // and cannot be taken a second time.
+      const result = await markPenaltyShot(student, subject, slot, ref, String(answerText ?? ""));
       if (!result) return res.status(404).json({ success: false, message: "That question isn't part of your game." });
       res.json({ success: true, ...result });
     } catch (error) {
