@@ -585,8 +585,8 @@ Run it after touching either game, the plays ledger, or anything under
 ## The Question Bank
 
 A library of **reusable questions**, saved once and found again by what they
-are about. Stage 1 built the store; Stage 2 added the teacher's screens.
-Assignments do not yet *draw from* the bank — that is still to come.
+are about. Stage 1 built the store, Stage 2 the teacher's screens, Stage 3 the
+way assignments pull questions out of it.
 
 - `shared/question-bank.ts` — the shapes, the tag vocabulary, and the validator.
   Pure, no database access.
@@ -675,6 +675,46 @@ your connection" to a teacher whose connection is fine and whose question is
 merely incomplete. `client/src/lib/api-error.ts` digs the server's own words
 back out; use it wherever a request can be legitimately refused.
 
+### Assignments pull from the bank (Stage 3)
+
+"Add from bank" beside "Add question" in the assignment form opens a picker
+(`client/src/components/AddFromBankDialog.tsx`): filter and search the library,
+tick several questions, add them all at once. The filters start on the
+assignment's own subject and class, because that is what a teacher writing that
+paper is looking for.
+
+**What lands on the paper is a COPY, never a link.** This is the design, not a
+shortcut, and it is what keeps the promise the other two stages make:
+
+> bank → paper is a snapshot, and paper → bank is a snapshot. The two never
+> move together after the moment of copying.
+
+If pulling a question created a reference, then editing the library would change
+a paper a class had **already answered**, and their marks would stop matching
+the questions they were actually asked. So `bankQuestionToAssignmentQuestion()`
+in `shared/question-bank.ts` takes a full copy, gives it a **fresh question id**
+(marks link by question id, so a reused id would attach old marks to a new
+question), and the assignment is on its own from then on.
+
+`npm run check:bank` proves it the hard way: it pulls a question onto a paper,
+then **rewords the saved question, changes its answer and deletes it outright**,
+and checks the paper still asks what it asked — then has a child answer it and
+confirms the mark comes from the paper, not from the library.
+
+**The tags do not come across.** `subject`, `topic`, `form` and `difficulty`
+describe where a question sits in the **library**. On a paper the subject and
+class come from the assignment itself, and a second copy on every question would
+be one more thing to disagree with it.
+
+**Unused answer-key fields arrive with the same empty defaults a brand-new
+question has**, rather than as `undefined`. A teacher who pulls in a numeric
+question and then changes its type to multiple choice must find an options
+editor ready to type into, not a broken one.
+
+A repeat is **pointed out, not blocked** — the picker marks a question already
+on the paper, because a teacher may well want the same question twice and only
+they can say.
+
 ### Proving it — `npm run check:bank`
 
 `script/check-question-bank.ts`, in two halves.
@@ -698,7 +738,14 @@ assignment, and that a refusal reaches the screen as readable words rather than
 as "check your connection". If no server is reachable it says so plainly instead
 of failing in a way that looks like broken code.
 
-89 checks. It removes everything it creates.
+Stage 3 adds both a pure half and an end-to-end one: the converter is checked
+field by field (including that the tags and the bank id do NOT come across, and
+that a converted question marks correctly), and then a real paper is built from
+a saved question, the saved question is reworded and deleted, and the paper is
+checked to have not moved — with a child's submission marked against it to
+prove the point.
+
+111 checks. It removes everything it creates.
 
 ## Classes (forms)
 

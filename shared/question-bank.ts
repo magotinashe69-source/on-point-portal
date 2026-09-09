@@ -256,6 +256,90 @@ export const BANK_TEXT = {
     "A written question is marked by hand, so it has no answer to save. Only multiple choice, true/false, number and short text questions can go in the bank.",
 } as const;
 
+// --- Taking a question OUT of the bank and into an assignment -------------
+
+/**
+ * The shape an assignment's question form holds. Deliberately written out here
+ * rather than imported from the schema: the form carries a few fields the
+ * database question does not (`qid`, and empty defaults the inputs need), and
+ * this is the shape a converted question has to arrive in.
+ */
+export interface AssignmentQuestionDraft {
+  qid: string;
+  questionText: string;
+  maxScore: number;
+  imageUrls: string[];
+  // Always one of the four the bank holds — never "written", which the bank
+  // cannot store. Typed narrowly so the assignment form accepts it directly.
+  type: BankType;
+  options: string[];
+  correctOption: number;
+  correctBool: boolean;
+  correctNumber: number | undefined;
+  tolerance: number | undefined;
+  acceptedAnswers: string[];
+  explanation: string;
+  modelAnswer: string;
+}
+
+/**
+ * Copy a bank question into an assignment.
+ *
+ * A COPY, never a link — and that is the whole design, not a shortcut.
+ *
+ * Editing a bank question already promises not to change a paper somebody has
+ * sat (see the edit and delete warnings above). If pulling a question into an
+ * assignment created a reference instead of a copy, that promise would break
+ * the moment anyone tidied up the library: a paper a class had already answered
+ * would change under them, and their marks would stop matching the questions
+ * they were actually asked. So the two move apart at the moment of copying and
+ * never move together again, in either direction.
+ *
+ * The answer key is carried across by NAME, not by translation. That is what
+ * Stage 1 bought by giving the bank the same field names an assignment question
+ * uses — if this function ever has to start renaming things, that decision has
+ * been undone somewhere.
+ *
+ * `newId` is passed in rather than generated here so this file stays pure and
+ * the caller keeps whatever id scheme the form uses.
+ *
+ * The unused fields are filled with the same empty defaults a brand-new
+ * question gets, not left undefined. A teacher who pulls in a numeric question
+ * and then changes its type to multiple choice must find an options editor
+ * ready to type into, rather than a broken one.
+ */
+export function bankQuestionToAssignmentQuestion(
+  q: BankQuestion, newId: string,
+): AssignmentQuestionDraft {
+  return {
+    qid: newId,
+    questionText: q.questionText,
+    maxScore: q.maxScore,
+    // Bank questions carry no images: a picture belongs to the paper it was set
+    // on, not to a reusable question.
+    imageUrls: [],
+    type: q.type,
+
+    // The answer key, carried across by name.
+    options: q.options && q.options.length > 0 ? [...q.options] : ["", ""],
+    correctOption: q.correctOption ?? 0,
+    correctBool: q.correctBool ?? true,
+    correctNumber: q.correctNumber,
+    tolerance: q.tolerance,
+    acceptedAnswers:
+      q.acceptedAnswers && q.acceptedAnswers.length > 0 ? [...q.acceptedAnswers] : [""],
+    explanation: q.explanation ?? "",
+
+    // A model answer belongs to a written question, and the bank holds none.
+    modelAnswer: "",
+
+    // The tags (subject, topic, form, difficulty) are deliberately NOT carried
+    // over. They describe where a question lives in the LIBRARY. On a paper the
+    // subject and class come from the assignment itself, and a second copy on
+    // each question would be one more thing to disagree with it.
+  };
+}
+
 /** The question's type, as a teacher would say it. */
 export function typeLabel(type: BankType | string): string {
   return (BANK_TEXT.types as Record<string, string>)[type] ?? type;

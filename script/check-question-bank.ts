@@ -20,6 +20,7 @@ import { storage } from "../server/storage";
 import { markAnswer } from "../shared/auto-marking";
 import {
   validateBankQuestion,
+  bankQuestionToAssignmentQuestion,
   type NewBankQuestion,
 } from "../shared/question-bank";
 import { apiErrorMessage } from "../client/src/lib/api-error";
@@ -185,6 +186,51 @@ async function main() {
   check(markAnswer(asQuestion, "0").correct === false, "and a wrong one marks wrong");
   check(markAnswer({ ...backNum!, id: "q2" } as any, "56").correct === true,
     "a numeric bank question marks correct too");
+
+  // =======================================================================
+  section("A bank question converts into an assignment question (Stage 3)");
+  // =======================================================================
+  //
+  // Carried across by NAME, not translated. If this ever needs renaming, the
+  // decision Stage 1 made — give the bank the same field names an assignment
+  // question uses — has been undone somewhere.
+
+  const asAssignment = bankQuestionToAssignmentQuestion(backMcq!, "q_test_1");
+  check(asAssignment.questionText === mcq.questionText, "the wording comes across");
+  check(asAssignment.type === "multiple_choice", "the type comes across", asAssignment.type);
+  check(asAssignment.maxScore === 1, "the marks come across", String(asAssignment.maxScore));
+  check(
+    JSON.stringify(asAssignment.options) === JSON.stringify(mcq.options),
+    "the options come across in order", JSON.stringify(asAssignment.options),
+  );
+  check(asAssignment.correctOption === 1, "the correct answer comes across");
+  check(asAssignment.explanation === mcq.explanation, "the explanation comes across");
+  check(asAssignment.qid === "q_test_1", "it is given the new question id it was handed");
+
+  // The tags describe where a question sits in the LIBRARY. On a paper the
+  // subject and class come from the assignment itself, and a second copy on
+  // each question would be one more thing to disagree with it.
+  check(!("subject" in asAssignment), "the subject tag is NOT carried onto the paper");
+  check(!("topic" in asAssignment), "nor the topic");
+  check(!("difficulty" in asAssignment), "nor the difficulty");
+  check(!("id" in asAssignment), "and no link back to the bank row is kept");
+
+  // A converted question must be markable straight away — that is the point.
+  check(markAnswer({ ...asAssignment, id: asAssignment.qid } as any, "1").correct === true,
+    "the converted question marks correctly");
+
+  // Unused fields get the same empty defaults a brand-new question has, so a
+  // teacher who changes the type afterwards finds an editor ready to type in
+  // rather than a broken one.
+  const numAsAssignment = bankQuestionToAssignmentQuestion(backNum!, "q_test_2");
+  check(Array.isArray(numAsAssignment.options) && numAsAssignment.options.length === 2,
+    "a numeric question still arrives with an empty options editor",
+    JSON.stringify(numAsAssignment.options));
+  check(Array.isArray(numAsAssignment.acceptedAnswers) && numAsAssignment.acceptedAnswers.length === 1,
+    "and an empty accepted-answers editor");
+  check(numAsAssignment.correctNumber === 56, "while keeping its own answer");
+  check(Array.isArray(numAsAssignment.imageUrls) && numAsAssignment.imageUrls.length === 0,
+    "and carries no images — those belong to a paper, not to a saved question");
 
   // =======================================================================
   section("Questions are found by what they are about");
@@ -439,6 +485,82 @@ async function main() {
 
     const missing = await teacher.delete(`/api/question-bank/${httpId}`);
     check(missing.status === 404, "deleting it twice is a plain 404", `got ${missing.status}`);
+
+    // --- A paper built from the bank does not move when the bank does ----
+    //
+    // The whole design in one check. A question is pulled into an assignment,
+    // then the saved one is reworded and its answer changed, then deleted
+    // outright. The paper must not budge, and a child answering it must be
+    // marked against what the paper actually asks.
+
+    const sourceRes = await teacher.post("/api/question-bank", {
+      questionText: `Capital of France? ${stamp}`,
+      type: "short_text", maxScore: 1, acceptedAnswers: ["Paris"],
+      subject: "GEOGRAPHY", topic: TOPIC, form: "Form 2", difficulty: "easy",
+    });
+    const source = sourceRes.body?.question;
+    check(!!source, "a question to pull from is saved", JSON.stringify(sourceRes.body).slice(0, 120));
+
+    if (source) {
+      // What the form does when a teacher ticks it in the picker.
+      const pulled = bankQuestionToAssignmentQuestion(source, "qb1");
+
+      const paperRes = await teacher.post("/api/assignments", {
+        subject: "GEOGRAPHY", topic: "Capitals", form: "Form 2",
+        title: `Built from the bank ${stamp}`,
+        instructions: "Answer the question.",
+        dueDate: "2026-12-01", totalMarks: 1, createdById: 1,
+        questions: [{ ...pulled, id: pulled.qid }],
+      });
+      const paper = paperRes.body?.assignment;
+      check(!!paper, "an assignment is created from it", JSON.stringify(paperRes.body).slice(0, 160));
+
+      if (paper) {
+        // Now change the saved question completely, and delete it.
+        await teacher.patch(`/api/question-bank/${source.id}`, {
+          questionText: `Capital of Germany? ${stamp}`,
+          acceptedAnswers: ["Berlin"],
+          maxScore: 5,
+          difficulty: "hard",
+        });
+        await teacher.delete(`/api/question-bank/${source.id}`);
+
+        const paperAfter = (await teacher.get(`/api/assignments/${paper.id}`)).body;
+        const q = (paperAfter?.questions || [])[0];
+        check(q?.questionText === `Capital of France? ${stamp}`,
+          "the paper still asks what it asked when it was written", q?.questionText);
+        check(
+          JSON.stringify(q?.acceptedAnswers) === JSON.stringify(["Paris"]),
+          "with the answer it was written with", JSON.stringify(q?.acceptedAnswers),
+        );
+        check(q?.maxScore === 1, "and the marks it was written with", String(q?.maxScore));
+
+        // And a child answering it is marked against the PAPER, not against
+        // whatever the library says today.
+        const learner = (await teacher.post("/api/students", {
+          studentId: `QB-${stamp}`, fullName: `Bank Paper Child ${stamp}`,
+          gender: "Female", form: "Form 2",
+        })).body?.student;
+
+        if (learner) {
+          const pupil = new Session();
+          await pupil.post("/api/auth/student/login", {
+            fullName: learner.fullName, password: "bankpw123",
+          });
+          const handIn = await pupil.post("/api/submissions", {
+            assignmentId: paper.id, studentId: learner.id,
+            answers: [{ questionId: pulled.qid, answerText: "Paris" }],
+          });
+          check(handIn.body?.mark?.totalScore === 1,
+            "a child answering the paper is marked against the paper, not the library",
+            JSON.stringify(handIn.body?.mark));
+
+          await teacher.delete(`/api/students/${learner.id}`);
+        }
+
+        await teacher.delete(`/api/assignments/${paper.id}`);
+      }
+    }
 
     // --- What the teacher actually READS when a save is refused ----------
     //

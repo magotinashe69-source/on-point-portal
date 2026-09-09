@@ -13,6 +13,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Checkbox } from "@/components/ui/checkbox";
 import { BulkPasteDialog } from "@/components/BulkPasteDialog";
 import { SaveToBankDialog, type BankableQuestion } from "@/components/SaveToBankDialog";
+import { AddFromBankDialog } from "@/components/AddFromBankDialog";
+import { bankQuestionToAssignmentQuestion, type BankQuestion } from "@shared/question-bank";
 import { splitPastedLines, type SkippedLine } from "@/lib/bulk-paste";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
@@ -277,6 +279,33 @@ export default function CreateAssignment() {
       tolerance: q.tolerance,
       acceptedAnswers: q.acceptedAnswers,
       explanation: q.explanation,
+    });
+  };
+
+  // Whether the "add from bank" picker is open.
+  const [pickingFromBank, setPickingFromBank] = useState(false);
+
+  /**
+   * Add copies of the chosen bank questions to the end of this paper.
+   *
+   * Copies, with a fresh question id each. Nothing links them back to the
+   * library afterwards: editing a saved question later must not change a paper
+   * a class may already have answered, which is the promise the Question Bank
+   * screen makes and this is the half that keeps it.
+   *
+   * The assignment is NOT saved here — the questions land in the form like any
+   * others, and the teacher saves the paper when they are ready.
+   */
+  const addQuestionsFromBank = (chosen: BankQuestion[]) => {
+    if (chosen.length === 0) return;
+    for (const q of chosen) {
+      append(bankQuestionToAssignmentQuestion(q, newQid()));
+    }
+    toast({
+      title: chosen.length === 1
+        ? "1 question added from the bank"
+        : `${chosen.length} questions added from the bank`,
+      description: "They are copies — editing the saved question later will not change this paper.",
     });
   };
 
@@ -872,6 +901,17 @@ export default function CreateAssignment() {
                         <ClipboardPaste className="h-4 w-4 mr-2" />
                         Paste questions
                       </Button>
+                      {/* Pull a saved question in, rather than typing it again. */}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPickingFromBank(true)}
+                        data-testid="button-add-from-bank"
+                      >
+                        <Library className="h-4 w-4 mr-2" />
+                        Add from bank
+                      </Button>
                       <Button
                         type="button"
                         variant="outline"
@@ -1278,6 +1318,19 @@ export default function CreateAssignment() {
                     cancel: "button-paste-cancel",
                   }}
                 />
+
+                {/* Choosing saved questions to copy into this paper. */}
+                {pickingFromBank && (
+                  <AddFromBankDialog
+                    defaultSubject={formMethods.getValues("subject")}
+                    defaultForm={formMethods.getValues("form")}
+                    alreadyAdded={(formMethods.getValues("questions") || []).map(
+                      (q: { questionText?: string }) => q.questionText || "",
+                    )}
+                    onAdd={addQuestionsFromBank}
+                    onClose={() => setPickingFromBank(false)}
+                  />
+                )}
 
                 {/* Saving one question to the reusable library. Opened from the
                     "Save to bank" button on a question; changes nothing here. */}
