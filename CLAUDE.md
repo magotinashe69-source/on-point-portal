@@ -71,6 +71,13 @@ appears nowhere in what parent A is sent, that a made-up pupil id is refused
 with 403 rather than 404 (a 404 would reveal which ids exist), and that a
 logged-out caller gets nothing. It tidies up the accounts it made.
 
+It also builds its own Stage 3 pupil and Form 1 pupil to check the game-plays
+view: that a parent is shown the *same* figures their child is shown (a real
+game is played, then the two endpoints are compared against each other), that
+the week strip is seven days newest-first, that earned and used both count both
+games, that a Form child's parent is told the games do not apply rather than
+shown zeros, and that the view cannot be posted to.
+
 It ends with one check that reads the source rather than the server: no login
 page may call `logout()`, which would destroy the session it had just created
 (see "A login page must never call `logout()`" below).
@@ -205,6 +212,50 @@ observation: a middleware on `/api/parent` refuses anything that is not a GET
 with **405**. Without it an unmatched POST does not fail loudly — it falls
 through to the catch-all and answers **200 with the React page**, which reads
 like it worked.
+
+### What a parent sees about the games
+
+`GET /api/parent/plays` — what the games cost in homework, and what has been
+earned and used. Shapes and wording in `shared/parent-plays.ts`; the figures are
+gathered in `server/parent-plays.ts`. Like every other parent address except the
+one below, it carries **no pupil id**.
+
+A parent's real question about the games is not "what did he score?" but
+**"is the phone being earned, or just used?"** — so the view is built around the
+deal the child is on, and a parent can read homework and screen time as the same
+number, because they are.
+
+Three rules it follows:
+
+1. **The parent's figures are the child's figures.** Today's numbers come from
+   `getPlayState()` — the same function the child's own game screens use — not
+   from counting again. A parent quoted "2 left" while their child's screen says
+   3 is worse than no view at all. `npm run check:parents` plays a real game and
+   then compares the two endpoints against each other, rather than against
+   numbers typed into the test.
+2. **Every figure counts BOTH games**, so they read against each other: earned
+   4, used 3, left 1. One assignment earns a play of *each* game, so the totals
+   are worked out in the builder (`playsEarned`) rather than left for the page to
+   multiply out — a page doing its own arithmetic is exactly how one figure ends
+   up per-game and the one beside it a total. The per-game split is the lines
+   underneath.
+3. **Forms 1-2 get told plainly.** The games are Stages 3-6 only, so a secondary
+   child's parent gets `available: false` and a sentence saying so, never a row
+   of zeros — zeros would read as "your child has earned nothing".
+
+The week strip is seven days, newest first. Plays **earned** on a past day are
+recounted from the assignments handed in that day, exactly as today's are, since
+earned is never stored: if a teacher deletes an assignment, the plays it earned
+stop showing in the history too. That is the honest reading — the work is gone —
+and it is the same rule the child's own screen follows. Plays **used** are the
+stored figure.
+
+Like the rest of the portal it is a **GET**: a parent can see the plays but
+cannot grant them, take them away, or unlock a game.
+
+The card says plainly that it counts plays, **not minutes** — the portal does
+not record how long a child plays for, in the same spirit as the attendance
+note.
 
 ### Completed work, and the one id a parent can edit
 
@@ -540,6 +591,7 @@ shared/
   schema.ts       # Drizzle tables, TypeScript types, login schemas
   weekly-report.ts # Weekly parent report: shape, week maths, WhatsApp message
   parent-overview.ts # The parent's fuller view of their child: shapes + wording
+  parent-plays.ts  # The parent's view of game plays: shapes + wording
   parent-work.ts   # Completed work, question by question, areas to practise
 script/
   check-parent-security.ts  # npm run check:parents — the parent security test

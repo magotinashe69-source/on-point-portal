@@ -227,6 +227,21 @@ async function main() {
     username: credsA.username,
     password: credsA.password,
   });
+  // A rate-limited login is not a broken portal, but it looks exactly like one:
+  // every request after it comes back 401 and the rest of this file turns red
+  // for the wrong reason. Say so once and stop, rather than printing thirty
+  // failures that all mean "wait five minutes".
+  if (/too many attempts/i.test(String(parentLogin.body?.message || "")) || parentLogin.status === 429) {
+    await teacher.delete(`/api/parents/${parentAId}`);
+    await teacher.delete(`/api/parents/${parentBId}`);
+    abort(
+      "\nParent login is rate limited (10 attempts per IP every 5 minutes, and this " +
+      "check uses four).\nWait five minutes and run it again — this is the limiter " +
+      "working, not a code failure.\nTest parent accounts removed.",
+    );
+    return;
+  }
+
   check(parentLogin.body?.success === true, "parent A can log in", JSON.stringify(parentLogin.body));
   check(parentLogin.body?.parent?.password === undefined, "the login reply does not include the password");
 
@@ -387,6 +402,209 @@ async function main() {
   check(deleted.status === 405, "deleting a piece of work is refused", `got ${deleted.status}`);
   const patched = await parentA.request("PATCH", "/api/parent/overview");
   check(patched.status === 405, "changing the overview is refused", `got ${patched.status}`);
+
+  /**
+   * Log a parent in, telling a rate-limited attempt apart from a failed one.
+   *
+   * Parent login allows 10 attempts per IP every 5 minutes (see
+   * parentLoginLimiter in server/routes.ts). This whole check uses four of
+   * them, so running it three times inside five minutes trips the limiter — and
+   * a limiter doing its job then looks exactly like a broken portal, because
+   * every request after it comes back 401.
+   *
+   * Worth keeping the limit rather than exempting the test from it: it sits in
+   * front of a child's record, and a security check that turns the security off
+   * to make itself pass is not a check. So the limiter stays and this says
+   * plainly what happened instead.
+   */
+  async function loginParent(session: Session, username: string, password: string) {
+    const res = await session.post("/api/auth/parent/login", { username, password });
+    const message = String(res.body?.message || "");
+    if (/too many attempts/i.test(message) || res.status === 429) return "rate-limited" as const;
+    return res.body?.success === true ? ("ok" as const) : ("failed" as const);
+  }
+
+  // --- Game plays, as a parent sees them -----------------------------------
+  //
+  // The parent's figures must be the CHILD'S figures. A parent quoted "2 left"
+  // while their child's screen says 3 is worse than no view at all, so this
+  // section plays a real game as a real Stage 3 pupil and then compares the two
+  // endpoints against each other rather than against numbers typed in here.
+  //
+  // It builds its own pupils, because the two children borrowed above come from
+  // whatever is on the register and may be in any class — and the games are
+  // Stages 3-6 only.
+
+  console.log("\nGame plays, as a parent sees them");
+
+  const playStamp = Date.now().toString().slice(-6);
+
+  const gamesChild = (await teacher.post("/api/students", {
+    studentId: `PP3-${playStamp}`, fullName: `Plays Parent Child ${playStamp}`,
+    gender: "Female", form: "Stage 3",
+  })).body?.student;
+
+  const formChild = (await teacher.post("/api/students", {
+    studentId: `PPF-${playStamp}`, fullName: `Plays Form Child ${playStamp}`,
+    gender: "Male", form: "Form 1",
+  })).body?.student;
+
+  let gamesParentId: number | undefined;
+  let formParentId: number | undefined;
+
+  if (!gamesChild || !formChild) {
+    check(false, "could create the pupils for the game-plays check");
+  } else {
+    // One assignment, handed in. That is one play of EACH game earned, so two
+    // plays in the parent's terms.
+    const paper = (await teacher.post("/api/assignments", {
+      subject: "MATHS", topic: "Adding", form: "Stage 3",
+      title: `Parent Plays ${playStamp}`, instructions: "Answer all questions.",
+      dueDate: "2026-12-01", totalMarks: 2, createdById: 1,
+      questions: [
+        { id: "p1", questionText: "what is 2 + 2?", maxScore: 1, type: "numeric", correctNumber: 4, tolerance: 0 },
+        { id: "p2", questionText: "what is 3 + 3?", maxScore: 1, type: "numeric", correctNumber: 6, tolerance: 0 },
+      ],
+    })).body?.assignment;
+
+    const pupil = new Session("pupil");
+    await pupil.post("/api/auth/student/login", {
+      fullName: gamesChild.fullName, password: "playspw123",
+    });
+    await pupil.post("/api/submissions", {
+      assignmentId: paper.id, studentId: gamesChild.id,
+      answers: [{ questionId: "p1", answerText: "4" }, { questionId: "p2", answerText: "6" }],
+    });
+
+    // Play ONE game right through, so there is a used play and a record.
+    const game = await pupil.post(`/api/students/${gamesChild.id}/blaster/start`);
+    for (const r of game.body?.rounds || []) {
+      await pupil.post(`/api/students/${gamesChild.id}/blaster/answer`, {
+        slot: r.index, ref: r.ref, answerText: "4",
+      });
+    }
+    await pupil.post(`/api/students/${gamesChild.id}/blaster/finish`, { answers: [] });
+
+    // What the CHILD is told, to compare the parent's view against.
+    const childsOwn = (await pupil.get(`/api/students/${gamesChild.id}/plays`)).body?.plays;
+
+    const gp = (await teacher.post(`/api/students/${gamesChild.id}/parent`, {
+      fullName: "Test Parent Plays", username: `checkparent_p_${playStamp}`, password: "parentP123",
+    })).body;
+    gamesParentId = gp?.parent?.id;
+
+    const fp = (await teacher.post(`/api/students/${formChild.id}/parent`, {
+      fullName: "Test Parent Form", username: `checkparent_f_${playStamp}`, password: "parentF123",
+    })).body;
+    formParentId = fp?.parent?.id;
+
+    const gamesParent = new Session("games parent");
+    const gamesLogin = await loginParent(gamesParent, `checkparent_p_${playStamp}`, "parentP123");
+
+    if (gamesLogin === "rate-limited") {
+      check(false,
+        "the game-plays checks could run",
+        "parent login is rate limited (10 per 5 minutes) — this run used them up. " +
+        "Wait five minutes and run it again. This is the limiter working, not a code failure.");
+    } else {
+
+    const view = await gamesParent.get("/api/parent/plays");
+    check(view.status === 200 && view.body?.success === true,
+      "a parent can read their child's game plays", `status ${view.status}`);
+
+    const plays = view.body?.plays;
+    check(plays?.child?.id === gamesChild.id,
+      "the view is about their own child and nobody else", JSON.stringify(plays?.child));
+    check(plays?.available === true, "a Stage 3 child's games are available",
+      `got ${plays?.available}`);
+
+    // The whole point: the parent's numbers ARE the child's numbers.
+    const parentBlaster = (plays?.today?.games || []).find((g: any) => g.game === "blaster");
+    const parentPenalty = (plays?.today?.games || []).find((g: any) => g.game === "penalty");
+    check(
+      parentBlaster?.earned === childsOwn?.blaster?.earned &&
+      parentBlaster?.used === childsOwn?.blaster?.used &&
+      parentBlaster?.left === childsOwn?.blaster?.left,
+      "the parent is shown the same Target Blaster figures as the child",
+      `parent ${JSON.stringify(parentBlaster)} vs child ${JSON.stringify(childsOwn?.blaster)}`,
+    );
+    check(
+      parentPenalty?.earned === childsOwn?.penalty?.earned &&
+      parentPenalty?.used === childsOwn?.penalty?.used &&
+      parentPenalty?.left === childsOwn?.penalty?.left,
+      "the parent is shown the same Penalty Shootout figures as the child",
+      `parent ${JSON.stringify(parentPenalty)} vs child ${JSON.stringify(childsOwn?.penalty)}`,
+    );
+
+    check(plays?.today?.assignmentsHandedIn === 1,
+      "today's one assignment is what earned the plays",
+      `got ${plays?.today?.assignmentsHandedIn}`);
+    check(parentBlaster?.used === 1, "the game that was played shows as used",
+      `got ${parentBlaster?.used}`);
+
+    // The week strip: seven days, newest first, today at the top.
+    check(Array.isArray(plays?.week) && plays.week.length === 7,
+      "the week strip covers seven days", `got ${plays?.week?.length}`);
+    const daysDescending = (plays?.week || []).every(
+      (d: any, i: number, all: any[]) => i === 0 || all[i - 1].day > d.day,
+    );
+    check(daysDescending, "newest day first", JSON.stringify((plays?.week || []).map((d: any) => d.day)));
+    check(plays?.week?.[0]?.assignmentsHandedIn === 1,
+      "today's row shows the assignment handed in", JSON.stringify(plays?.week?.[0]));
+
+    // Earned and used are BOTH totals across the two games, so they can be read
+    // against each other. One assignment earns two plays, one of which was used.
+    check(plays?.week?.[0]?.playsEarned === 2,
+      "today's row counts both games — one assignment is two plays",
+      `got ${plays?.week?.[0]?.playsEarned}`);
+    check(plays?.week?.[0]?.playsUsed === 1, "and one of them was used",
+      `got ${plays?.week?.[0]?.playsUsed}`);
+
+    const blasterRecord = (plays?.records || []).find((r: any) => r.game === "blaster");
+    check(!!blasterRecord, "the finished game leaves a best score",
+      JSON.stringify(plays?.records));
+
+    // Read-only, like the rest of the portal: a parent may look at the plays
+    // but never grant, take away or unlock one.
+    const postPlays = await gamesParent.request("POST", "/api/parent/plays");
+    check(postPlays.status === 405, "a parent cannot post to the plays view",
+      `got ${postPlays.status}`);
+    const patchPlays = await gamesParent.request("PATCH", "/api/parent/plays");
+    check(patchPlays.status === 405, "nor change it", `got ${patchPlays.status}`);
+
+    // A logged-out caller gets nothing, like everywhere else.
+    const anonPlays = await new Session("anon").get("/api/parent/plays");
+    check(anonPlays.status === 401, "a logged-out caller gets nothing from the plays view",
+      `got ${anonPlays.status}`);
+
+    // A secondary child has no games at all. Their parent must be told that
+    // plainly rather than shown a row of zeros, which would read as "your child
+    // has earned nothing".
+    const formParent = new Session("form parent");
+    await loginParent(formParent, `checkparent_f_${playStamp}`, "parentF123");
+    const formView = await formParent.get("/api/parent/plays");
+    check(formView.status === 200, "a Form child's parent still gets an answer",
+      `status ${formView.status}`);
+    check(formView.body?.plays?.available === false,
+      "and is told the games do not apply to their child's class",
+      `got ${formView.body?.plays?.available}`);
+    check(
+      (formView.body?.plays?.week || []).length === 0 &&
+      (formView.body?.plays?.today?.games || []).length === 0,
+      "with no figures at all, rather than a row of zeros",
+      JSON.stringify(formView.body?.plays),
+    );
+
+    }
+
+    // Tidy up this section's own pupils and accounts. Outside the branch above,
+    // so a rate-limited run still clears up after itself.
+    if (paper) await teacher.delete(`/api/assignments/${paper.id}`);
+    if (gamesParentId) await teacher.delete(`/api/parents/${gamesParentId}`);
+    if (formParentId) await teacher.delete(`/api/parents/${formParentId}`);
+    await teacher.delete(`/api/students/${gamesChild.id}`);
+    await teacher.delete(`/api/students/${formChild.id}`);
+  }
 
   // --- The login pages must not log the parent straight back out ----------
   //

@@ -9,7 +9,11 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { REPORT_TEXT, subjectLabel, type WeeklyReport } from "@shared/weekly-report";
 import { OVERVIEW_TEXT, type ParentOverview } from "@shared/parent-overview";
 import { WORK_TEXT } from "@shared/parent-work";
-import { LogOut, Loader2, GraduationCap, CalendarDays, TrendingUp, AlertCircle, Flame, ClipboardList, MessageSquare, Megaphone, Eye, Target, ChevronRight } from "lucide-react";
+import {
+  PLAYS_PARENT_TEXT, earnedToday, leftToday, usedToday,
+  weekActiveDays, weekEarned, weekUsed, type ParentPlays,
+} from "@shared/parent-plays";
+import { LogOut, Loader2, GraduationCap, CalendarDays, TrendingUp, AlertCircle, Flame, ClipboardList, MessageSquare, Megaphone, Eye, Target, ChevronRight, Gamepad2, Trophy } from "lucide-react";
 import logoPath from "@assets/logo.webp";
 
 // What the server sends back about the child. Deliberately small: a parent sees
@@ -89,11 +93,22 @@ export default function ParentDashboard() {
     enabled: !!parent,
   });
 
+  // Game plays: what the games cost in homework, and what has been earned and
+  // used. Carries no pupil id either, for the same reason as the three above.
+  const {
+    data: playsData,
+    isLoading: playsLoading,
+  } = useQuery<{ success: boolean; plays: ParentPlays }>({
+    queryKey: ["/api/parent/plays"],
+    enabled: !!parent,
+  });
+
   if (!parent) return null;
 
   const child = data?.child;
   const report = reportData?.report;
   const overview = overviewData?.overview;
+  const plays = playsData?.plays;
 
   // The teacher's written comments, taken from the recent marks that have one.
   // Kept as its own list so a parent can read the feedback on its own without
@@ -502,6 +517,169 @@ export default function ParentDashboard() {
                   />
                   <p className="text-xs text-muted-foreground mt-2">{OVERVIEW_TEXT.activityNote}</p>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Games and screen time.
+                Placed straight after homework on purpose: the two are the same
+                number, and reading them together is the whole point. */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Gamepad2 className="h-5 w-5" />
+                  {PLAYS_PARENT_TEXT.title}
+                </CardTitle>
+                <CardDescription>{PLAYS_PARENT_TEXT.howItWorks}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {playsLoading && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+                  </div>
+                )}
+
+                {/* Forms 1-2 do not have the games. Said plainly, because a row
+                    of zeros would read as "your child has earned nothing". */}
+                {!playsLoading && plays && !plays.available && (
+                  <p className="text-sm text-muted-foreground" data-testid="text-plays-not-available">
+                    {PLAYS_PARENT_TEXT.notAvailable}
+                  </p>
+                )}
+
+                {!playsLoading && plays?.available && (
+                  <>
+                    <div className="grid grid-cols-3 gap-3">
+                      {/* All three count BOTH games, so they read against each
+                          other: earned 4, used 3, left 1. The per-game split is
+                          the lines underneath. */}
+                      <Stat
+                        icon={<ClipboardList className="h-4 w-4" />}
+                        label={PLAYS_PARENT_TEXT.earnedToday}
+                        value={String(earnedToday(plays.today.games))}
+                        testId="stat-plays-earned-today"
+                      />
+                      <Stat
+                        icon={<Gamepad2 className="h-4 w-4" />}
+                        label={PLAYS_PARENT_TEXT.usedToday}
+                        value={String(usedToday(plays.today.games))}
+                        testId="stat-plays-used-today"
+                      />
+                      <Stat
+                        icon={<Target className="h-4 w-4" />}
+                        label={PLAYS_PARENT_TEXT.leftToday}
+                        value={String(leftToday(plays.today.games))}
+                        testId="stat-plays-left-today"
+                      />
+                    </div>
+
+                    <p className="text-xs text-muted-foreground">{PLAYS_PARENT_TEXT.bothGamesNote}</p>
+
+                    {/* Where today's plays came from, in the child's own terms. */}
+                    {plays.today.assignmentsHandedIn === 0 ? (
+                      <p className="text-sm text-muted-foreground" data-testid="text-plays-nothing-today">
+                        {PLAYS_PARENT_TEXT.nothingToday}
+                      </p>
+                    ) : (
+                      <div className="space-y-1">
+                        {plays.today.games.map((g) => (
+                          <p key={g.game} className="text-sm" data-testid={`text-plays-${g.game}`}>
+                            {PLAYS_PARENT_TEXT.gameLine(g.label, g.left, g.earned)}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+
+                    <p className="text-xs text-muted-foreground">{PLAYS_PARENT_TEXT.resetNote}</p>
+
+                    {/* The week, so a parent who looks in once can still read
+                        the pattern rather than only the day they happened to
+                        open it. */}
+                    <div className="border-t pt-4">
+                      <p className="text-sm font-semibold mb-3">{PLAYS_PARENT_TEXT.week}</p>
+                      <div className="grid grid-cols-3 gap-3 mb-3">
+                        <Stat
+                          icon={<ClipboardList className="h-4 w-4" />}
+                          label={PLAYS_PARENT_TEXT.weekEarned}
+                          value={String(weekEarned(plays.week))}
+                          testId="stat-plays-week-earned"
+                        />
+                        <Stat
+                          icon={<Gamepad2 className="h-4 w-4" />}
+                          label={PLAYS_PARENT_TEXT.weekUsed}
+                          value={String(weekUsed(plays.week))}
+                          testId="stat-plays-week-used"
+                        />
+                        <Stat
+                          icon={<CalendarDays className="h-4 w-4" />}
+                          label={PLAYS_PARENT_TEXT.weekActive}
+                          value={String(weekActiveDays(plays.week))}
+                          testId="stat-plays-week-active"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        {plays.week.map((d) => (
+                          <div
+                            key={d.day}
+                            className="flex items-center justify-between gap-3 rounded-md border p-3"
+                            data-testid={`row-plays-day-${d.day}`}
+                          >
+                            <p className="text-sm font-medium">{d.day}</p>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline">
+                                {d.assignmentsHandedIn} handed in
+                              </Badge>
+                              <Badge variant={d.playsUsed > 0 ? "secondary" : "outline"}>
+                                {d.playsUsed} played
+                              </Badge>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Best scores, as encouragement rather than a report. */}
+                    <div className="border-t pt-4">
+                      <p className="text-sm font-semibold mb-3 flex items-center gap-2">
+                        <Trophy className="h-4 w-4" />
+                        {PLAYS_PARENT_TEXT.records}
+                      </p>
+                      {plays.records.length === 0 ? (
+                        <p className="text-sm text-muted-foreground" data-testid="text-plays-no-records">
+                          {PLAYS_PARENT_TEXT.recordsEmpty}
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {plays.records.map((r) => (
+                            <div
+                              key={r.game}
+                              className="flex items-center justify-between gap-3 rounded-md border p-3"
+                              data-testid={`row-plays-record-${r.game}`}
+                            >
+                              <div>
+                                <p className="font-medium">{r.label}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {r.subject ? `${subjectLabel(r.subject)} · ` : ""}
+                                  {r.gamesPlayed} played
+                                </p>
+                              </div>
+                              <Badge variant="secondary">
+                                {PLAYS_PARENT_TEXT.recordLine(r.bestScore, r.bestOutOf)}
+                              </Badge>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Said plainly, in the same spirit as the attendance note:
+                        this is plays, not minutes, and must not be read as a
+                        record of time spent. */}
+                    <p className="text-xs text-muted-foreground border-t pt-4">
+                      {PLAYS_PARENT_TEXT.notMinutes}
+                    </p>
+                  </>
+                )}
               </CardContent>
             </Card>
 

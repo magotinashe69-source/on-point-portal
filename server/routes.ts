@@ -17,6 +17,7 @@ import { isFullyAutoMarked, markSubmission, markAnswer, buildFeedback, isAutoMar
 import { awardRandomCollectible } from "./rewards";
 import { buildWeeklyReport } from "./weekly-report";
 import { buildParentOverview } from "./parent-overview";
+import { buildParentPlays } from "./parent-plays";
 import { buildCompletedWork, buildSubmissionReview, buildSupportReport } from "./parent-work";
 import { buildWhatsAppReport } from "@shared/weekly-report";
 import { awardXp, adjustXp, xpProgress, XP_PER_CORRECT, XP_COMPLETION_BONUS, XP_IMPROVEMENT_BONUS } from "./xp";
@@ -835,6 +836,31 @@ export async function registerRoutes(
       res.json({ success: true, overview });
     } catch (error) {
       console.error("Parent overview error:", error);
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
+    }
+  });
+
+  // ─── Game plays, as a parent sees them ────────────────────────────────────
+  //
+  // What the games cost in homework, and what has been earned and used. Takes
+  // NO id: the child comes from the parent's own row, like everything else on
+  // this dashboard, so there is no id here for anyone to tamper with.
+  //
+  // A GET, like the rest of the parent portal. A parent can see the plays but
+  // cannot grant them, take them away, or unlock a game — the guard on
+  // /api/parent answers 405 to anything that is not a GET.
+  app.get("/api/parent/plays", async (req, res) => {
+    try {
+      const parent = await requireParent(req, res);
+      if (!parent) return;
+
+      const student = await parentsChild(res, parent);
+      if (!student) return;
+
+      const plays = await buildParentPlays(student);
+      res.json({ success: true, plays });
+    } catch (error) {
+      console.error("Parent plays error:", error);
       res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });
