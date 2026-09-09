@@ -218,11 +218,85 @@ export const DEFAULT_BANK_LIMIT = 100;
 
 export const BANK_TEXT = {
   title: "Question Bank",
+  subtitle: "Questions you have saved, ready to use again.",
+
   difficulties: {
     easy: "Easy",
     medium: "Medium",
     hard: "Hard",
   } as Record<Difficulty, string>,
+
+  types: {
+    multiple_choice: "Multiple choice",
+    true_false: "True / False",
+    numeric: "Number",
+    short_text: "Short text",
+  } as Record<BankType, string>,
+
+  answer: "Answer",
   saved: "Saved to the question bank.",
+  searchPlaceholder: "Search the wording of a question",
+
   empty: "No saved questions match that yet.",
+  emptyLibrary:
+    "Nothing saved yet. Open an assignment, write a question, and use \u201cSave to bank\u201d on it.",
+
+  /**
+   * Said wherever a bank question is changed or removed, because a teacher
+   * cannot be expected to assume it: the library and the papers already set
+   * from it are separate things.
+   */
+  editWarning:
+    "This changes only the saved copy. Assignments that already use this question are not affected, and marks already given stand.",
+  deleteWarning:
+    "This removes it from the library only. Assignments that already use this question keep it, and marks already given stand.",
+
+  /** Shown when a teacher tries to bank a question that has no answer key. */
+  cannotSaveWritten:
+    "A written question is marked by hand, so it has no answer to save. Only multiple choice, true/false, number and short text questions can go in the bank.",
 } as const;
+
+/** The question's type, as a teacher would say it. */
+export function typeLabel(type: BankType | string): string {
+  return (BANK_TEXT.types as Record<string, string>)[type] ?? type;
+}
+
+/**
+ * The answer in words, for a teacher scanning the library.
+ *
+ * One place, so the browse screen, the save dialog and anything later all
+ * describe an answer the same way. It shows the answer deliberately: this is a
+ * teacher-only screen, and a question whose answer cannot be seen cannot be
+ * checked before it is set as homework.
+ */
+export function describeAnswer(q: {
+  type: BankType | string;
+  options?: string[];
+  correctOption?: number;
+  correctBool?: boolean;
+  correctNumber?: number;
+  tolerance?: number;
+  acceptedAnswers?: string[];
+}): string {
+  switch (q.type) {
+    case "multiple_choice": {
+      const options = q.options ?? [];
+      const at = q.correctOption;
+      return at != null && at >= 0 && at < options.length ? options[at] : "\u2014";
+    }
+    case "true_false":
+      return q.correctBool ? "True" : "False";
+    case "numeric": {
+      if (q.correctNumber == null) return "\u2014";
+      // A tolerance changes what counts as right, so it belongs beside the
+      // number rather than hidden — "10" and "10 (\u00b10.5)" are different keys.
+      return q.tolerance ? `${q.correctNumber} (\u00b1${q.tolerance})` : String(q.correctNumber);
+    }
+    case "short_text": {
+      const accepted = (q.acceptedAnswers ?? []).filter((a) => a && a.trim());
+      return accepted.length > 0 ? accepted.join(", ") : "\u2014";
+    }
+    default:
+      return "\u2014";
+  }
+}

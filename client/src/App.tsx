@@ -22,6 +22,7 @@ import SubmissionReview from "@/pages/teacher/submission-review";
 import TeacherExport from "@/pages/teacher/export";
 import DailyReport from "@/pages/teacher/daily-report";
 import TeacherGamePlays from "@/pages/teacher/game-plays";
+import QuestionBankPage from "@/pages/teacher/question-bank";
 import ParentLogin from "@/pages/parent/login";
 import ParentDashboard from "@/pages/parent/dashboard";
 import { ParentWorkList, ParentWorkDetail } from "@/pages/parent/work";
@@ -61,6 +62,7 @@ function Router() {
       <Route path="/teacher/export" component={TeacherExport} />
       <Route path="/teacher/daily-report" component={DailyReport} />
       <Route path="/teacher/game-plays" component={TeacherGamePlays} />
+      <Route path="/teacher/question-bank" component={QuestionBankPage} />
       {/* Parent portal. A parent account can only ever see its own child —
           the server enforces that on every request, not these routes. */}
       <Route path="/parent/login" component={ParentLogin} />

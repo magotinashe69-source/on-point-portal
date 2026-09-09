@@ -1,11 +1,16 @@
-// The Question Bank, Stage 1 — proving the table exists and holds a question.
-//
-// Unlike the other check scripts this one does NOT talk to a running server.
-// There are no HTTP endpoints for the bank yet (that comes with the teacher
-// screen in the next stage), so it runs in-process against storage directly —
-// which is the "internal way" this stage is about.
+// The Question Bank — the store (Stage 1) and the teacher's screens (Stage 2).
 //
 //   npm run check:bank
+//
+// Two halves. The first runs IN-PROCESS against storage: it calls
+// ensureSchema() itself, which is what makes "was the table created?"
+// answerable without a server. The second half walks the teacher's journey over
+// HTTP against a running server — save a question with tags, find it, filter
+// it, search it, edit it — which is the sequence the screens actually perform.
+//
+// So: start the server first (npm run dev). The in-process half runs either
+// way; the HTTP half says plainly if it cannot reach a server rather than
+// failing in a way that looks like broken code.
 //
 // It creates its own questions, tagged with a run stamp, and removes them at
 // the end. It never touches anything else in the database.
@@ -17,6 +22,7 @@ import {
   validateBankQuestion,
   type NewBankQuestion,
 } from "../shared/question-bank";
+import { apiErrorMessage } from "../client/src/lib/api-error";
 
 let passed = 0;
 let failed = 0;
@@ -31,6 +37,45 @@ function section(title: string) { console.log(`\n${title}`); }
 // collide with a previous run left half-finished.
 const stamp = Date.now().toString().slice(-6);
 const TOPIC = `BankCheck ${stamp}`;
+
+const BASE = "http://localhost:5000";
+const TEACHER = { email: "onpointeducationcentremoza@gmail.com", password: "onpoint123" };
+
+/** A logged-in browser, near enough — it keeps the session cookie. */
+class Session {
+  private cookie = "";
+  async request(method: string, path: string, body?: unknown) {
+    const res = await fetch(BASE + path, {
+      method,
+      headers: {
+        ...(body ? { "Content-Type": "application/json" } : {}),
+        ...(this.cookie ? { Cookie: this.cookie } : {}),
+      },
+      body: body ? JSON.stringify(body) : undefined,
+      redirect: "manual",
+    });
+    const setCookie = res.headers.get("set-cookie");
+    if (setCookie) this.cookie = setCookie.split(";")[0];
+    let json: any = null;
+    try { json = JSON.parse(await res.text()); } catch { /* not JSON */ }
+    return { status: res.status, body: json };
+  }
+  get(p: string) { return this.request("GET", p); }
+  post(p: string, b?: unknown) { return this.request("POST", p, b); }
+  patch(p: string, b?: unknown) { return this.request("PATCH", p, b); }
+  delete(p: string) { return this.request("DELETE", p); }
+}
+
+async function serverIsUp(): Promise<boolean> {
+  try {
+    const res = await fetch(BASE + "/api/question-bank");
+    // 401 is the right answer to a logged-out caller, and proves the route is
+    // registered — which a 200 (the React page from the catch-all) would not.
+    return res.status === 401;
+  } catch {
+    return false;
+  }
+}
 
 async function main() {
   console.log(`\nQuestion Bank check (topic tag "${TOPIC}")\n`);
@@ -243,6 +288,184 @@ async function main() {
 
   await storage.deleteBankQuestion(extra.id);
   check(!(await storage.getBankQuestion(extra.id)), "a deleted question is gone");
+
+  // =======================================================================
+  section("The teacher's journey, over HTTP (Stage 2)");
+  // =======================================================================
+  //
+  // The sequence the screens actually perform: save a question with tags from
+  // the assignment form, open the bank and see it, narrow by subject and
+  // difficulty, search the wording, then edit it and see the change.
+
+  if (!(await serverIsUp())) {
+    check(false, "a server is running to check the teacher's screens against",
+      `nothing answering on ${BASE} — start it with "npm run dev" and run this again`);
+  } else {
+    const teacher = new Session();
+    const login = await teacher.post("/api/auth/teacher/login", TEACHER);
+    check(login.body?.success === true, "the teacher can sign in", JSON.stringify(login.body).slice(0, 120));
+
+    // --- 1. Save a question to the bank, with its tags -------------------
+    const savedRes = await teacher.post("/api/question-bank", {
+      questionText: `What is the capital of Zimbabwe? ${stamp}`,
+      type: "short_text",
+      maxScore: 1,
+      acceptedAnswers: ["Harare"],
+      subject: "GEOGRAPHY", topic: TOPIC, form: "Stage 5", difficulty: "easy",
+    });
+    check(savedRes.body?.success === true, "a question is saved to the bank with its tags",
+      JSON.stringify(savedRes.body).slice(0, 160));
+    const httpId: number | undefined = savedRes.body?.question?.id;
+    if (httpId) saved.push(httpId);
+
+    check(savedRes.body?.question?.subject === "GEOGRAPHY"
+      && savedRes.body?.question?.difficulty === "easy"
+      && savedRes.body?.question?.form === "Stage 5",
+      "and comes back carrying those tags", JSON.stringify(savedRes.body?.question));
+
+    // The teacher who saved it is taken from the SESSION, never the body —
+    // so a browser cannot put another teacher's name on a question.
+    const impersonated = await teacher.post("/api/question-bank", {
+      questionText: `Impersonation attempt ${stamp}`,
+      type: "true_false", correctBool: true, maxScore: 1,
+      subject: "MATHS", topic: TOPIC, form: "Stage 3", difficulty: "easy",
+      createdById: 999999,
+    });
+    if (impersonated.body?.question?.id) saved.push(impersonated.body.question.id);
+    check(impersonated.body?.question?.createdById !== 999999,
+      "the teacher in the body is ignored — the author comes from the session",
+      `got ${impersonated.body?.question?.createdById}`);
+
+    // --- 2. It appears when the bank is opened ---------------------------
+    const listed = await teacher.get(`/api/question-bank?topic=${encodeURIComponent(TOPIC)}`);
+    check(listed.body?.success === true, "the question bank opens", `status ${listed.status}`);
+    check((listed.body?.questions || []).some((q: any) => q.id === httpId),
+      "and the question just saved is in it");
+
+    // --- 3. Filters ------------------------------------------------------
+    const bySubject = await teacher.get(
+      `/api/question-bank?topic=${encodeURIComponent(TOPIC)}&subject=GEOGRAPHY`);
+    check((bySubject.body?.questions || []).length === 1,
+      "filtering by subject narrows to it", `got ${(bySubject.body?.questions || []).length}`);
+
+    const byDifficulty = await teacher.get(
+      `/api/question-bank?topic=${encodeURIComponent(TOPIC)}&subject=GEOGRAPHY&difficulty=easy`);
+    check((byDifficulty.body?.questions || []).length === 1,
+      "and subject together with difficulty still finds it",
+      `got ${(byDifficulty.body?.questions || []).length}`);
+
+    const wrongDifficulty = await teacher.get(
+      `/api/question-bank?topic=${encodeURIComponent(TOPIC)}&subject=GEOGRAPHY&difficulty=hard`);
+    check((wrongDifficulty.body?.questions || []).length === 0,
+      "asking for the wrong difficulty finds nothing — the filter really filters",
+      `got ${(wrongDifficulty.body?.questions || []).length}`);
+
+    // An untouched dropdown sends nothing, which must mean "no filter" rather
+    // than "match the empty string".
+    const blankFilters = await teacher.get(
+      `/api/question-bank?topic=${encodeURIComponent(TOPIC)}&subject=&difficulty=&form=`);
+    check((blankFilters.body?.questions || []).length >= 1,
+      "empty filter values mean 'any', not 'match nothing'",
+      `got ${(blankFilters.body?.questions || []).length}`);
+
+    // --- 4. Search the wording -------------------------------------------
+    const found = await teacher.get(
+      `/api/question-bank?topic=${encodeURIComponent(TOPIC)}&search=capital`);
+    check((found.body?.questions || []).some((q: any) => q.id === httpId),
+      "searching a word in the question finds it");
+    const notFound = await teacher.get(
+      `/api/question-bank?topic=${encodeURIComponent(TOPIC)}&search=zzzznotaword`);
+    check((notFound.body?.questions || []).length === 0,
+      "and a word that is in no question finds nothing",
+      `got ${(notFound.body?.questions || []).length}`);
+
+    // --- 5. Edit it, and see the change ----------------------------------
+    const edited = await teacher.patch(`/api/question-bank/${httpId}`, {
+      questionText: `What is the capital city of Zimbabwe? ${stamp}`,
+      difficulty: "medium",
+      maxScore: 2,
+    });
+    check(edited.body?.success === true, "a saved question can be edited",
+      JSON.stringify(edited.body).slice(0, 160));
+
+    const afterEdit = await teacher.get(`/api/question-bank?topic=${encodeURIComponent(TOPIC)}&search=capital city`);
+    const editedRow = (afterEdit.body?.questions || []).find((q: any) => q.id === httpId);
+    check(!!editedRow, "the edit is there when the bank is read again");
+    check(editedRow?.difficulty === "medium", "the new difficulty stuck", editedRow?.difficulty);
+    check(editedRow?.maxScore === 2, "the new marks stuck", String(editedRow?.maxScore));
+    check(
+      (editedRow?.acceptedAnswers || []).includes("Harare"),
+      "and the answer it was not asked to change is untouched",
+      JSON.stringify(editedRow?.acceptedAnswers),
+    );
+
+    // Who saved it, and when, survives an edit.
+    check(editedRow?.createdAt === savedRes.body?.question?.createdAt,
+      "the date it was first saved is not rewritten by an edit");
+
+    // An edit that would leave an unmarkable question is refused. The patch
+    // looks harmless on its own — it is the MERGED question that is broken.
+    const broken = await teacher.patch(`/api/question-bank/${httpId}`, { acceptedAnswers: [] });
+    check(broken.status === 400,
+      "an edit that would leave the question unmarkable is refused", `got ${broken.status}`);
+    const stillFine = await teacher.get(`/api/question-bank?topic=${encodeURIComponent(TOPIC)}`);
+    check(
+      (stillFine.body?.questions || []).find((q: any) => q.id === httpId)?.acceptedAnswers?.length === 1,
+      "and the question in the bank is left as it was",
+    );
+
+    // --- Teacher-only ----------------------------------------------------
+    // These are the school's answer keys. A pupil who could read this endpoint
+    // could read the answer to a question before it was ever set.
+    const anon = new Session();
+    check((await anon.get("/api/question-bank")).status === 401,
+      "a logged-out caller cannot read the bank");
+    check((await anon.post("/api/question-bank", { questionText: "x" })).status === 401,
+      "nor save to it");
+    check((await anon.delete(`/api/question-bank/${httpId}`)).status === 401,
+      "nor delete from it");
+
+    // --- Deleting --------------------------------------------------------
+    const assignmentsBeforeDelete = await storage.getAssignments();
+    const removed = await teacher.delete(`/api/question-bank/${httpId}`);
+    check(removed.body?.success === true, "a question can be removed from the bank");
+    const afterDelete = await teacher.get(`/api/question-bank?topic=${encodeURIComponent(TOPIC)}`);
+    check(!(afterDelete.body?.questions || []).some((q: any) => q.id === httpId),
+      "and is gone from the library");
+    const assignmentsAfterDelete = await storage.getAssignments();
+    check(assignmentsBeforeDelete.length === assignmentsAfterDelete.length,
+      "and removing it changed no assignment",
+      `${assignmentsBeforeDelete.length} -> ${assignmentsAfterDelete.length}`);
+
+    const missing = await teacher.delete(`/api/question-bank/${httpId}`);
+    check(missing.status === 404, "deleting it twice is a plain 404", `got ${missing.status}`);
+
+    // --- What the teacher actually READS when a save is refused ----------
+    //
+    // apiRequest() throws on any non-2xx, so a refusal reaches the screen as an
+    // exception rather than a reply. Caught carelessly that shows "check your
+    // connection" to somebody whose connection is fine and whose question is
+    // merely incomplete — so the server's own words are dug back out.
+    const refusal = await teacher.post("/api/question-bank", {
+      questionText: `No answer given ${stamp}`,
+      type: "short_text", acceptedAnswers: [], maxScore: 1,
+      subject: "MATHS", topic: TOPIC, form: "Stage 3", difficulty: "easy",
+    });
+    check(refusal.status === 400, "an incomplete question is refused with 400", `got ${refusal.status}`);
+    check(/accepted answer/i.test(refusal.body?.message || ""),
+      "and the refusal says what is missing, in plain words", refusal.body?.message);
+
+    const thrown = new Error(`400: ${JSON.stringify(refusal.body)}`);
+    check(
+      apiErrorMessage(thrown, "Check your connection.") === refusal.body?.message,
+      "the screen recovers that message instead of blaming the connection",
+      apiErrorMessage(thrown, "Check your connection."),
+    );
+    check(
+      apiErrorMessage(new TypeError("Failed to fetch"), "Check your connection.") === "Check your connection.",
+      "and a real network failure still says to check the connection",
+    );
+  }
 
   // --- Tidy up -----------------------------------------------------------
   for (const id of saved) {

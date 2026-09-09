@@ -135,6 +135,8 @@ export interface IStorage {
   getBankQuestions(filters?: BankFilters): Promise<BankQuestion[]>;
   /** One saved question by its id. */
   getBankQuestion(id: number): Promise<BankQuestion | undefined>;
+  /** Change a saved question. Only the library copy — never an assignment. */
+  updateBankQuestion(id: number, changes: Partial<NewBankQuestion>): Promise<BankQuestion>;
   /** Remove one saved question from the library. */
   deleteBankQuestion(id: number): Promise<void>;
 
@@ -804,6 +806,56 @@ export class DatabaseStorage implements IStorage {
   async getBankQuestion(id: number): Promise<BankQuestion | undefined> {
     const [row] = await db.select().from(questionBank).where(eq(questionBank.id, id));
     return row ? this.toBankQuestion(row) : undefined;
+  }
+
+  /**
+   * Change a saved question.
+   *
+   * Only the LIBRARY copy changes. An assignment that already used this
+   * question keeps the copy it took, and the children who answered it keep
+   * their marks — editing a bank question months later must never quietly
+   * re-word a paper somebody has already sat.
+   *
+   * The MERGED question is validated, not the change on its own. Clearing the
+   * options of a multiple-choice question is a perfectly valid-looking patch
+   * and leaves behind a question that marks every child wrong, so what matters
+   * is whether the row is still markable AFTER the edit.
+   *
+   * The type may be changed, which can leave the old type's answer key behind
+   * on the row (a numeric value on a question that is now true/false). Harmless
+   * — markAnswer only reads the fields its own type uses — but the merged
+   * question still has to satisfy the new type's rules.
+   */
+  async updateBankQuestion(id: number, changes: Partial<NewBankQuestion>): Promise<BankQuestion> {
+    const existing = await this.getBankQuestion(id);
+    if (!existing) throw new Error("That question is not in the bank.");
+
+    const merged: NewBankQuestion = { ...existing, ...changes };
+    const problems = validateBankQuestion(merged);
+    if (problems.length > 0) {
+      throw new Error(`That question cannot be saved: ${problems.join(" ")}`);
+    }
+
+    const [updated] = await db.update(questionBank).set({
+      questionText: merged.questionText.trim(),
+      type: merged.type,
+      maxScore: merged.maxScore,
+      options: merged.options ?? null,
+      correctOption: merged.correctOption ?? null,
+      correctBool: merged.correctBool ?? null,
+      correctNumber: merged.correctNumber ?? null,
+      tolerance: merged.tolerance ?? null,
+      acceptedAnswers: merged.acceptedAnswers ?? null,
+      explanation: merged.explanation ?? null,
+      subject: merged.subject,
+      topic: merged.topic.trim(),
+      form: merged.form,
+      difficulty: merged.difficulty,
+      // createdById and createdAt are deliberately NOT touched: who first saved
+      // a question, and when, stays true however often it is edited later.
+    }).where(eq(questionBank.id, id)).returning();
+
+    return this.toBankQuestion(updated);
   }
 
   async deleteBankQuestion(id: number): Promise<void> {

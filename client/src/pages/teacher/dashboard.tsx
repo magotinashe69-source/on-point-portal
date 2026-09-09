@@ -622,6 +622,20 @@ export default function TeacherDashboard() {
             </Card>
           </Link>
 
+          <Link href="/teacher/question-bank" data-testid="link-question-bank">
+            <Card className="hover-elevate cursor-pointer h-full">
+              <CardContent className="flex items-center gap-4 py-6">
+                <div className="p-3 rounded-md bg-secondary/10">
+                  <Library className="h-6 w-6 text-secondary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold">Question Bank</h3>
+                  <p className="text-sm text-muted-foreground">Saved questions, ready to reuse</p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+
           <Link href="/teacher/game-plays" data-testid="link-game-plays">
             <Card className="hover-elevate cursor-pointer h-full">
               <CardContent className="flex items-center gap-4 py-6">

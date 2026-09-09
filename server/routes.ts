@@ -19,6 +19,10 @@ import { buildWeeklyReport } from "./weekly-report";
 import { buildParentOverview } from "./parent-overview";
 import { buildParentPlays } from "./parent-plays";
 import { buildTeacherPlays } from "./teacher-plays";
+import {
+  validateBankQuestion, isDifficulty, isBankType,
+  type BankType, type Difficulty,
+} from "@shared/question-bank";
 import { buildCompletedWork, buildSubmissionReview, buildSupportReport } from "./parent-work";
 import { buildWhatsAppReport } from "@shared/weekly-report";
 import { awardXp, adjustXp, xpProgress, XP_PER_CORRECT, XP_COMPLETION_BONUS, XP_IMPROVEMENT_BONUS } from "./xp";
@@ -3318,6 +3322,136 @@ export async function registerRoutes(
       res.json({ success: true, plays });
     } catch (error) {
       console.error("Teacher plays report error:", error);
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
+    }
+  });
+
+  // ─── The Question Bank ────────────────────────────────────────────────────
+  //
+  // A library of reusable questions (Stage 1 built the store; see
+  // shared/question-bank.ts). Teacher-only, all four of them: these are the
+  // school's answer keys, and a pupil who could read this endpoint could read
+  // the answer to a question before it was ever set as homework.
+  //
+  // NOTHING here touches an assignment. Saving to the bank copies a question
+  // into the library and leaves the paper alone; editing a bank question
+  // changes only the library copy, so an assignment that already used it keeps
+  // what it took and the children who answered it keep their marks.
+
+  /** Browse and filter the library. */
+  app.get("/api/question-bank", async (req, res) => {
+    try {
+      if (!(await requireTeacher(req, res))) return;
+
+      const { subject, topic, form, difficulty, type, search, limit } = req.query as Record<string, string | undefined>;
+
+      const questions = await storage.getBankQuestions({
+        // Blank strings arrive from an untouched dropdown and mean "no filter",
+        // not "match the empty string".
+        subject: subject || undefined,
+        topic: topic || undefined,
+        form: form || undefined,
+        difficulty: isDifficulty(difficulty || "") ? (difficulty as Difficulty) : undefined,
+        type: isBankType(type || "") ? (type as BankType) : undefined,
+        search: search || undefined,
+        limit: limit ? Number(limit) : undefined,
+      });
+
+      res.json({ success: true, questions });
+    } catch (error) {
+      console.error("Question bank list error:", error);
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
+    }
+  });
+
+  /** Save one question into the library. */
+  app.post("/api/question-bank", async (req, res) => {
+    try {
+      if (!(await requireTeacher(req, res))) return;
+
+      const body = req.body ?? {};
+
+      // The author comes from the SESSION, never from the body. The same rule
+      // as everywhere else that records who did something: an id in the body is
+      // a value the browser chose, so believing it would let one teacher's name
+      // be put on another's work.
+      const teacherId = req.session.teacherId;
+      if (!teacherId) {
+        return res.status(401).json({ success: false, message: "Please sign in again." });
+      }
+
+      const question = { ...body, createdById: teacherId };
+
+      // Checked here as well as in storage so the teacher gets the problems
+      // back in plain words to fix, rather than a 500 from a thrown error.
+      const problems = validateBankQuestion(question);
+      if (problems.length > 0) {
+        return res.status(400).json({ success: false, message: problems.join(" "), problems });
+      }
+
+      const saved = await storage.createBankQuestion(question);
+      res.json({ success: true, question: saved });
+    } catch (error) {
+      console.error("Question bank save error:", error);
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
+    }
+  });
+
+  /** Change a saved question — the library copy only. */
+  app.patch("/api/question-bank/:id", async (req, res) => {
+    try {
+      if (!(await requireTeacher(req, res))) return;
+
+      const id = parseInt(req.params.id);
+      if (!Number.isFinite(id)) {
+        return res.status(400).json({ success: false, message: "That is not a question id." });
+      }
+
+      const existing = await storage.getBankQuestion(id);
+      if (!existing) {
+        return res.status(404).json({ success: false, message: "That question is not in the bank." });
+      }
+
+      // createdById and createdAt are not editable: who saved a question, and
+      // when, stays true however often it is reworded afterwards.
+      const { createdById, createdAt, id: _ignored, ...changes } = req.body ?? {};
+
+      // Validated as MERGED with what is already saved, because a patch that
+      // looks fine on its own can still leave an unmarkable question behind.
+      const problems = validateBankQuestion({ ...existing, ...changes });
+      if (problems.length > 0) {
+        return res.status(400).json({ success: false, message: problems.join(" "), problems });
+      }
+
+      const updated = await storage.updateBankQuestion(id, changes);
+      res.json({ success: true, question: updated });
+    } catch (error) {
+      console.error("Question bank edit error:", error);
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
+    }
+  });
+
+  /** Remove a saved question from the library. */
+  app.delete("/api/question-bank/:id", async (req, res) => {
+    try {
+      if (!(await requireTeacher(req, res))) return;
+
+      const id = parseInt(req.params.id);
+      if (!Number.isFinite(id)) {
+        return res.status(400).json({ success: false, message: "That is not a question id." });
+      }
+
+      const existing = await storage.getBankQuestion(id);
+      if (!existing) {
+        return res.status(404).json({ success: false, message: "That question is not in the bank." });
+      }
+
+      // Only the library copy goes. Any assignment that already used this
+      // question keeps its own copy, and the marks against it stand.
+      await storage.deleteBankQuestion(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Question bank delete error:", error);
       res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });

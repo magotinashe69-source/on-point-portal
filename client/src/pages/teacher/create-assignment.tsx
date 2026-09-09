@@ -12,12 +12,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Checkbox } from "@/components/ui/checkbox";
 import { BulkPasteDialog } from "@/components/BulkPasteDialog";
+import { SaveToBankDialog, type BankableQuestion } from "@/components/SaveToBankDialog";
 import { splitPastedLines, type SkippedLine } from "@/lib/bulk-paste";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { ArrowLeft, PlusCircle, Trash2, Loader2, Save, X, Image, Users, Circle, CheckCircle2, ChevronUp, ChevronDown, RefreshCw, FileClock, ClipboardPaste, Copy, AlertTriangle } from "lucide-react";
+import { ArrowLeft, PlusCircle, Trash2, Loader2, Save, X, Image, Users, Circle, CheckCircle2, ChevronUp, ChevronDown, RefreshCw, FileClock, ClipboardPaste, Copy, AlertTriangle, Library } from "lucide-react";
 import logoPath from "@assets/logo.webp";
 import { SimpleUploader } from "@/components/SimpleUploader";
 import { FileAttachmentZone } from "@/components/FileAttachmentZone";
@@ -251,6 +252,34 @@ export default function CreateAssignment() {
 
   // Add a new question, then scroll to it and focus its text box so the teacher
   // can keep typing without scrolling or clicking. Used by both add buttons.
+  // Which question is being saved to the Question Bank, if any. Held as the
+  // question's own values rather than its index, so the dialog cannot end up
+  // showing a different question if the list is reordered under it.
+  const [bankingQuestion, setBankingQuestion] = useState<BankableQuestion | null>(null);
+
+  /**
+   * Open the Save-to-bank dialog for one question.
+   *
+   * Reads the question's values straight out of the form as they stand — a
+   * teacher can bank a question without saving the assignment first, which is
+   * the point: the two are separate things.
+   */
+  const openSaveToBank = (index: number) => {
+    const q = formMethods.getValues(`questions.${index}`);
+    setBankingQuestion({
+      questionText: q.questionText,
+      type: q.type,
+      maxScore: q.maxScore,
+      options: q.options,
+      correctOption: q.correctOption,
+      correctBool: q.correctBool,
+      correctNumber: q.correctNumber,
+      tolerance: q.tolerance,
+      acceptedAnswers: q.acceptedAnswers,
+      explanation: q.explanation,
+    });
+  };
+
   const addQuestionAndFocus = () => {
     const newIndex = fields.length;
     append(newQuestion());
@@ -902,6 +931,20 @@ export default function CreateAssignment() {
                               <span className="hidden sm:inline">Duplicate</span>
                             </Button>
 
+                            {/* Save a COPY of this question to the reusable
+                                library. Does not change or save the assignment. */}
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openSaveToBank(index)}
+                              title="Save a copy of this question to the Question Bank for reuse"
+                              data-testid={`button-save-to-bank-${index}`}
+                            >
+                              <Library className="h-4 w-4 sm:mr-1" />
+                              <span className="hidden sm:inline">Save to bank</span>
+                            </Button>
+
                             <SimpleUploader
                               onUpload={(url) => handleQuestionImageUpload(index, url)}
                               accept="image/*"
@@ -1235,6 +1278,18 @@ export default function CreateAssignment() {
                     cancel: "button-paste-cancel",
                   }}
                 />
+
+                {/* Saving one question to the reusable library. Opened from the
+                    "Save to bank" button on a question; changes nothing here. */}
+                {bankingQuestion && (
+                  <SaveToBankDialog
+                    question={bankingQuestion}
+                    defaultSubject={formMethods.getValues("subject")}
+                    defaultForm={formMethods.getValues("form")}
+                    defaultTopic={formMethods.getValues("topic") || ""}
+                    onClose={() => setBankingQuestion(null)}
+                  />
+                )}
 
                 <div className="space-y-2">
                   <h3 className="font-semibold">Attachments (optional)</h3>

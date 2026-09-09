@@ -582,12 +582,11 @@ it. 94 checks.
 Run it after touching either game, the plays ledger, or anything under
 `/api/students/:id/plays`.
 
-## The Question Bank (Stage 1)
+## The Question Bank
 
 A library of **reusable questions**, saved once and found again by what they
-are about. Stage 1 is the store itself: the table, and the internal way to save
-and fetch. **Nothing reads from it yet** — assignments will draw from it in a
-later stage, and the teacher screen is the stage after this one.
+are about. Stage 1 built the store; Stage 2 added the teacher's screens.
+Assignments do not yet *draw from* the bank — that is still to come.
 
 - `shared/question-bank.ts` — the shapes, the tag vocabulary, and the validator.
   Pure, no database access.
@@ -631,20 +630,75 @@ by teachers who never saw it go in. `validateBankQuestion()` returns the
 problems in plain words so a screen can show a teacher what to fix, and
 `createBankQuestion()` refuses rather than writing a broken row.
 
+### The teacher's screens (Stage 2)
+
+Four teacher-only endpoints — `GET`, `POST`, `PATCH` and `DELETE` on
+`/api/question-bank` — and two places in the UI.
+
+**Teacher-only, all four.** These are the school's answer keys. A pupil who
+could read this endpoint could read the answer to a question before it was ever
+set as homework.
+
+**Saving: the "Save to bank" button on each question** in the assignment form
+(`client/src/components/SaveToBankDialog.tsx`). It copies the question into the
+library **in one direction only** — the assignment is not changed, not re-saved,
+and not linked to the library row, so a teacher can bank a question and carry on
+writing the paper. The tags an assignment already knows (subject, class, topic)
+are filled in; the teacher only adds the difficulty, and every field stays
+editable because a paper's topic is often broader than one question.
+
+A **written** question cannot be banked, and the dialog says so rather than
+letting the save fail with a message that would read like a bug.
+
+**Browsing: `/teacher/question-bank`** — filter by subject, topic, class and
+difficulty, or search the wording when the tags are forgotten. Each question
+shows its type, its answer, its marks and its tags.
+
+**Editing and deleting change ONLY the library copy.** An assignment that
+already used a question keeps the copy it took, and marks already given stand —
+rewording a bank question months later must never quietly change a paper
+somebody has already sat. Both screens say so in plain words, because a teacher
+cannot be expected to assume it.
+
+Two rules worth keeping when adding to this:
+
+1. **The author comes from the session, never the body.** `createdById` sent by
+   a browser is ignored, like everywhere else that records who did something.
+2. **An edit is validated as MERGED with what is already saved.** Clearing the
+   options of a multiple-choice question is a perfectly valid-looking patch that
+   leaves behind a question marking every child wrong. What matters is whether
+   the row is still markable *after* the edit.
+
+**A refusal is not a broken connection.** `apiRequest()` throws on any non-2xx,
+so a 400 reaches the screen as an exception. Caught carelessly that shows "check
+your connection" to a teacher whose connection is fine and whose question is
+merely incomplete. `client/src/lib/api-error.ts` digs the server's own words
+back out; use it wherever a request can be legitimately refused.
+
 ### Proving it — `npm run check:bank`
 
-`script/check-question-bank.ts`. Unlike the other check scripts it does **not**
-need a running server: there are no HTTP endpoints for the bank yet, so it runs
-in-process against storage, which is the "internal way" this stage is about. It
-calls `ensureSchema()` first, which is what makes "was the table created?"
-answerable.
+`script/check-question-bank.ts`, in two halves.
 
-It saves one question of each of the four types and reads them back from the
-table, checks every part of the answer key and every tag survives, marks a row
-straight out of the bank with the real auto-marker, filters by subject, topic,
-class, difficulty and type (singly and combined), searches the wording, checks
-twelve kinds of broken question are refused, checks the bank is separate from
-assignments, and removes everything it created. 58 checks.
+The **in-process half** runs against storage directly and calls `ensureSchema()`
+itself, which is what makes "was the table created?" answerable without a
+server. It saves one question of each of the four types and reads them back from
+the table, checks every part of the answer key and every tag survives, marks a
+row straight out of the bank with the real auto-marker, filters by subject,
+topic, class, difficulty and type (singly and combined), searches the wording,
+checks twelve kinds of broken question are refused, and checks the bank is
+separate from assignments.
+
+The **HTTP half** needs a running server (`npm run dev`) and walks the teacher's
+journey in order: save a question with tags, open the bank and see it, narrow by
+subject and then by difficulty, search a word in the wording, edit it and see
+the change stick. It also checks the author cannot be forged through the body,
+that an edit leaving an unmarkable question is refused and the saved row is left
+alone, that a logged-out caller gets nothing, that deleting changes no
+assignment, and that a refusal reaches the screen as readable words rather than
+as "check your connection". If no server is reachable it says so plainly instead
+of failing in a way that looks like broken code.
+
+89 checks. It removes everything it creates.
 
 ## Classes (forms)
 
@@ -689,7 +743,7 @@ client/
   src/
     components/   # Reusable UI components
     pages/
-      teacher/    # Teacher pages (login, dashboard, create, mark, resources, lessons)
+      teacher/    # Teacher pages (login, dashboard, create, mark, resources, lessons, question bank)
       student/    # Student pages (login, dashboard, submit, results, resources, lessons)
       parent/     # Parent pages (login, dashboard + weekly report)
     lib/          # Query client and auth helpers
