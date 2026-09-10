@@ -1062,7 +1062,22 @@ Full walkthrough: **`docs/ANDROID_PACKAGING.md`**.
 ## Running the app
 
 - Start dev server: `npm run dev` — runs on **http://localhost:5000**, no setup
-  needed (uses the local SQLite database).
+  needed (uses the local SQLite database). It **watches and reloads** on a
+  change to any server or shared file.
+
+  It did not always. Without watching, a route added to `server/routes.ts` did
+  not exist until somebody restarted by hand — and the symptom is misleading: a
+  brand-new endpoint answers **200 with the React page** (the catch-all), which
+  reads like the route is registered but broken. That cost time three separate
+  times before it was fixed. If a check suite reports a field as `undefined` or
+  an endpoint as missing, confirm the server is running the code you just wrote
+  before debugging the code.
+
+  `data/`, `uploads/` and `dist/` are excluded from the watch: the SQLite
+  database lives in `data/`, and watching it would restart the server on every
+  write. A restart also empties the in-memory session store, so everyone signed
+  in is logged out — expected in development, and the reason
+  `handleExpiredLogin()` exists (see the parent section).
 - The `dev`/`start` scripts use `cross-env`, so they work on Windows, macOS, and Linux.
 - Environment variables can go in a `.env` file (see `.env.example`). None are
   required for local development.
