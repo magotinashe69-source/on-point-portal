@@ -16,6 +16,8 @@
     "check:certs": "tsx script/check-certificates.ts",
     "check:reports": "tsx script/check-report-cards.ts",
     "check:offline": "tsx script/check-offline.ts",
+    "check:offline:browser": "tsx script/check-offline-browser.ts",
+    "check:offline:pwa": "tsx script/check-offline-pwa.ts",
     "db:push": "drizzle-kit push"
   },
   "dependencies": {

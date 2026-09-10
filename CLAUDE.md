@@ -1078,21 +1078,49 @@ back so a result appears after syncing; a new id for a paper already handed in
 refused rather than stored twice; another pupil's device id refused with 403;
 and an ordinary hand-in proved unchanged. 88 checks.
 
-The browser half is not in this script, because it needs a real browser driven
-over the DevTools Protocol with Chrome's own network emulation (so
-`navigator.onLine` really is false and `fetch` really does fail). Two harnesses
-were used, and both live in the commit message rather than the repo:
+### Proving the other half — in a real browser
 
-* against `npm run dev` — save a paper, pull the network, answer it, hand it in,
-  check it is waiting with the child's own completion time and no mark on the
-  device, restore the network, watch it sync once; then queue a second piece and
-  RELOAD the app mid-send to prove an interrupted sync neither loses nor
-  duplicates. 28 checks.
-* against the BUILT app (`npm run build`, `NODE_ENV=production`) — the only way
-  to exercise the service worker, since it is deliberately never registered in
-  development. Pull the network, reload the whole app, and check it starts,
-  shows the saved questions, takes a hand-in, syncs once, and that nothing under
-  `/api/` ended up in any cache. 10 checks.
+The rest of the promise happens on a PHONE, and cannot be tested by sending
+requests to anything: a paper saved to the device, answered with no signal, and
+sent on its own later. That needs a real browser with Chrome's own network emulation,
+so `navigator.onLine` really is false and `fetch` really does reject.
+
+`script/chrome.ts` is the driver — a small DevTools Protocol client built on the
+`ws` this project already depends on, rather than adding a browser driver as a
+dependency. Launch Chrome on a throwaway profile, open a tab, run JavaScript in
+it, pull the network out.
+
+* **`npm run check:offline:browser`** (needs `npm run dev` running) — sign in,
+  save a paper, pull the network, answer it, hand it in. The school has nothing;
+  the work is waiting on the device with the child's own completion time and no
+  mark beside it. Restore the network and it syncs on its own, with no tap.
+  Then the case nothing else can produce: a hand-in held at the moment the
+  SERVER HAS ALREADY STORED IT and the reply is still in the air, with the app
+  reloaded underneath it. The work must still be on the device — nothing is
+  thrown away before the school confirms it — and must not be stored twice when
+  it goes again. 34 checks.
+* **`npm run check:offline:pwa`** — builds the app and serves it on port 5050
+  with `NODE_ENV=production`, which is the only way to exercise the service
+  worker: it is deliberately never registered in development, so `npm run dev`
+  cannot reach a single line of `sw.js`. Pull the network, reload the WHOLE app,
+  and check it starts from the saved shell rather than a dead end, shows the
+  saved questions, takes a hand-in, and syncs when the signal returns — and that
+  nothing under `/api/` or `/uploads/` is in any cache. 15 checks. It really does
+  build, so it is slow; `SKIP_BUILD=1` reuses `dist/` while working on the checks
+  themselves. Its own port and its own build, so a dev server can be left running.
+
+Two things to know before changing either:
+
+* Chrome's network emulation is **per debugging session**, and a service worker
+  is a target of its own. `Browser.setOffline()` attaches to every target and
+  pulls the network on all of them; pulling it on the page alone leaves the
+  service worker happily online, and the offline fallback is never exercised at
+  all.
+* Emulation does **not** replay the online/offline transition into a document
+  that was LOADED while the network was already off, so no `online` event
+  arrives in a page opened with no signal. A real phone fires one. The dev
+  script covers that path with a page that was open throughout; the PWA script
+  reopens the app instead, which is the more realistic story there anyway.
 
 ## Report cards
 
