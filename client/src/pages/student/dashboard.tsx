@@ -23,7 +23,7 @@ import {
   Video,
   Map,
   CircleDot,
-  Target, Sparkles } from "lucide-react";
+  Target, Sparkles, Award } from "lucide-react";
 import type { Assignment, Announcement } from "@shared/schema";
 import { isPrimaryForm } from "@shared/schema";
 import { XpLevelBar } from "@/components/XpLevelBar";
@@ -44,6 +44,7 @@ interface EnrichedSubmission {
 
 import { MasteryMap } from "@/components/MasteryMap";
 import { MASTERY_TEXT, type MasteryMap as MasteryMapData } from "@shared/mastery";
+import { CERTIFICATE_TEXT, certificateDate, type Certificate as CertificateRow } from "@shared/certificates";
 
 export default function StudentDashboard() {
   const [, setLocation] = useLocation();
@@ -97,6 +98,14 @@ export default function StudentDashboard() {
     success: boolean; mastery: MasteryMapData;
   }>({
     queryKey: ["/api/students", student?.id, "mastery"],
+    enabled: !!student,
+  });
+
+  // Certificates. Asking for them is also what EARNS any milestone newly
+  // reached — the server works them out on read — so this one query both shows
+  // and awards, without marking, XP or streaks being touched.
+  const { data: certificatesData } = useQuery<{ success: boolean; certificates: CertificateRow[] }>({
+    queryKey: ["/api/students", student?.id, "certificates"],
     enabled: !!student,
   });
 
@@ -245,6 +254,48 @@ export default function StudentDashboard() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Certificates. Above the skills map because an award is the happiest
+            thing on the page, and a child who has just earned one should meet
+            it before a list of what to practise. Only shown once there IS one —
+            an empty awards shelf on a dashboard reads as a reproach. */}
+        {(certificatesData?.certificates?.length ?? 0) > 0 && (
+          <Card className="mb-6 border-primary/30">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <Award className="h-5 w-5 text-primary" />
+                  <CardTitle className="text-lg">{CERTIFICATE_TEXT.areaTitle}</CardTitle>
+                </div>
+                <Link href="/student/certificates">
+                  <Button variant="outline" size="sm" data-testid="button-all-certificates">
+                    See all {certificatesData!.certificates.length}
+                  </Button>
+                </Link>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {certificatesData!.certificates.slice(0, 3).map((c) => (
+                  <Link key={c.id} href={`/student/certificate/${c.id}`}>
+                    <div
+                      className="flex items-center justify-between gap-3 rounded-md border p-3 hover-elevate cursor-pointer"
+                      data-testid={`row-dash-certificate-${c.id}`}
+                    >
+                      <div className="min-w-0">
+                        <p className="font-medium">{c.title}</p>
+                        <p className="text-xs text-muted-foreground break-words">{c.detail}</p>
+                      </div>
+                      <span className="text-xs text-muted-foreground shrink-0">
+                        {certificateDate(c.earnedAt)}
+                      </span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* The skills map: what this child has shown they can do, from work
             already marked. Placed above announcements because it is about them,

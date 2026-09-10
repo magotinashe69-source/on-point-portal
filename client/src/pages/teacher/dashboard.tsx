@@ -34,7 +34,8 @@ import {
   XCircle,
   Pencil,
   Gamepad2,
-  GraduationCap
+  GraduationCap,
+  Award
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -618,6 +619,20 @@ export default function TeacherDashboard() {
                 <div>
                   <h3 className="font-semibold">Daily Report</h3>
                   <p className="text-sm text-muted-foreground">WhatsApp-ready submission snapshot</p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link href="/teacher/most-improved" data-testid="link-most-improved">
+            <Card className="hover-elevate cursor-pointer h-full">
+              <CardContent className="flex items-center gap-4 py-6">
+                <div className="p-3 rounded-md bg-secondary/10">
+                  <Award className="h-6 w-6 text-secondary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold">Most Improved</h3>
+                  <p className="text-sm text-muted-foreground">Award the biggest climb in a subject</p>
                 </div>
               </CardContent>
             </Card>

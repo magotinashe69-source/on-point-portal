@@ -324,6 +324,18 @@ export const questionBank = sqliteTable("question_bank", {
   createdAt: timestamp("created_at").notNull().$defaultFn(() => new Date()),
 });
 
+// Certificates & Awards. See shared/certificates.ts for the rules.
+export const certificates = sqliteTable("certificates", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  studentId: integer("student_id").notNull().references(() => students.id),
+  kind: text("kind").notNull(),
+  certKey: text("cert_key").notNull(),
+  title: text("title").notNull(),
+  detail: text("detail").notNull(),
+  earnedAt: timestamp("earned_at").notNull(),
+  issuedById: integer("issued_by_id"),
+});
+
 // Plain SQL that creates every table above if it does not exist yet.
 // We run this once on startup so a fresh SQLite database is ready to use
 // with no manual migration step.
@@ -547,4 +559,19 @@ CREATE TABLE IF NOT EXISTS question_bank (
 -- Looked up by what a question is ABOUT, so the tags carry an index. Without
 -- it every filtered fetch is a full scan of the whole library.
 CREATE INDEX IF NOT EXISTS question_bank_tags ON question_bank (subject, form, topic, difficulty);
+CREATE TABLE IF NOT EXISTS certificates (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  student_id INTEGER NOT NULL,
+  kind TEXT NOT NULL,
+  cert_key TEXT NOT NULL,
+  title TEXT NOT NULL,
+  detail TEXT NOT NULL,
+  earned_at INTEGER NOT NULL,
+  issued_by_id INTEGER
+);
+-- One certificate per achievement per child. The uniqueness is enforced by the
+-- database, not only by the code that checks first: two requests arriving
+-- together would otherwise both look, both find nothing, and both insert.
+CREATE UNIQUE INDEX IF NOT EXISTS certificates_one_per_achievement
+  ON certificates (student_id, cert_key);
 `;

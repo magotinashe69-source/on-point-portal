@@ -105,6 +105,20 @@ CREATE TABLE IF NOT EXISTS question_bank (
 -- Looked up by what a question is ABOUT, so the tags carry an index. Without
 -- it every filtered fetch is a full scan of the whole library.
 CREATE INDEX IF NOT EXISTS question_bank_tags ON question_bank (subject, form, topic, difficulty);
+CREATE TABLE IF NOT EXISTS certificates (
+  id SERIAL PRIMARY KEY,
+  student_id INTEGER NOT NULL,
+  kind TEXT NOT NULL,
+  cert_key TEXT NOT NULL,
+  title TEXT NOT NULL,
+  detail TEXT NOT NULL,
+  earned_at TIMESTAMP NOT NULL,
+  issued_by_id INTEGER
+);
+-- One certificate per achievement per child, enforced by the database so two
+-- simultaneous reads cannot both insert the same award.
+CREATE UNIQUE INDEX IF NOT EXISTS certificates_one_per_achievement
+  ON certificates (student_id, cert_key);
 CREATE TABLE IF NOT EXISTS dream_world (
   id SERIAL PRIMARY KEY,
   student_id INTEGER NOT NULL,
@@ -315,4 +329,5 @@ export const {
   gamePlays,
   blasterBest,
   questionBank,
+  certificates,
 } = (usePostgres ? pgSchema : sqliteSchema) as typeof pgSchema;

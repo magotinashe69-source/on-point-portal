@@ -37,6 +37,9 @@ import StudentLessons from "@/pages/student/lessons";
 import TreasureIsland from "@/pages/student/treasure-island";
 import PenaltyShootout from "@/pages/student/penalty-shootout";
 import TargetBlaster from "@/pages/student/target-blaster";
+import CertificatesPage from "@/pages/student/certificates";
+import CertificatePage from "@/pages/student/certificate";
+import MostImprovedPage from "@/pages/teacher/most-improved";
 // Dream World is retired. Its pages (dream-world, visit, town-view, certificate)
 // are still in the repo but are no longer imported or routed to — see the
 // redirects below.
@@ -65,6 +68,7 @@ function Router() {
       <Route path="/teacher/game-plays" component={TeacherGamePlays} />
       <Route path="/teacher/question-bank" component={QuestionBankPage} />
       <Route path="/teacher/class-mastery" component={ClassMasteryPage} />
+      <Route path="/teacher/most-improved" component={MostImprovedPage} />
       {/* Parent portal. A parent account can only ever see its own child —
           the server enforces that on every request, not these routes. */}
       <Route path="/parent/login" component={ParentLogin} />
@@ -89,13 +93,18 @@ function Router() {
       {/* Target Blaster, like the other two games, is Stages 3-6 only.
           The page sends Forms back and every endpoint refuses them. */}
       <Route path="/student/blaster" component={TargetBlaster} />
+      <Route path="/student/certificates" component={CertificatesPage} />
+      <Route path="/student/certificate/:id" component={CertificatePage} />
       {/* Dream World is retired. An old bookmark or a typed address lands back
           on the dashboard instead of opening a game we no longer run. Nothing
           has been deleted — the towns are all still saved. */}
       <Route path="/student/dream-world">{() => <Redirect to="/student/dashboard" />}</Route>
       <Route path="/student/visit">{() => <Redirect to="/student/dashboard" />}</Route>
       <Route path="/student/town/:id">{() => <Redirect to="/student/dashboard" />}</Route>
-      <Route path="/student/certificate">{() => <Redirect to="/student/dashboard" />}</Route>
+      {/* The bare /student/certificate address belonged to the Town Award, which
+          went with Dream World. Certificates are a real feature again, so it now
+          leads to the list rather than back to the dashboard. */}
+      <Route path="/student/certificate">{() => <Redirect to="/student/certificates" />}</Route>
       <Route component={NotFound} />
     </Switch>
   );

@@ -916,6 +916,59 @@ and the other has none of it — and checks the spread tells them apart, that th
 list is weakest-first, that the struggling pupil is flagged and the strong one
 is not, and that a pupil cannot read the class view. 61 checks.
 
+## Certificates & Awards
+
+Printable certificates in the school's navy and gold, generated from data that
+is ALREADY STORED. No AI, and nothing that marks, awards XP or changes a streak.
+
+- `shared/certificates.ts` — the kinds, the keys and the wording. Pure.
+- `server/certificates.ts` — works out what a child has earned and writes it
+  down. `server/most-improved.ts` ranks a class for the teacher-run one.
+- `client/src/components/CertificateSheet.tsx` — the printable sheet.
+- Pages: `/student/certificates`, `/student/certificate/:id`,
+  `/teacher/most-improved`.
+
+**Earned on READ, not by a hook.** Marking, XP and streaks were not to be
+touched, so nothing hooks into them. When a child's certificates are fetched the
+server works out which milestones are now true and inserts the new ones. Asking
+twice earns nothing twice — `certificates.cert_key` names the ACHIEVEMENT (a
+submission id, a topic, a level) and carries a unique index per student, so the
+database refuses a duplicate even if two requests arrive together.
+
+**A certificate carries the date of the achievement, not of the day it was
+noticed.** Perfect Score is dated by the mark, Level Up by the XP row. Otherwise
+a child who scored full marks in July gets a certificate dated today, which is a
+small lie on a document somebody keeps. One compromise, written down where it
+happens: the streak table keeps no history of WHEN a seven-day run occurred, so
+Streak Star uses the last day the streak counted. Fixing that properly means
+recording streak history, which means changing the streak code.
+
+**"PDF" means the browser's own print dialog with "Save as PDF" chosen** — the
+approach the Grade Book already uses. No library, no embedded fonts, and on a
+phone it is the native Share → Print → Save as PDF. A one-tap `.pdf` download
+would need a real generator; this is the trade-off that keeps it lightweight.
+
+The sheet's design came from the old Town Award page, which Dream World's
+retirement had left pointing at a dead endpoint. Rather than a second
+certificate look drifting alongside it, that page is now the printable view for
+any certificate, and `/student/certificate` leads to the list instead of
+redirecting to the dashboard.
+
+**Most Improved is the one a teacher runs.** Looking is separate from awarding,
+so periods can be compared as often as you like without issuing anything, and
+the teacher who issues it is taken from the session. Its percentages are marks
+scored over marks available — the same formula as everywhere else, so a
+certificate never quotes a figure a teacher cannot find elsewhere in the app.
+
+### Proving it — `npm run check:certs`
+
+`script/check-certificates.ts` makes a pupil score full marks and walks the dev
+clock forward a day at a time until they hold a real seven-day streak, then
+checks the certificates they are owed appear with the right words and the right
+dates, that reading the page repeatedly earns nothing more, that one pupil
+cannot read another's, that a pupil cannot award themselves Most Improved, and
+that the mark is untouched by any of it. 39 checks.
+
 ## Classes (forms)
 
 Assignments and students are grouped by class:

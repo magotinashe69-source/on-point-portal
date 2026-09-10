@@ -3,7 +3,7 @@ import { eq, and, inArray, or, isNull, desc, gte, lte } from "drizzle-orm";
 // the right database (SQLite or PostgreSQL) at runtime.
 import {
   db,
-  teachers, students, parents, assignments, submissions, marks, resources, announcements, lessons, exportLogs, studentRewards, studentXp, studentStreaks, dreamWorld, penaltyBest, gamePlays, blasterBest, questionBank,
+  teachers, students, parents, assignments, submissions, marks, resources, announcements, lessons, exportLogs, studentRewards, studentXp, studentStreaks, dreamWorld, penaltyBest, gamePlays, blasterBest, questionBank, certificates,
 } from "./db";
 // The TypeScript types are the same for both databases, so they come from the shared schema.
 import {
@@ -25,6 +25,7 @@ import {
   type GamePlays, type InsertGamePlays,
   type BlasterBest, type InsertBlasterBest,
   type QuestionBankRow,
+  type CertificateRow, type InsertCertificateRow,
   MASTER_PASSWORD
 } from "@shared/schema";
 // The Question Bank's shapes and rules are pure, so they live in shared/.
@@ -139,6 +140,15 @@ export interface IStorage {
   updateBankQuestion(id: number, changes: Partial<NewBankQuestion>): Promise<BankQuestion>;
   /** Remove one saved question from the library. */
   deleteBankQuestion(id: number): Promise<void>;
+
+  // --- Certificates & Awards ---
+  /** Every certificate a child has earned. */
+  getCertificates(studentId: number): Promise<CertificateRow[]>;
+  /**
+   * Write down a newly earned certificate. Returns null when that achievement
+   * was already recorded, so awarding twice is a no-op rather than an error.
+   */
+  awardCertificate(row: InsertCertificateRow): Promise<CertificateRow | null>;
 
   getGamePlays(studentId: number, day: string, game: string): Promise<GamePlays | undefined>;
   /** Every play row for a group of children across a range of days. */
@@ -711,6 +721,50 @@ export class DatabaseStorage implements IStorage {
   // Only what has been USED is stored. What a child EARNED is counted from the
   // assignments they handed in today (server/game-plays.ts), so nothing here
   // needs clearing overnight: tomorrow is a different `day` and finds no row.
+
+  // ---------------------------------------------------------------------
+  // Certificates & Awards
+  // ---------------------------------------------------------------------
+
+  async getCertificates(studentId: number): Promise<CertificateRow[]> {
+    return db.select().from(certificates).where(eq(certificates.studentId, studentId));
+  }
+
+  /**
+   * Write down a newly earned certificate.
+   *
+   * Checks first, and returns null rather than throwing when the achievement is
+   * already recorded — earning is worked out on every read, so "already have
+   * it" is the normal case, not a failure.
+   *
+   * The insert is still wrapped: the database holds a unique index on
+   * (student_id, cert_key), and two requests arriving together would both look,
+   * both find nothing, and both try to insert. The index is the real guard; the
+   * check above just avoids the noise.
+   */
+  async awardCertificate(row: InsertCertificateRow): Promise<CertificateRow | null> {
+    const [existing] = await db.select().from(certificates).where(
+      and(eq(certificates.studentId, row.studentId), eq(certificates.certKey, row.certKey)),
+    );
+    if (existing) return null;
+
+    try {
+      const [created] = await db.insert(certificates).values({
+        studentId: row.studentId,
+        kind: row.kind,
+        certKey: row.certKey,
+        title: row.title,
+        detail: row.detail,
+        earnedAt: row.earnedAt,
+        issuedById: row.issuedById ?? null,
+      }).returning();
+      return created;
+    } catch {
+      // Lost the race to another request. The certificate exists, which is all
+      // the caller wanted.
+      return null;
+    }
+  }
 
   // ---------------------------------------------------------------------
   // The Question Bank

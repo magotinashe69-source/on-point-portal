@@ -563,6 +563,45 @@ export const questionBank = pgTable("question_bank", {
 
 export type QuestionBankRow = typeof questionBank.$inferSelect;
 
+// Certificates & Awards — what a child has been awarded, and when.
+//
+// Written down rather than worked out afresh every time, for two reasons: a
+// certificate is a record (it should not vanish because a mark was later
+// edited), and it has to carry the date it was EARNED rather than the date
+// somebody looked.
+//
+// `cert_key` is what makes earning idempotent. It names the ACHIEVEMENT — a
+// submission id, a topic, a level — so the same milestone can only be written
+// down once however many times the page is opened. Unique per student.
+export const certificates = pgTable("certificates", {
+  id: serial("id").primaryKey(),
+  studentId: integer("student_id").notNull().references(() => students.id),
+  kind: text("kind").notNull(),
+  // Named cert_key, not key: "key" is reserved in some SQL dialects and this
+  // table is created by hand-written DDL as well as by drizzle.
+  certKey: text("cert_key").notNull(),
+  title: text("title").notNull(),
+  detail: text("detail").notNull(),
+  // The date of the ACHIEVEMENT. Not defaulted to now(): a certificate for a
+  // paper marked in July must say July.
+  earnedAt: timestamp("earned_at").notNull(),
+  // The teacher who ran it, for certificates a teacher issues by hand. Null for
+  // the ones the milestones award on their own.
+  issuedById: integer("issued_by_id"),
+});
+
+export type CertificateRow = typeof certificates.$inferSelect;
+
+export type InsertCertificateRow = {
+  studentId: number;
+  kind: string;
+  certKey: string;
+  title: string;
+  detail: string;
+  earnedAt: Date;
+  issuedById?: number | null;
+};
+
 // Written out by hand rather than derived. createInsertSchema turns the JSON
 // array columns into a shape TypeScript will not accept back as plain
 // string[], and these rows are only ever written by our own code.

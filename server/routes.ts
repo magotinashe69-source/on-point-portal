@@ -20,6 +20,8 @@ import { buildParentOverview } from "./parent-overview";
 import { buildParentPlays } from "./parent-plays";
 import { buildTeacherPlays } from "./teacher-plays";
 import { buildMastery, buildClassMastery } from "./mastery";
+import { certificatesFor, certificateFor, awardMostImproved } from "./certificates";
+import { improvementFor } from "./most-improved";
 import {
   validateBankQuestion, isDifficulty, isBankType,
   type BankType, type Difficulty,
@@ -2692,6 +2694,132 @@ export async function registerRoutes(
       res.json({ success: true, mastery });
     } catch (error) {
       console.error("Mastery error:", error);
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
+    }
+  });
+
+  // ─── Certificates & Awards ────────────────────────────────────────────────
+  //
+  // A child's certificates, with any newly earned milestones written down as a
+  // side effect of asking. Nothing here marks anything, awards XP or changes a
+  // streak — a certificate is a record of what already happened.
+  //
+  // requireTeacherOrSelf: a child sees their own, and their teacher can see
+  // them. Nobody else.
+  app.get("/api/students/:id/certificates", async (req, res) => {
+    try {
+      const studentId = parseInt(req.params.id);
+      if (!(await requireTeacherOrSelf(req, res, studentId))) return;
+
+      const student = await storage.getStudent(studentId);
+      if (!student) {
+        return res.status(404).json({ success: false, message: "Student not found" });
+      }
+
+      const list = await certificatesFor(student);
+      res.json({ success: true, certificates: list, student: { fullName: student.fullName, form: student.form } });
+    } catch (error) {
+      console.error("Certificates error:", error);
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
+    }
+  });
+
+  // One certificate, for the printable page.
+  app.get("/api/students/:id/certificates/:certificateId", async (req, res) => {
+    try {
+      const studentId = parseInt(req.params.id);
+      if (!(await requireTeacherOrSelf(req, res, studentId))) return;
+
+      const student = await storage.getStudent(studentId);
+      if (!student) {
+        return res.status(404).json({ success: false, message: "Student not found" });
+      }
+
+      const certificate = await certificateFor(student, parseInt(req.params.certificateId));
+      if (!certificate) {
+        return res.status(404).json({ success: false, message: "That certificate is not one of yours." });
+      }
+
+      res.json({
+        success: true,
+        certificate,
+        student: { fullName: student.fullName, form: student.form },
+      });
+    } catch (error) {
+      console.error("Certificate error:", error);
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
+    }
+  });
+
+  // ─── Most Improved, run by a teacher ──────────────────────────────────────
+  //
+  // Compare two periods in a subject and see who climbed furthest. Reading it
+  // awards nothing; the award is the POST below, so a teacher can look without
+  // committing.
+  app.get("/api/reports/most-improved", async (req, res) => {
+    try {
+      if (!(await requireTeacher(req, res))) return;
+
+      const { form, subject, beforeFrom, beforeTo, afterFrom, afterTo } = req.query as Record<string, string | undefined>;
+      if (!form || !subject) {
+        return res.status(400).json({ success: false, message: "Choose a class and a subject." });
+      }
+      if (!beforeFrom || !beforeTo || !afterFrom || !afterTo) {
+        return res.status(400).json({ success: false, message: "Choose both periods." });
+      }
+      if (beforeFrom > beforeTo || afterFrom > afterTo) {
+        return res.status(400).json({ success: false, message: "A period starts after it ends." });
+      }
+
+      const rows = await improvementFor(form, subject,
+        { from: beforeFrom, to: beforeTo }, { from: afterFrom, to: afterTo });
+      res.json({ success: true, rows });
+    } catch (error) {
+      console.error("Most improved error:", error);
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
+    }
+  });
+
+  /** Award the Most Improved certificate to one child. */
+  app.post("/api/reports/most-improved/award", async (req, res) => {
+    try {
+      if (!(await requireTeacher(req, res))) return;
+
+      const teacherId = req.session.teacherId;
+      if (!teacherId) {
+        return res.status(401).json({ success: false, message: "Please sign in again." });
+      }
+
+      const { studentId, subject, beforePercent, afterPercent, from, to } = req.body ?? {};
+      if (typeof studentId !== "number" || typeof subject !== "string") {
+        return res.status(400).json({ success: false, message: "Choose a pupil and a subject." });
+      }
+      if (typeof beforePercent !== "number" || typeof afterPercent !== "number") {
+        return res.status(400).json({ success: false, message: "That pupil has no figures to compare." });
+      }
+
+      const student = await storage.getStudent(studentId);
+      if (!student) {
+        return res.status(404).json({ success: false, message: "Student not found" });
+      }
+
+      // The teacher who ran it is taken from the SESSION, never the body — the
+      // same rule as everywhere else that records who did something.
+      const certificate = await awardMostImproved(student, {
+        subject, beforePercent, afterPercent,
+        from: String(from ?? ""), to: String(to ?? ""),
+        issuedById: teacherId,
+      });
+
+      if (!certificate) {
+        return res.json({
+          success: true, alreadyAwarded: true,
+          message: "That pupil already has this certificate for these dates.",
+        });
+      }
+      res.json({ success: true, certificate });
+    } catch (error) {
+      console.error("Most improved award error:", error);
       res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });

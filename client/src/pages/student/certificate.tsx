@@ -1,107 +1,88 @@
-// A printable Town Award certificate in the On Point navy/gold style. Reads the
-// student's current award from their Dream World state and lets them print it
-// (browser print — no libraries). Screen shows a "Print" button and back link;
-// print shows only the certificate.
+// One certificate, opened to be printed.
+//
+// This file used to hold the Town Award certificate, which Dream World's
+// retirement left pointing at a dead endpoint. The sheet design it carried was
+// the school's, so it lives on in CertificateSheet — this page is now the
+// printable view for any certificate a child has earned.
+//
+// Printing is the browser's own dialog. Choosing "Save as PDF" there produces
+// the file; on a phone it is Share → Print → Save as PDF. No library, no fonts
+// to embed, and the page is the thing that prints.
 
 import { useEffect } from "react";
-import { useLocation, Link } from "wouter";
+import { useLocation, Link, useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
-import { isPrimaryForm } from "@shared/schema";
-import { ArrowLeft, Printer } from "lucide-react";
-import { AWARDS, type AwardId } from "@shared/dreamworld";
+import { CertificateSheet } from "@/components/CertificateSheet";
+import { CERTIFICATE_TEXT, type Certificate } from "@shared/certificates";
+import { ArrowLeft, Loader2, Printer } from "lucide-react";
 
-const NAVY = "var(--onpoint-blue)";
-const GOLD = "#BF9000";
+const NAVY = "var(--onpoint-blue, #1F3864)";
 
-export default function Certificate() {
+export default function CertificatePage() {
   const [, setLocation] = useLocation();
   const { student } = useAuth();
+  const params = useParams<{ id?: string }>();
+  const certificateId = params.id;
 
   useEffect(() => {
     if (!student) setLocation("/student/login");
-    else if (!isPrimaryForm(student.form)) setLocation("/student/dashboard");
   }, [student, setLocation]);
 
-  const { data } = useQuery<{ success: boolean; townName: string; award: string; awardTerm: string }>({
-    queryKey: ["/api/students/" + student?.id + "/dreamworld"],
-    enabled: !!student && isPrimaryForm(student.form),
+  const { data, isLoading } = useQuery<{
+    success: boolean;
+    certificate: Certificate;
+    student: { fullName: string; form: string };
+  }>({
+    queryKey: ["/api/students", student?.id, "certificates", certificateId],
+    enabled: !!student && !!certificateId,
   });
 
-  if (!student || !isPrimaryForm(student.form)) return null;
-  const award = data?.award ? AWARDS[data.award as AwardId] : null;
+  if (!student) return null;
+
+  const certificate = data?.certificate;
 
   return (
-    <div className="min-h-screen bg-muted/40 py-8 px-4">
-      <style>{`
-        @media print {
-          body { background: #fff; }
-          .cert-noprint { display: none !important; }
-          .cert-sheet { box-shadow: none !important; margin: 0 !important; }
-          @page { margin: 12mm; }
-        }
-      `}</style>
-
-      <div className="cert-noprint mx-auto max-w-3xl flex items-center justify-between mb-4">
-        <Link href="/student/dream-world" className="inline-flex items-center gap-2 text-sm">
-          <ArrowLeft className="h-4 w-4" /> Back to My Town
+    <div className="cert-page min-h-screen bg-muted/40 py-6 px-3">
+      <div className="cert-noprint mx-auto max-w-3xl flex items-center justify-between gap-3 mb-4">
+        <Link href="/student/certificates" className="inline-flex items-center gap-2 text-sm">
+          <ArrowLeft className="h-4 w-4" /> {CERTIFICATE_TEXT.back}
         </Link>
-        {award && (
+        {certificate && (
           <button
             onClick={() => window.print()}
             className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white"
             style={{ backgroundColor: NAVY }}
             data-testid="button-print"
           >
-            <Printer className="h-4 w-4" /> Print certificate
+            <Printer className="h-4 w-4" /> {CERTIFICATE_TEXT.print}
           </button>
         )}
       </div>
 
-      {!award ? (
-        <p className="text-center text-sm text-muted-foreground py-16" data-testid="no-award">
-          No award yet. Your teacher runs the term awards at the end of term.
-        </p>
-      ) : (
-        <div
-          className="cert-sheet mx-auto max-w-3xl bg-white text-center shadow-xl"
-          style={{ border: `10px solid ${NAVY}`, outline: `2px solid ${GOLD}`, outlineOffset: "-16px", padding: "3.5rem 2.5rem" }}
-          data-testid="certificate"
-        >
-          <div style={{ color: NAVY, fontWeight: 800, letterSpacing: "0.06em", fontSize: "0.8rem", textTransform: "uppercase" }}>
-            On Point Education Centre
-          </div>
-          <div style={{ color: GOLD, fontStyle: "italic", fontSize: "0.8rem", marginTop: "0.15rem" }}>Quality Beyond Measure</div>
-
-          <h1 style={{ color: NAVY, fontSize: "1.9rem", fontWeight: 800, margin: "0.25rem 0" }}>Certificate of Achievement</h1>
-          <div style={{ height: 3, width: 120, background: GOLD, margin: "0.5rem auto 1.5rem" }} />
-
-          <p style={{ color: "#444", fontSize: "0.95rem" }}>This certificate is proudly awarded to</p>
-          <p style={{ color: NAVY, fontSize: "1.6rem", fontWeight: 800, margin: "0.5rem 0" }} data-testid="cert-name">{student.fullName}</p>
-          <p style={{ color: "#444", fontSize: "0.95rem" }}>
-            Mayor of <span style={{ fontWeight: 700 }} data-testid="cert-town">{data?.townName || "their Dream World town"}</span> ({student.form})
-          </p>
-
-          <div style={{ margin: "1.75rem auto", maxWidth: "34rem" }}>
-            <p style={{ color: "#333", fontSize: "1.05rem" }}>
-              for winning <span style={{ color: GOLD, fontWeight: 800 }} data-testid="cert-award">{award.name}</span>
-            </p>
-            <p style={{ color: "#555", fontSize: "0.95rem", marginTop: "0.35rem" }}>{award.blurb}.</p>
-          </div>
-
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: "2.5rem", gap: "1rem" }}>
-            <div style={{ textAlign: "center", flex: 1 }}>
-              <div style={{ borderTop: `2px solid ${NAVY}`, paddingTop: "0.35rem", fontSize: "0.8rem", color: "#555" }} data-testid="cert-term">
-                {data?.awardTerm || "This Term"}
-              </div>
-            </div>
-            <div style={{ textAlign: "center", flex: 1 }}>
-              <div style={{ borderTop: `2px solid ${NAVY}`, paddingTop: "0.35rem", fontSize: "0.8rem", color: "#555" }}>
-                On Point Education Centre
-              </div>
-            </div>
-          </div>
+      {isLoading && (
+        <div className="cert-noprint flex justify-center py-16">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
+      )}
+
+      {!isLoading && !certificate && (
+        <p className="cert-noprint text-center text-sm text-muted-foreground py-16" data-testid="text-no-certificate">
+          That certificate could not be found.
+        </p>
+      )}
+
+      {certificate && (
+        <>
+          <CertificateSheet
+            certificate={certificate}
+            studentName={data?.student.fullName ?? student.fullName}
+            form={data?.student.form ?? student.form}
+          />
+          <p className="cert-noprint text-center text-xs text-muted-foreground mt-4">
+            {CERTIFICATE_TEXT.printNote}
+          </p>
+        </>
       )}
     </div>
   );
