@@ -277,8 +277,10 @@ export default function TeacherGamePlays() {
                         >
                           <div>
                             <p className="font-medium">{r.fullName}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {r.assignmentsHandedIn} handed in
+                            {/* The school's id, because two children can share
+                                a name and this list is meant to be acted on. */}
+                            <p className="text-xs text-muted-foreground" data-testid={`text-pupil-id-${r.studentId}`}>
+                              ID: {r.pupilId} · {r.assignmentsHandedIn} handed in
                             </p>
                           </div>
                           <div className="flex items-center gap-2">

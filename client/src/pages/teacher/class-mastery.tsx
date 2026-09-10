@@ -283,6 +283,12 @@ export default function ClassMasteryPage() {
                         data-testid={`row-support-${c.studentId}`}
                       >
                         <p className="font-medium">{c.fullName}</p>
+                        {/* Two children really can share a name, and this page
+                            exists to be acted on — a name alone would send a
+                            teacher to the wrong child. */}
+                        <p className="text-xs text-muted-foreground" data-testid={`text-pupil-id-${c.studentId}`}>
+                          ID: {c.pupilId}
+                        </p>
                         <div className="flex flex-wrap gap-1.5 mt-1.5">
                           {c.topics.map((t) => (
                             <Badge

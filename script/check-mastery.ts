@@ -431,6 +431,12 @@ async function main() {
     const aSupport = support.find((c: any) => c.studentId === kidA.id);
     check(!!bSupport, "the pupil who got nothing right is flagged for support");
     check(!aSupport, "and the pupil who did well is not");
+    // Two children can share a name, so a name alone would send a teacher to
+    // the wrong child. The school's id has to travel with it.
+    check(bSupport?.pupilId === `MC-B${stamp}`,
+      "a pupil flagged for support carries their school id, not just a name",
+      `got ${bSupport?.pupilId}`);
+
     check((bSupport?.topics || []).some((t: any) => t.topic === `Split ${stamp}`),
       "with the topic they are stuck on named",
       JSON.stringify(bSupport?.topics));

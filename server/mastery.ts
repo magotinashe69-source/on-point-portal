@@ -120,7 +120,7 @@ export async function buildClassMastery(form: string): Promise<ClassMastery> {
   const mine = allSubmissions.filter((s) => studentIds.has(s.studentId));
   if (mine.length === 0) {
     return buildClassMasteryMap(form, students.map((s) => ({
-      studentId: s.id, fullName: s.fullName, map: buildMasteryMap([]),
+      studentId: s.id, fullName: s.fullName, pupilId: s.studentId, map: buildMasteryMap([]),
     })));
   }
 
@@ -154,6 +154,7 @@ export async function buildClassMastery(form: string): Promise<ClassMastery> {
   const children: ChildMastery[] = students.map((student) => ({
     studentId: student.id,
     fullName: student.fullName,
+    pupilId: student.studentId,
     map: buildMasteryMap(
       answeredFrom(submissionsByStudent.get(student.id) ?? [], marks, assignmentById),
     ),

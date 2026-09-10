@@ -28,6 +28,16 @@ import { PLAY_GAMES, type PlayGame } from "./game-plays";
 export interface TeacherPlayRow {
   studentId: number;
   fullName: string;
+  /**
+   * The school's own id for this child (e.g. "F1-001"), as printed on their
+   * record and shown on their dashboard.
+   *
+   * Named `pupilId` and NOT `studentId` because the field above already uses
+   * that name for the database row id. Two children really can share a name —
+   * this register has four pupils called the same thing — and "check in with
+   * Dan Frost" identifies nobody when there are four of him.
+   */
+  pupilId: string;
 
   /** Distinct assignments handed in over the days being looked at. */
   assignmentsHandedIn: number;

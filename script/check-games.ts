@@ -492,6 +492,14 @@ async function main() {
   check(!!worked && !!idle, "every child in the class has a row",
     `worked ${!!worked}, idle ${!!idle}`);
 
+  // A name is not an identifier: this register has four pupils sharing one, so
+  // a row a teacher is meant to act on has to say WHICH child it is.
+  check(idle?.pupilId === `G3I-${stamp}`,
+    "each row carries the child's school id, not just their name",
+    `got ${idle?.pupilId}`);
+  check(rows.every((r: any) => typeof r.pupilId === "string" && r.pupilId.length > 0),
+    "and every row has one", JSON.stringify(rows.map((r: any) => r.pupilId).slice(0, 8)));
+
   // The child who did the homework. Their figures must match the ledger: five
   // assignments handed in today, so ten plays across the two games.
   const ledger = (await pupil.get(`/api/students/${child.id}/plays`)).body?.plays;

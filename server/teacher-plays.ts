@@ -94,6 +94,7 @@ export async function buildTeacherPlays(
     return {
       studentId: student.id,
       fullName: student.fullName,
+      pupilId: student.studentId,
       assignmentsHandedIn,
       playsEarned: earned,
       playsUsed: usedCount,
@@ -112,7 +113,12 @@ export async function buildTeacherPlays(
     neither: 0, playedNotEarned: 1, earnedNotPlayed: 2, earnedAndPlayed: 3,
   };
   rows.sort((a, b) =>
-    order[a.group] - order[b.group] || a.fullName.localeCompare(b.fullName),
+    order[a.group] - order[b.group] ||
+    a.fullName.localeCompare(b.fullName) ||
+    // Names are not unique — this register has four pupils sharing one. Without
+    // this the four would shuffle between requests and a teacher could not tell
+    // which row they had just read.
+    a.pupilId.localeCompare(b.pupilId),
   );
 
   const summary: TeacherPlaysSummary = {
