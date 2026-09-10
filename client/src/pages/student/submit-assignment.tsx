@@ -17,7 +17,7 @@ import { useAuth } from "@/lib/auth";
 import { QueryError } from "@/components/QueryError";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { ArrowLeft, Loader2, Send, Calendar, BookOpen, Edit, AlertTriangle, ImagePlus, X, FileText, Paperclip, Circle, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Loader2, Send, Calendar, BookOpen, Edit, AlertTriangle, ImagePlus, X, FileText, Paperclip, Circle, CheckCircle2, Download, CloudOff } from "lucide-react";
 import { AttachmentDisplay } from "@/components/FileAttachmentZone";
 import { Lightbox } from "@/components/Lightbox";
 import { useUpload } from "@/hooks/use-upload";
@@ -28,6 +28,13 @@ import { setPendingXp, type XpAward } from "@/lib/xp-handoff";
 import { setPendingResources } from "@/lib/dream-handoff";
 import type { Wallet } from "@shared/dreamworld";
 import logoPath from "@assets/logo.webp";
+// --- Offline mode ---
+// A child with no signal must still be able to open a paper they saved and hand
+// it in. The questions come from this device; the answers wait in the outbox.
+import { OFFLINE_TEXT, newClientId } from "@shared/offline";
+import { readPaper, savePaper } from "@/lib/offline-db";
+import { queueSubmission } from "@/lib/outbox";
+import { useOnline } from "@/hooks/use-offline";
 
 const MIN_ANSWER_LENGTH = 30;
 
@@ -76,7 +83,7 @@ export default function SubmitAssignment() {
     }
   }, [student, setLocation]);
 
-  const { data: assignment, isLoading: assignmentLoading, isError: assignmentFailed, error: assignmentError, refetch: refetchAssignment } = useQuery<Assignment>({
+  const { data: liveAssignment, isLoading: assignmentLoading, isError: assignmentFailed, error: assignmentError, refetch: refetchAssignment } = useQuery<Assignment>({
     queryKey: ["/api/assignments", id],
     enabled: !!student && !!id,
   });
@@ -85,6 +92,74 @@ export default function SubmitAssignment() {
     queryKey: ["/api/submissions", { assignmentId: id, studentId: student?.id }],
     enabled: !!student && !!id,
   });
+
+  const online = useOnline();
+
+  // The copy of this paper saved on this phone, if the child downloaded it.
+  // This is what makes answering with no signal possible at all.
+  const [savedPaper, setSavedPaper] = useState<Assignment | null>(null);
+  const [isSavedOffline, setIsSavedOffline] = useState(false);
+  const [savingPaper, setSavingPaper] = useState(false);
+
+  useEffect(() => {
+    if (!student || !id) return;
+    readPaper(student.id, parseInt(id))
+      .then((paper) => {
+        if (!paper) return;
+        setSavedPaper(paper.assignment as Assignment);
+        setIsSavedOffline(true);
+      })
+      .catch(() => { /* no offline storage on this device — carry on as normal */ });
+  }, [student, id]);
+
+  // The paper from the server when there is one, otherwise the saved copy.
+  const assignment = liveAssignment ?? savedPaper ?? undefined;
+
+  // Whether this page can actually reach the school.
+  //
+  // navigator.onLine is not enough on its own, and a real test caught it: after
+  // reopening the app with the network pulled, the phone still said it was
+  // online — it only knows whether it is attached to something, not whether
+  // that something can reach us. So the page's own failed request counts as
+  // evidence too. If we are reading this paper off the device because the
+  // server could not be reached, we are offline, whatever the phone claims.
+  const cannotReachSchool = !online || (assignmentFailed && !liveAssignment && !!savedPaper);
+
+  // Keep an already-saved paper up to date whenever the real one loads, so a
+  // child who saved it last week does not answer last week's questions.
+  useEffect(() => {
+    if (!student || !liveAssignment || !isSavedOffline) return;
+    void savePaper({
+      key: `${student.id}:${liveAssignment.id}`,
+      studentId: student.id,
+      assignmentId: liveAssignment.id,
+      assignment: liveAssignment,
+      savedAt: new Date().toISOString(),
+    }).catch(() => { /* best effort */ });
+  }, [student, liveAssignment, isSavedOffline]);
+
+  async function handleSavePaper() {
+    if (!student || !liveAssignment) return;
+    setSavingPaper(true);
+    try {
+      await savePaper({
+        key: `${student.id}:${liveAssignment.id}`,
+        studentId: student.id,
+        assignmentId: liveAssignment.id,
+        // Exactly what the server sent, which already has the answer key
+        // stripped out of it by assignmentForStudent().
+        assignment: liveAssignment,
+        savedAt: new Date().toISOString(),
+      });
+      setIsSavedOffline(true);
+      setSavedPaper(liveAssignment);
+      toast({ title: OFFLINE_TEXT.savedAlready, description: OFFLINE_TEXT.savedForOffline });
+    } catch {
+      toast({ title: "Not saved", description: OFFLINE_TEXT.cannotSave, variant: "destructive" });
+    } finally {
+      setSavingPaper(false);
+    }
+  }
 
   const existingSubmission = existingSubmissions?.[0];
   const isEditing = !!existingSubmission;
@@ -123,11 +198,53 @@ export default function SubmitAssignment() {
     }
   }, [assignment, existingSubmission, form]);
 
+  // The id THIS hand-in will carry, made once and reused for every attempt —
+  // online, offline, and any retry after a failure. It is what lets the server
+  // recognise the same work arriving twice, so it can never be stored twice.
+  //
+  // It is sent on an ordinary online hand-in too, not just an offline one. That
+  // is what makes the fallback below safe: if the request left the phone and
+  // the reply was lost, the queued retry is recognised rather than duplicated.
+  const clientIdRef = useRef<string | null>(null);
+  function handInId() {
+    if (!clientIdRef.current) clientIdRef.current = newClientId();
+    return clientIdRef.current;
+  }
+
+  /** Keep the work on this phone and tell the child it is safe. */
+  async function handInOffline(values: SubmitForm) {
+    if (!student || !assignment) return;
+    await queueSubmission({
+      clientId: handInId(),
+      studentId: student.id,
+      assignmentId: assignment.id,
+      assignmentTitle: assignment.title,
+      answers: values.answers,
+    });
+    toast({
+      title: OFFLINE_TEXT.handedInOffline,
+      description: OFFLINE_TEXT.handedInOfflineDetail,
+    });
+    setLocation("/student/dashboard");
+  }
+
   async function doSubmit(values: SubmitForm) {
     if (!student || !assignment) return;
 
     setIsLoading(true);
     try {
+      // No connection. Their work is finished, so it is saved here rather than
+      // refused with an error — which is what used to happen, and what makes a
+      // child think they have lost an evening's work.
+      //
+      // Only for a FIRST hand-in: changing work already handed in has to be
+      // done against the server, or two phones could each save a different
+      // version and one would quietly win.
+      if (cannotReachSchool && !isEditing) {
+        await handInOffline(values);
+        return;
+      }
+
       let response;
 
       if (isEditing && existingSubmission) {
@@ -139,6 +256,7 @@ export default function SubmitAssignment() {
           assignmentId: assignment.id,
           studentId: student.id,
           answers: values.answers,
+          clientSubmissionId: handInId(),
         });
       }
 
@@ -189,6 +307,19 @@ export default function SubmitAssignment() {
         });
       }
     } catch (error) {
+      // The request never made it off the phone. The child has finished the
+      // work, so keep it and send it later rather than throwing it away with a
+      // "check your connection". Safe even if it DID reach the school and only
+      // the reply was lost, because it carried an id the server recognises.
+      if (!isEditing) {
+        try {
+          await handInOffline(values);
+          return;
+        } catch {
+          // No offline storage either. Fall through to the message below, which
+          // at least leaves their answers on the screen to try again.
+        }
+      }
       toast({
         title: "Not handed in",
         description: "Check your connection and try again.",
@@ -237,6 +368,12 @@ export default function SubmitAssignment() {
   const answerFileRefs = useRef<Record<number, HTMLInputElement | null>>({});
 
   const handleAnswerFileDrop = async (index: number, files: FileList | File[]) => {
+    // A photo has to be uploaded to the school, so it cannot wait on the phone
+    // the way typed answers can. Say so plainly instead of failing silently.
+    if (cannotReachSchool) {
+      toast({ title: OFFLINE_TEXT.offlineBadge, description: OFFLINE_TEXT.noPhotosOffline });
+      return;
+    }
     const fileArr = Array.from(files);
     setAnswerUploading(prev => ({ ...prev, [index]: true }));
     for (const file of fileArr) {
@@ -326,11 +463,11 @@ export default function SubmitAssignment() {
       </header>
 
       <main className="container mx-auto px-4 py-8 max-w-3xl">
-        {assignmentLoading ? (
+        {assignmentLoading && !assignment ? (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
-        ) : assignmentFailed ? (
+        ) : assignmentFailed && !assignment ? (
           <QueryError error={assignmentError} what="this homework" role="student" variant="page" onRetry={() => refetchAssignment()} data-testid="assignment-load-error" />
         ) : assignment ? (
           <>
@@ -356,6 +493,38 @@ export default function SubmitAssignment() {
                   <h3 className="font-semibold mb-2">Instructions</h3>
                   <p className="whitespace-pre-wrap text-sm">{assignment.instructions}</p>
                 </div>
+
+                {/* Save the questions onto this phone, so the paper opens with
+                    no signal. Only the questions — the answers are queued
+                    separately, and a mark is never kept on a device. */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSavePaper}
+                    disabled={savingPaper || !online || !liveAssignment}
+                    data-testid="button-save-offline"
+                  >
+                    {savingPaper ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : isSavedOffline ? (
+                      <CheckCircle2 className="h-4 w-4 mr-2 text-green-600" />
+                    ) : (
+                      <Download className="h-4 w-4 mr-2" />
+                    )}
+                    {savingPaper
+                      ? OFFLINE_TEXT.saving
+                      : isSavedOffline
+                        ? OFFLINE_TEXT.savedAlready
+                        : OFFLINE_TEXT.saveForOffline}
+                  </Button>
+                  {isSavedOffline && (
+                    <span className="text-xs text-muted-foreground" data-testid="text-saved-offline">
+                      {OFFLINE_TEXT.savedForOffline}
+                    </span>
+                  )}
+                </div>
                 {assignment.attachments && assignment.attachments.length > 0 && (
                   <div className="p-4 border rounded-md space-y-2">
                     <h3 className="font-semibold flex items-center gap-2 text-sm">
@@ -367,6 +536,17 @@ export default function SubmitAssignment() {
                 )}
               </CardContent>
             </Card>
+
+            {cannotReachSchool && (
+              <Alert className="mb-6" data-testid="alert-offline-paper">
+                <CloudOff className="h-4 w-4" />
+                <AlertDescription>
+                  {isEditing
+                    ? OFFLINE_TEXT.cannotEditOffline
+                    : `${OFFLINE_TEXT.handedInOfflineDetail} ${OFFLINE_TEXT.markComesLater}`}
+                </AlertDescription>
+              </Alert>
+            )}
 
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -633,7 +813,7 @@ export default function SubmitAssignment() {
                   type="submit"
                   className="w-full"
                   size="lg"
-                  disabled={isLoading || lockedByTeacherMark}
+                  disabled={isLoading || lockedByTeacherMark || (cannotReachSchool && isEditing)}
                   data-testid="button-submit"
                 >
                   {isLoading ? (

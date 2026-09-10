@@ -29,6 +29,9 @@ import { isPrimaryForm } from "@shared/schema";
 import { XpLevelBar } from "@/components/XpLevelBar";
 import { StreakFlame } from "@/components/StreakFlame";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+// Offline mode: the dashboard is the page that owns the syncing, because it is
+// the one a child always comes back to.
+import { SyncStatus } from "@/components/SyncStatus";
 import logoPath from "@assets/logo.webp";
 
 interface EnrichedSubmission {
@@ -168,6 +171,13 @@ export default function StudentDashboard() {
           <h1 className="text-3xl font-bold mb-2">Welcome, {student.fullName}!</h1>
           <p className="text-muted-foreground">{student.form} - ID: {student.studentId}</p>
         </div>
+
+        {/* Work answered with no signal, and how far it has got. Shows nothing
+            at all on an ordinary connected day. `driveSync` means this page is
+            the one that starts the sending. */}
+        <ErrorBoundary label="sync-status">
+          <SyncStatus studentId={student.id} driveSync />
+        </ErrorBoundary>
 
         {/* Level + XP progress with the daily streak flame beside it. Both come
             from the stats already loaded above, so this adds no extra request.

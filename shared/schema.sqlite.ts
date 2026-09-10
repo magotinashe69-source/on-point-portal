@@ -123,6 +123,9 @@ export const submissions = sqliteTable("submissions", {
     flags: string[];
     details: string;
   } | null>(),
+  // Offline hand-in — see the PostgreSQL schema for why these two exist.
+  clientSubmissionId: text("client_submission_id"),
+  receivedAt: timestamp("received_at"),
 });
 
 // --- Marks ---
@@ -418,8 +421,16 @@ CREATE TABLE IF NOT EXISTS submissions (
   status TEXT NOT NULL DEFAULT 'SUBMITTED',
   answers TEXT NOT NULL,
   late_days INTEGER NOT NULL DEFAULT 0,
-  ai_analysis TEXT
+  ai_analysis TEXT,
+  client_submission_id TEXT,
+  received_at INTEGER
 );
+
+-- NOTE: the unique index on client_submission_id is NOT here. It is created in
+-- server/db.ts, AFTER the ALTER TABLE that adds the column. On a database that
+-- already exists, "CREATE TABLE IF NOT EXISTS" does nothing, so the column is
+-- not there yet when this file runs — and an index on a column that does not
+-- exist fails the whole batch, taking the rest of the schema with it.
 
 CREATE TABLE IF NOT EXISTS marks (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

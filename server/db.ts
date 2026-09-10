@@ -222,6 +222,15 @@ const STUDENTS_ADDED_COLUMNS: { name: string; type: string }[] = [
   { name: "active", type: "BOOLEAN NOT NULL DEFAULT true" },
 ];
 
+// Columns added to submissions after it first shipped, for offline hand-in.
+// Both are nullable on purpose: every submission already in the database was
+// handed in with a connection, so it has neither a device id nor an arrival
+// time, and that is the correct reading of a null here.
+const SUBMISSIONS_ADDED_COLUMNS: { name: string; type: string }[] = [
+  { name: "client_submission_id", type: "TEXT" },
+  { name: "received_at", type: "TIMESTAMP" },
+];
+
 // Filled in below depending on which database we use.
 let activeDb: unknown;
 let pgPoolInstance: pg.Pool | undefined;
@@ -258,9 +267,19 @@ if (usePostgres) {
     for (const col of STUDENTS_ADDED_COLUMNS) {
       await pgPoolInstance!.query(`ALTER TABLE students ADD COLUMN IF NOT EXISTS ${col.name} ${col.type}`);
     }
+    for (const col of SUBMISSIONS_ADDED_COLUMNS) {
+      await pgPoolInstance!.query(`ALTER TABLE submissions ADD COLUMN IF NOT EXISTS ${col.name} ${col.type}`);
+    }
     // The unique index is separate: ADD COLUMN cannot carry UNIQUE in Postgres.
     await pgPoolInstance!.query(
       `CREATE UNIQUE INDEX IF NOT EXISTS students_qr_code_key ON students (qr_code)`
+    );
+    // The index that makes offline work safe to re-send: the same piece of work
+    // can arrive twice and the DATABASE refuses the second copy, rather than
+    // relying on code that looked first and could be beaten by a second request
+    // arriving in between.
+    await pgPoolInstance!.query(
+      `CREATE UNIQUE INDEX IF NOT EXISTS submissions_client_submission_id_key ON submissions (client_submission_id)`
     );
   };
 
@@ -305,9 +324,23 @@ if (usePostgres) {
       try { await client.execute(`ALTER TABLE students ADD COLUMN ${col.name} ${type}`); }
       catch { /* column already present */ }
     }
+    for (const col of SUBMISSIONS_ADDED_COLUMNS) {
+      // SQLite keeps timestamps as numbers, as the rest of this file does.
+      const type = col.type.replace("TIMESTAMP", "INTEGER");
+      try { await client.execute(`ALTER TABLE submissions ADD COLUMN ${col.name} ${type}`); }
+      catch { /* column already present */ }
+    }
     try {
       await client.execute(
         `CREATE UNIQUE INDEX IF NOT EXISTS students_qr_code_key ON students (qr_code)`
+      );
+    } catch { /* index already present */ }
+    // See the PostgreSQL side: this index is what stops offline work being
+    // stored twice. It is created here as well as in the DDL because a database
+    // that already exists never runs the DDL's CREATE TABLE.
+    try {
+      await client.execute(
+        `CREATE UNIQUE INDEX IF NOT EXISTS submissions_client_submission_id_key ON submissions (client_submission_id)`
       );
     } catch { /* index already present */ }
   };

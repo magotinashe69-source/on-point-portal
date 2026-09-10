@@ -35,6 +35,22 @@ import {
   type BankFilters, type BankQuestion, type NewBankQuestion,
 } from "@shared/question-bank";
 
+/**
+ * The extra facts an OFFLINE hand-in carries, on top of the answers themselves.
+ *
+ * All three are optional, so an ordinary hand-in over a live connection calls
+ * createSubmission exactly as it always did and behaves exactly as it always
+ * did.
+ */
+export interface SubmissionArrival {
+  /** When the CHILD finished, which is what the school should count. */
+  submittedAt?: Date;
+  /** The id the device gave this work. Unique — see shared/offline.ts. */
+  clientSubmissionId?: string | null;
+  /** When it actually reached us, for anyone who needs to know the gap. */
+  receivedAt?: Date | null;
+}
+
 export interface IStorage {
   // Teachers
   getTeacher(id: number): Promise<Teacher | undefined>;
@@ -74,7 +90,8 @@ export interface IStorage {
   // Submissions
   getSubmission(id: number): Promise<Submission | undefined>;
   getSubmissions(filters?: { assignmentId?: number; studentId?: number }): Promise<Submission[]>;
-  createSubmission(submission: InsertSubmission): Promise<Submission>;
+  createSubmission(submission: InsertSubmission & SubmissionArrival): Promise<Submission>;
+  getSubmissionByClientId(clientSubmissionId: string): Promise<Submission | undefined>;
   updateSubmission(id: number, data: { answers: Array<{ questionId: string; answerText: string; imageUrls?: string[] }> }): Promise<Submission | undefined>;
   updateSubmissionStatus(id: number, status: string): Promise<void>;
   updateSubmissionAiAnalysis(id: number, analysis: { overallScore: number; flags: string[]; details: string }): Promise<void>;
@@ -439,13 +456,31 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(submissions);
   }
 
-  async createSubmission(submission: InsertSubmission): Promise<Submission> {
+  async createSubmission(submission: InsertSubmission & SubmissionArrival): Promise<Submission> {
     const [newSubmission] = await db.insert(submissions).values({
       ...submission,
       answers: submission.answers as any,
       lateDays: 0,
+      // Left undefined for an ordinary hand-in, so the column default (now)
+      // still applies exactly as it did before offline mode existed.
+      ...(submission.submittedAt ? { submittedAt: submission.submittedAt } : {}),
     }).returning();
     return newSubmission;
+  }
+
+  /**
+   * Find a submission by the id the DEVICE gave it.
+   *
+   * This is how a re-sent piece of offline work is recognised as one we already
+   * have, instead of being stored a second time.
+   */
+  async getSubmissionByClientId(clientSubmissionId: string): Promise<Submission | undefined> {
+    const [found] = await db
+      .select()
+      .from(submissions)
+      .where(eq(submissions.clientSubmissionId, clientSubmissionId))
+      .limit(1);
+    return found;
   }
 
   async updateSubmission(id: number, data: { answers: Array<{ questionId: string; answerText: string; imageUrls?: string[] }> }): Promise<Submission | undefined> {

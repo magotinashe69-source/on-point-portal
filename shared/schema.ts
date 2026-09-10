@@ -213,6 +213,17 @@ export const submissions = pgTable("submissions", {
     flags: string[];
     details: string;
   } | null>().default(null),
+  // --- Offline hand-in ---
+  // The id the DEVICE gave this piece of work before it was ever sent. UNIQUE,
+  // which is the whole reason offline work can be re-sent safely: the same
+  // answers can arrive twice and only be stored once. Null for work handed in
+  // with a live connection, and a unique index ignores nulls in both engines,
+  // so any number of online submissions sit happily alongside.
+  clientSubmissionId: text("client_submission_id"),
+  // When an offline hand-in actually reached us. `submittedAt` stays the moment
+  // the CHILD finished, so the two together say "done Monday, arrived
+  // Wednesday" rather than pretending the work is late.
+  receivedAt: timestamp("received_at"),
 });
 
 export const submissionsRelations = relations(submissions, ({ one }) => ({

@@ -24,6 +24,8 @@ import { certificatesFor, certificateFor, awardMostImproved } from "./certificat
 import { improvementFor } from "./most-improved";
 import { buildClassReportCards, boundaries as reportBoundaries, termKeyFor } from "./report-card";
 import { validateBoundaries, sortBoundaries, type GradeBoundary } from "@shared/report-card";
+// Offline hand-in: deciding what time a piece of work was really finished.
+import { resolveCompletedAt } from "@shared/offline";
 import {
   validateBankQuestion, isDifficulty, isBankType,
   type BankType, type Difficulty,
@@ -2073,7 +2075,30 @@ export async function registerRoutes(
       answerText: z.string(),
       imageUrls: z.array(z.string()).optional(),
     })),
+    // --- Offline hand-in (both optional; an ordinary hand-in sends neither) ---
+    // The id the device gave this work before it was ever sent. The same work
+    // may arrive many times under this id and must be stored exactly once.
+    clientSubmissionId: z.string().min(8).max(64).optional(),
+    // When the child actually finished, by their own clock. Checked, not
+    // trusted — see resolveCompletedAt in shared/offline.ts.
+    completedAt: z.string().optional(),
   });
+
+  /**
+   * True when the database refused a write because a unique index already holds
+   * that value.
+   *
+   * This is the race that a "look first, then insert" check cannot win: two
+   * sends of the same offline work arriving together both look, both find
+   * nothing, and both insert. The index refuses the loser, and this is how we
+   * recognise that refusal so it can be turned into "we already have it".
+   */
+  function isUniqueViolation(error: unknown): boolean {
+    const err = error as { code?: string; message?: string; cause?: { message?: string } };
+    if (err?.code === "23505") return true; // PostgreSQL
+    const text = `${err?.message ?? ""} ${err?.cause?.message ?? ""}`;
+    return /UNIQUE constraint failed|SQLITE_CONSTRAINT/i.test(text);
+  }
 
   app.post("/api/submissions", async (req, res) => {
     try {
@@ -2084,12 +2109,49 @@ export async function registerRoutes(
         return res.json({ success: false, message: validation.error });
       }
       
-      const { assignmentId, studentId, answers } = validation.data;
+      const { assignmentId, studentId, answers, clientSubmissionId, completedAt } = validation.data;
 
       // Work can only be handed in for yourself. The studentId arrives in the
       // request body, so without this check anyone could submit answers in any
       // child's name.
       if (!(await requireTeacherOrSelf(req, res, studentId))) return;
+
+      // --- Have we already got this exact piece of work? ---
+      //
+      // Offline work is re-sent until the school confirms it, so the SAME work
+      // legitimately arrives more than once: the reply was lost, the app was
+      // closed mid-send, two tabs synced at once. Recognising it here is what
+      // makes that safe.
+      //
+      // This has to come BEFORE the "you have already handed this in" check
+      // below. Otherwise a perfectly ordinary re-send would be refused as a
+      // second attempt, the device would mark it as blocked, and a child would
+      // be told their own handed-in work had been rejected.
+      //
+      // Nothing is awarded again: XP, the treasure chest and the streak all sit
+      // below the early return, so they happen once, on the arrival that
+      // actually stored something.
+      if (clientSubmissionId) {
+        const already = await storage.getSubmissionByClientId(clientSubmissionId);
+        if (already) {
+          // A device id is not a password. Answer as if it were unknown to
+          // anyone but its owner, so it can never be used to read another
+          // child's work.
+          if (already.studentId !== studentId) {
+            return res.status(403).json({ success: false, message: "That work belongs to somebody else." });
+          }
+          const existingMark = await storage.getMark(already.id);
+          return res.json({
+            success: true,
+            submission: already,
+            mark: existingMark ?? undefined,
+            // Says plainly that nothing new was stored. The device treats this
+            // exactly like a fresh acceptance — the work has arrived, which is
+            // all it needs to know.
+            duplicate: true,
+          });
+        }
+      }
 
       const student = await storage.getStudent(studentId);
       if (!student) {
@@ -2115,11 +2177,48 @@ export async function registerRoutes(
         return res.json({ success: false, message: "You have already handed this in." });
       }
       
-      const submission = await storage.createSubmission({
-        assignmentId,
-        studentId,
-        answers,
+      // When the work was finished. For an ordinary hand-in that is now; for
+      // offline work it is the child's own clock, checked but not trusted.
+      const arrivedAt = new Date();
+      const { submittedAt, verdict } = resolveCompletedAt({
+        completedAt,
+        now: arrivedAt,
+        assignmentCreatedAt: assignment.createdAt ? new Date(assignment.createdAt) : null,
       });
+      if (clientSubmissionId && verdict !== "trusted" && verdict !== "no-claim") {
+        // Worth a line in the log: a phone whose clock cannot be believed is
+        // usually a flat battery, but it is also what setting the clock back to
+        // beat a deadline looks like.
+        console.warn(`[offline] device clock not used for ${clientSubmissionId}: ${verdict}`);
+      }
+
+      let submission;
+      try {
+        submission = await storage.createSubmission({
+          assignmentId,
+          studentId,
+          answers,
+          submittedAt,
+          clientSubmissionId: clientSubmissionId ?? null,
+          // Only offline work has a gap between finishing and arriving, so this
+          // stays null for an ordinary hand-in rather than repeating submittedAt.
+          receivedAt: clientSubmissionId ? arrivedAt : null,
+        });
+      } catch (insertError) {
+        // The race the check above cannot win: a second send of the same work
+        // arrived while this one was still deciding. The unique index refused
+        // it, which is exactly what we wanted — read back the copy that won and
+        // answer with that, so the device is told its work has arrived instead
+        // of seeing an error it would keep retrying.
+        if (clientSubmissionId && isUniqueViolation(insertError)) {
+          const winner = await storage.getSubmissionByClientId(clientSubmissionId);
+          if (winner) {
+            const winnerMark = await storage.getMark(winner.id);
+            return res.json({ success: true, submission: winner, mark: winnerMark ?? undefined, duplicate: true });
+          }
+        }
+        throw insertError;
+      }
 
       // If every question is an auto-marking type, mark it instantly in code
       // and save the score. Otherwise fall back to the teacher's AI text check.

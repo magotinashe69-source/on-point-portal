@@ -7,7 +7,9 @@
  *
  * The rules, in plain language:
  *   * Pages          -> try the internet first, so people always get the newest
- *                       version. If the internet is down, show the offline page.
+ *                       version. If the internet is down, open the saved copy of
+ *                       the app itself, so a student can still answer homework
+ *                       they saved earlier.
  *   * Built files     -> (the /assets/... files Vite makes) safe to keep forever,
  *                       because every build gives them a brand-new file name.
  *   * Icons, fonts    -> serve the saved copy straight away, then quietly refresh
@@ -20,13 +22,17 @@
  * are thrown away.
  */
 
-const CACHE_VERSION = "v1";
+const CACHE_VERSION = "v2";
 const SHELL_CACHE = `onpoint-shell-${CACHE_VERSION}`;
 const ASSET_CACHE = `onpoint-assets-${CACHE_VERSION}`;
 const OFFLINE_PAGE = "/offline.html";
+// The app itself. Every address in this app is served by the same small HTML
+// file, so saving it once means ANY page can be opened with no internet.
+const APP_SHELL = "/";
 
 // The few files needed to show *something* useful with no internet.
 const SHELL_FILES = [
+  APP_SHELL,
   OFFLINE_PAGE,
   "/manifest.webmanifest",
   "/favicon.png",
@@ -97,14 +103,36 @@ function isSaveable(response) {
   return response.ok && response.status === 200;
 }
 
-/** Pages: internet first, saved copy or the offline page as a backup. */
+/**
+ * Pages: internet first, then the saved copy of the app.
+ *
+ * The backup used to be offline.html — a dead end that said "you are offline"
+ * and nothing else. A student who had saved their homework to their phone could
+ * not get to it, because the app never started.
+ *
+ * Now an offline page request falls back to the app itself, which starts, reads
+ * the work saved on the device, and lets them carry on. offline.html is kept as
+ * the last resort for a browser that arrives here having never loaded the app.
+ *
+ * Note what this does NOT change: /api/ is still never saved, so no mark, no
+ * score and no homework list is ever served from a cache. The app shell is an
+ * empty frame; everything inside it is still fetched live.
+ */
 async function handlePageRequest(request) {
   try {
-    return await fetch(request);
+    const response = await fetch(request);
+    // Keep the saved app up to date, so an offline start is never running a
+    // version from months ago.
+    if (isSaveable(response)) {
+      const cache = await caches.open(SHELL_CACHE);
+      cache.put(APP_SHELL, response.clone());
+    }
+    return response;
   } catch {
     const cache = await caches.open(SHELL_CACHE);
     return (
       (await cache.match(request)) ||
+      (await cache.match(APP_SHELL)) ||
       (await cache.match(OFFLINE_PAGE)) ||
       new Response("You are offline.", {
         status: 503,

@@ -954,6 +954,146 @@ and the other has none of it — and checks the spread tells them apart, that th
 list is weakest-first, that the struggling pupil is flagged and the strong one
 is not, and that a pupil cannot read the class view. 61 checks.
 
+## Offline mode
+
+A child can save a paper to their phone while they have signal, answer it and
+hand it in with none, and have it sent on its own the moment they reconnect.
+
+- `shared/offline.ts` — the queue item, the rules, the wording. Pure.
+- `client/src/lib/offline-db.ts` — the store on the device (IndexedDB, by hand).
+- `client/src/lib/outbox.ts` — the sync runner.
+- `client/src/components/SyncStatus.tsx` — "2 items waiting to sync".
+- `client/public/sw.js` — serves the app itself when the network is gone.
+
+### The one rule everything rests on
+
+> **The DEVICE names the submission, not the server.**
+
+When a child taps "Hand in", the app makes a random `clientId` and saves it with
+the answers. Every later attempt to send that work carries the same id, for
+ever. That is what gives both halves of the promise:
+
+* **never duplicated** — `submissions.client_submission_id` carries a UNIQUE
+  index, so the same work can arrive any number of times and be stored once;
+* **never lost** — the device deletes a queued item only AFTER the server has
+  said in words that it has it. A crash mid-send leaves it exactly where it was.
+
+The id is sent on an **ordinary online hand-in too**, not only an offline one.
+That is what makes the fallback safe: if a normal hand-in leaves the phone and
+the reply is lost, the queued retry is recognised rather than stored again.
+
+### The order of the checks in POST /api/submissions matters
+
+The `clientSubmissionId` lookup runs **before** the "you have already handed
+this in" check. The other way round, an ordinary re-send would be refused as a
+second attempt, the phone would mark it blocked, and a child would be told their
+own handed-in work had been rejected.
+
+Nothing is awarded twice because the early return sits above the XP, the
+treasure chest and the streak.
+
+### The race a "look first" check cannot win
+
+Two sends of the same work arriving together both look, both find nothing, and
+both insert. The unique index refuses the loser; `isUniqueViolation()` catches
+that, re-reads the winner and answers with it. `npm run check:offline` fires
+five at once and checks the database holds one.
+
+### The device clock is USED but not TRUSTED
+
+`submittedAt` is the time the CHILD finished — so streaks, game plays and
+report-card terms all read the honest moment, not whenever a signal turned up.
+`receivedAt` records when it actually arrived, so the gap is visible.
+
+`resolveCompletedAt()` refuses a claimed time that is **in the future** (which
+would land the work in tomorrow's CAT day and break the game-plays count) or
+**before the paper was set** (impossible, so the clock is wrong). Either falls
+back to server time. A phone that was genuinely offline for a fortnight is still
+believed — the point is to catch a broken clock, not to punish a child.
+
+**A deliberately altered clock can still make late work look on time**, within
+the window between the paper being set and now. `received_at` and
+`client_submission_id` are the audit trail beside it. Closing that properly
+needs a signed timestamp, which is not worth it here.
+
+### What is deliberately NOT offline
+
+* **Editing work already handed in.** Two phones could each save a different
+  version and one would quietly win. Offline hand-in is a FIRST submission only,
+  and the button is disabled with a sentence saying so.
+* **Photo attachments.** An upload needs the server. Typed answers still work
+  and the camera button says why.
+* **Marks and results.** Nothing on the device may hold a score: a saved mark
+  goes stale, and a stale mark shows a child a score their teacher has already
+  changed. The queued item has no score field, the "just sent" list lives in
+  memory only, and `/api/` is still never cached by the service worker.
+* **Backdating the STREAK.** The submission is dated by completion, but the
+  streak counts on the day it syncs. Backdating means replaying a chain that
+  spends freezes — a rewrite of the streak state machine. Known limitation.
+
+### The service worker now serves the app, not a dead end
+
+An offline page request used to fall back to `offline.html`, which said "you are
+offline" and nothing else — so a child who had saved their homework could not
+reach it, because the app never started. Navigation now falls back to the saved
+app shell (`/`), which boots and reads the device. `offline.html` remains the
+last resort for a browser that has never loaded the app.
+
+`/api/` is untouched by this: still never cached, so no mark, score or homework
+list is ever served from a cache. The shell is an empty frame.
+
+### navigator.onLine is not enough
+
+A real test caught this: after reopening the app with the network pulled, the
+phone still reported `navigator.onLine === true`. It only knows whether the
+device is attached to something, not whether that something can reach the
+school.
+
+So the submit page uses `cannotReachSchool` — `!online` OR "this page is reading
+the paper off the device because the server could not be reached". `useOnline()`
+is used to decide what to OFFER a child, never to decide whether their work
+arrived. Only the server's own reply decides that.
+
+The work was queued correctly even before this was fixed, because a failed
+online hand-in falls into the outbox anyway. What was missing was the sentence
+telling the child why.
+
+### Reading the reply is the dangerous part
+
+`interpretReply()` treats everything that is not a clear, understood YES as "did
+not arrive". The trap it exists to survive is school WiFi: a hotspot that wants
+you to sign in answers every request with its own web page and a cheerful 200.
+Treating that as success would delete a child's work and send it nowhere. Only a
+reply that parses, says `success: true` AND names a numeric submission id counts.
+
+### Proving it — `npm run check:offline`
+
+`script/check-offline.ts`, in three parts. The rules on their own (every shape
+of reply, the stale-send recovery, the clock verdicts, two thousand ids with no
+collision). The source itself, for two promises no server can be asked about:
+that nothing which writes to a device mentions a mark, and that the service
+worker still refuses `/api/`. Then a live server: the same work sent twice, four
+more times, and five at once; XP that does not move on a repeat; the mark coming
+back so a result appears after syncing; a new id for a paper already handed in
+refused rather than stored twice; another pupil's device id refused with 403;
+and an ordinary hand-in proved unchanged. 88 checks.
+
+The browser half is not in this script, because it needs a real browser driven
+over the DevTools Protocol with Chrome's own network emulation (so
+`navigator.onLine` really is false and `fetch` really does fail). Two harnesses
+were used, and both live in the commit message rather than the repo:
+
+* against `npm run dev` — save a paper, pull the network, answer it, hand it in,
+  check it is waiting with the child's own completion time and no mark on the
+  device, restore the network, watch it sync once; then queue a second piece and
+  RELOAD the app mid-send to prove an interrupted sync neither loses nor
+  duplicates. 28 checks.
+* against the BUILT app (`npm run build`, `NODE_ENV=production`) — the only way
+  to exercise the service worker, since it is deliberately never registered in
+  development. Pull the network, reload the whole app, and check it starts,
+  shows the saved questions, takes a hand-in, syncs once, and that nothing under
+  `/api/` ended up in any cache. 10 checks.
+
 ## Report cards
 
 A term's marks assembled into a printable card, in the school's navy and gold.
