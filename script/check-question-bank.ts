@@ -24,6 +24,7 @@ import {
   type NewBankQuestion,
 } from "../shared/question-bank";
 import { apiErrorMessage } from "../client/src/lib/api-error";
+import { onCleanup, runCheck } from "./cleanup";
 
 let passed = 0;
 let failed = 0;
@@ -85,7 +86,13 @@ async function main() {
   // that is missing, which is what makes "was the table created?" answerable.
   await ensureSchema();
 
+  // Bank rows are removed through storage, which this half already talks to
+  // directly. Registered as they are made rather than listed at the end.
   const saved: number[] = [];
+  const remember = (id: number, what: string) => {
+    saved.push(id);
+    onCleanup(what, async () => { await storage.deleteBankQuestion(id); });
+  };
 
   // =======================================================================
   section("The table exists and can be read");
@@ -138,7 +145,10 @@ async function main() {
   const savedTf = await storage.createBankQuestion(tf);
   const savedNum = await storage.createBankQuestion(num);
   const savedText = await storage.createBankQuestion(text);
-  saved.push(savedMcq.id, savedTf.id, savedNum.id, savedText.id);
+  remember(savedMcq.id, "bank question (multiple choice)");
+  remember(savedTf.id, "bank question (true/false)");
+  remember(savedNum.id, "bank question (numeric)");
+  remember(savedText.id, "bank question (short text)");
 
   check(savedMcq.id > 0, "a multiple-choice question is saved and given an id", `id ${savedMcq.id}`);
   check(!!savedMcq.createdAt, "and the date it was saved", savedMcq.createdAt);
@@ -309,7 +319,7 @@ async function main() {
     let refused = false;
     try {
       const bad = await storage.createBankQuestion(q);
-      saved.push(bad.id); // saved when it should not have been — clean it up
+      remember(bad.id, "bank question that should have been refused");
     } catch {
       refused = true;
     }
@@ -328,7 +338,7 @@ async function main() {
 
   const assignmentsBefore = await storage.getAssignments();
   const extra = await storage.createBankQuestion({ ...num, questionText: `Separateness ${stamp}` });
-  saved.push(extra.id);
+  remember(extra.id, "bank question (separateness check)");
   const assignmentsAfter = await storage.getAssignments();
   check(assignmentsBefore.length === assignmentsAfter.length,
     "saving a bank question creates no assignment",
@@ -373,7 +383,7 @@ async function main() {
     check(savedRes.body?.success === true, "a question is saved to the bank with its tags",
       JSON.stringify(savedRes.body).slice(0, 160));
     const httpId: number | undefined = savedRes.body?.question?.id;
-    if (httpId) saved.push(httpId);
+    if (httpId) remember(httpId, "bank question saved over HTTP");
 
     check(savedRes.body?.question?.subject === "GEOGRAPHY"
       && savedRes.body?.question?.difficulty === "easy"
@@ -388,7 +398,9 @@ async function main() {
       subject: "MATHS", topic: TOPIC, form: "Stage 3", difficulty: "easy",
       createdById: 999999,
     });
-    if (impersonated.body?.question?.id) saved.push(impersonated.body.question.id);
+    if (impersonated.body?.question?.id) {
+      remember(impersonated.body.question.id, "bank question (impersonation attempt)");
+    }
     check(impersonated.body?.question?.createdById !== 999999,
       "the teacher in the body is ignored — the author comes from the session",
       `got ${impersonated.body?.question?.createdById}`);
@@ -511,6 +523,7 @@ async function main() {
     });
     const source = sourceRes.body?.question;
     check(!!source, "a question to pull from is saved", JSON.stringify(sourceRes.body).slice(0, 120));
+    if (source) remember(source.id, "bank question pulled onto a paper");
 
     if (source) {
       // What the form does when a teacher ticks it in the picker.
@@ -525,6 +538,7 @@ async function main() {
       });
       const paper = paperRes.body?.assignment;
       check(!!paper, "an assignment is created from it", JSON.stringify(paperRes.body).slice(0, 160));
+      if (paper) onCleanup(`assignment ${paper.title}`, () => teacher.delete(`/api/assignments/${paper.id}`));
 
       if (paper) {
         // Now change the saved question completely, and delete it.
@@ -554,6 +568,7 @@ async function main() {
         })).body?.student;
         check(!!learner, "a pupil is created to answer the paper",
           "if this fails the checks below are SKIPPED, not passing");
+        if (learner) onCleanup(`pupil ${learner.studentId}`, () => teacher.delete(`/api/students/${learner.id}`));
 
         if (learner) {
           const pupil = new Session();
@@ -568,10 +583,8 @@ async function main() {
             "a child answering the paper is marked against the paper, not the library",
             JSON.stringify(handIn.body?.mark));
 
-          await teacher.delete(`/api/students/${learner.id}`);
         }
 
-        await teacher.delete(`/api/assignments/${paper.id}`);
       }
     }
 
@@ -602,20 +615,16 @@ async function main() {
     );
   }
 
-  // --- Tidy up -----------------------------------------------------------
-  for (const id of saved) {
-    try { await storage.deleteBankQuestion(id); } catch { /* already gone */ }
-  }
-  const leftOver = await storage.getBankQuestions({ topic: TOPIC });
-  check(leftOver.length === 0, "the check removed everything it created", `${leftOver.length} left`);
-
-  console.log(`\n${passed} passed, ${failed} failed\n`);
-  // Set the code and let the process end by itself — never process.exit(),
-  // which tears down open sockets and reports a green run as a failure.
-  process.exitCode = failed === 0 ? 0 : 1;
 }
 
-main().catch(err => {
-  console.error(err);
-  process.exitCode = 1;
-});
+// No tidy-up block at the end on purpose. Everything this check creates
+// registers its own removal with onCleanup() at the moment it is made, and
+// runCheck runs those in a `finally` — so a run that throws partway, or one
+// killed by the dev server restarting under it, still cleans up after itself.
+
+function summary(): boolean {
+  console.log(`\n${passed} passed, ${failed} failed\n`);
+  return failed === 0;
+}
+
+runCheck(main, summary);

@@ -12,6 +12,7 @@
 import {
   CERTIFICATE_TEXT, STREAK_STAR_DAYS, certificateDate, certificateKey,
 } from "../shared/certificates";
+import { onCleanup, runCheck } from "./cleanup";
 
 const BASE = "http://localhost:5000";
 const TEACHER = { email: "onpointeducationcentremoza@gmail.com", password: "onpoint123" };
@@ -61,7 +62,7 @@ async function main() {
   const login = await teacher.post("/api/auth/teacher/login", TEACHER);
   if (!login.body?.success) {
     check(false, "the teacher can sign in", "is the server running? npm run dev");
-    return finish();
+    return;
   }
 
   const child = (await teacher.post("/api/students", {
@@ -69,7 +70,8 @@ async function main() {
     gender: "Female", form: "Stage 4",
   })).body?.student;
   check(!!child, "a pupil is created");
-  if (!child) return finish();
+  if (!child) return;
+  onCleanup(`pupil ${child.studentId}`, () => teacher.delete(`/api/students/${child.id}`));
 
   const pupil = new Session();
   await pupil.post("/api/auth/student/login", { fullName: child.fullName, password: "certpw1234" });
@@ -89,7 +91,8 @@ async function main() {
     dueDate: "2026-12-01", totalMarks: 4, createdById: 1, questions,
   })).body?.assignment;
   check(!!paper, "a paper is created");
-  if (!paper) return finish();
+  if (!paper) return;
+  onCleanup(`assignment ${paper.title}`, () => teacher.delete(`/api/assignments/${paper.id}`));
 
   // Everything right, so the mark is full.
   const handIn = await pupil.post("/api/submissions", {
@@ -147,6 +150,9 @@ async function main() {
   // Walked day by day with the dev clock, so the streak is a real one built the
   // way a child's is rather than a number written straight into the table.
 
+  // The clock is state as much as a pupil is: a run that dies mid-walk would
+  // otherwise leave the whole server pretending it is next Tuesday.
+  onCleanup("streak clock", () => teacher.post("/api/dev/streak/sim-date", { date: null }));
   const startToday = (await teacher.get("/api/dev/streak/sim-date")).body?.today;
   let ok = true;
   for (let i = 0; i < STREAK_STAR_DAYS; i++) {
@@ -213,12 +219,12 @@ async function main() {
   check(!!other, "a second pupil is created",
     "if this fails the checks below are SKIPPED, not passing");
   if (other) {
+    onCleanup(`pupil ${other.studentId}`, () => teacher.delete(`/api/students/${other.id}`));
     const otherPupil = new Session();
     await otherPupil.post("/api/auth/student/login", { fullName: other.fullName, password: "certpw5678" });
     const peek = await otherPupil.get(`/api/students/${child.id}/certificates`);
     check(peek.status === 403 || peek.status === 401,
       "one pupil cannot read another pupil's certificates", `got ${peek.status}`);
-    await teacher.delete(`/api/students/${other.id}`);
   }
 
   const anon = await new Session().get(`/api/students/${child.id}/certificates`);
@@ -304,21 +310,14 @@ async function main() {
     "and a date that reads properly on a certificate",
     certificateDate(single.body?.certificate?.earnedAt));
 
-  // --- Tidy up ----------------------------------------------------------
-  await teacher.post("/api/dev/streak/sim-date", { date: null });
-  await teacher.delete(`/api/assignments/${paper.id}`);
-  await teacher.delete(`/api/students/${child.id}`);
-  console.log("\nTest pupil and assignment removed, streak clock reset.");
-
-  finish();
+  // No tidy-up block here on purpose. Everything this check created registered
+  // its own removal with onCleanup() at the moment it was made, and runCheck
+  // runs those in a `finally` — so a crash halfway through cleans up too.
 }
 
-function finish() {
+function summary(): boolean {
   console.log(`\n${passed} passed, ${failed} failed\n`);
-  process.exitCode = failed === 0 ? 0 : 1;
+  return failed === 0;
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exitCode = 1;
-});
+runCheck(main, summary);

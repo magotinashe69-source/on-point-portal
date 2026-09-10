@@ -14,6 +14,7 @@ import {
   buildMasteryMap, bandFor, MASTERED_AT, DEVELOPING_AT, MIN_MARKS_FOR_A_TOPIC,
   type AnsweredQuestion,
 } from "../shared/mastery";
+import { onCleanup, runCheck } from "./cleanup";
 
 const BASE = "http://localhost:5000";
 const TEACHER = { email: "onpointeducationcentremoza@gmail.com", password: "onpoint123" };
@@ -159,7 +160,7 @@ async function main() {
   const login = await teacher.post("/api/auth/teacher/login", TEACHER);
   if (!login.body?.success) {
     check(false, "the teacher can sign in", "is the server running? npm run dev");
-    return finish();
+    return;
   }
 
   const child = (await teacher.post("/api/students", {
@@ -167,7 +168,8 @@ async function main() {
     gender: "Female", form: "Stage 4",
   })).body?.student;
   check(!!child, "a Stage 4 pupil is created");
-  if (!child) return finish();
+  if (!child) return;
+  onCleanup(`pupil ${child.studentId}`, () => teacher.delete(`/api/students/${child.id}`));
 
   // Four papers, chosen so each lands in a different band, plus one with no
   // topic at all.
@@ -192,7 +194,9 @@ async function main() {
 
   const created: Record<string, any> = {};
   for (const m of made) {
-    created[m.key] = (await teacher.post("/api/assignments", m.body)).body?.assignment;
+    const a = (await teacher.post("/api/assignments", m.body)).body?.assignment;
+    created[m.key] = a;
+    if (a) onCleanup(`assignment ${a.title}`, () => teacher.delete(`/api/assignments/${a.id}`));
   }
   check(Object.values(created).every(Boolean), "five papers are created",
     JSON.stringify(Object.entries(created).map(([k, v]) => `${k}:${!!v}`)));
@@ -269,6 +273,7 @@ async function main() {
   check(!!fresh, "a pupil with no work is created",
     "if this fails the checks below are SKIPPED, not passing");
   if (fresh) {
+    onCleanup(`pupil ${fresh.studentId}`, () => teacher.delete(`/api/students/${fresh.id}`));
     const freshPupil = new Session();
     await freshPupil.post("/api/auth/student/login", { fullName: fresh.fullName, password: "masterypw2" });
     const emptyRes = await freshPupil.get(`/api/students/${fresh.id}/mastery`);
@@ -277,7 +282,6 @@ async function main() {
       "with hasEnough false, so the page invites them rather than showing zeros");
     check((emptyRes.body?.mastery?.subjects || []).length === 0,
       "and no subjects at all — never a screen full of 0%");
-    await teacher.delete(`/api/students/${fresh.id}`);
   }
 
   // --- Whose map is it? -------------------------------------------------
@@ -290,12 +294,12 @@ async function main() {
   check(!!other, "a second pupil is created to try reading someone else's map",
     "if this fails the checks below are SKIPPED, not passing");
   if (other) {
+    onCleanup(`pupil ${other.studentId}`, () => teacher.delete(`/api/students/${other.id}`));
     const otherPupil = new Session();
     await otherPupil.post("/api/auth/student/login", { fullName: other.fullName, password: "masterypw3" });
     const peek = await otherPupil.get(`/api/students/${child.id}/mastery`);
     check(peek.status === 403 || peek.status === 401,
       "one pupil cannot read another pupil's map", `got ${peek.status}`);
-    await teacher.delete(`/api/students/${other.id}`);
   }
 
   const teacherView = await teacher.get(`/api/students/${child.id}/mastery`);
@@ -324,6 +328,8 @@ async function main() {
     gender: "Male", form: classForm,
   })).body?.student;
   check(!!kidA && !!kidB, "two pupils are created in one class");
+  if (kidA) onCleanup(`pupil ${kidA.studentId}`, () => teacher.delete(`/api/students/${kidA.id}`));
+  if (kidB) onCleanup(`pupil ${kidB.studentId}`, () => teacher.delete(`/api/students/${kidB.id}`));
 
   const classPapers: any[] = [];
   if (kidA && kidB) {
@@ -344,6 +350,9 @@ async function main() {
     const strongPaper = (await teacher.post("/api/assignments",
       mk("ENGLISH", `Strong ${stamp}`, `Strong paper ${stamp}`, strongQs))).body?.assignment;
     classPapers.push(splitPaper, togetherPaper, strongPaper);
+    for (const a of classPapers) {
+      if (a) onCleanup(`assignment ${a.title}`, () => teacher.delete(`/api/assignments/${a.id}`));
+    }
 
     const sessionFor = async (kid: any, password: string) => {
       const sess = new Session();
@@ -459,28 +468,16 @@ async function main() {
     check(noForm.status === 400, "asking without a class is refused", `got ${noForm.status}`);
   }
 
-  for (const a of classPapers) if (a) await teacher.delete(`/api/assignments/${a.id}`);
-  if (kidA) await teacher.delete(`/api/students/${kidA.id}`);
-  if (kidB) await teacher.delete(`/api/students/${kidB.id}`);
-
-  // --- Tidy up ----------------------------------------------------------
-  for (const a of Object.values(created)) {
-    if (a) await teacher.delete(`/api/assignments/${a.id}`);
-  }
-  await teacher.delete(`/api/students/${child.id}`);
-  console.log("\nTest pupils and assignments removed.");
-
-  finish();
 }
 
-function finish() {
+// No tidy-up block at the end on purpose. Everything this check creates
+// registers its own removal with onCleanup() at the moment it is made, and
+// runCheck runs those in a `finally` — so a run that throws partway, or one
+// killed by the dev server restarting under it, still cleans up after itself.
+
+function summary(): boolean {
   console.log(`\n${passed} passed, ${failed} failed\n`);
-  // Never process.exit(): it tears down open sockets and reports a green run
-  // as a failure. See the note in CLAUDE.md.
-  process.exitCode = failed === 0 ? 0 : 1;
+  return failed === 0;
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exitCode = 1;
-});
+runCheck(main, summary);

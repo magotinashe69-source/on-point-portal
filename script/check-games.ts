@@ -11,6 +11,7 @@
 // what a child would be shown when they come back to a half-finished game, so
 // a change to that logic breaks this test rather than a child's game.
 import { readProgress, scoreProgress } from "../shared/game-plays";
+import { onCleanup, runCheck } from "./cleanup";
 
 const BASE = "http://localhost:5000";
 const TEACHER = { email: "onpointeducationcentremoza@gmail.com", password: "onpoint123" };
@@ -78,14 +79,18 @@ async function main() {
     studentId: `G3-${stamp}`, fullName: `Games Test Child ${stamp}`, gender: "Female", form: "Stage 3",
   })).body?.student;
   check(!!child, "Stage 3 pupil created");
-  if (!child) return finish();
+  if (!child) return;
+  onCleanup(`pupil ${child.studentId}`, () => teacher.delete(`/api/students/${child.id}`));
 
   const a1 = (await teacher.post("/api/assignments", quizAssignment("MATHS", "Adding", `Adding ${stamp}`, ["m1", "m2", "m3"]))).body?.assignment;
   const a2 = (await teacher.post("/api/assignments", quizAssignment("SCIENCE", "Plants", `Plants ${stamp}`, ["s1", "s2"]))).body?.assignment;
   const a3 = (await teacher.post("/api/assignments", quizAssignment("ENGLISH", "Words", `Words ${stamp}`, ["e1", "e2"]))).body?.assignment;
   const a4 = (await teacher.post("/api/assignments", quizAssignment("HISTORY", "Long ago", `History ${stamp}`, ["h1", "h2"]))).body?.assignment;
   check(!!a1 && !!a2 && !!a3 && !!a4, "four assignments created (three to complete, one left undone)");
-  if (!a1 || !a2 || !a3 || !a4) return finish();
+  if (!a1 || !a2 || !a3 || !a4) return;
+  for (const a of [a1, a2, a3, a4]) {
+    onCleanup(`assignment ${a.title}`, () => teacher.delete(`/api/assignments/${a.id}`));
+  }
 
   const pupil = new Session();
   const pupilLogin = await pupil.post("/api/auth/student/login", { fullName: child.fullName, password: "gamepw123" });
@@ -340,6 +345,7 @@ async function main() {
   )).body?.assignment;
   check(!!extra, "an extra assignment is created to earn one more play",
     "if this fails the checks below are being skipped, not passing");
+  if (extra) onCleanup(`assignment ${extra.title}`, () => teacher.delete(`/api/assignments/${extra.id}`));
   if (extra) {
     await pupil.post("/api/submissions", {
       assignmentId: extra.id, studentId: child.id,
@@ -407,6 +413,7 @@ async function main() {
   const formChild = (await teacher.post("/api/students", {
     studentId: `F1-${stamp}`, fullName: `Form Test Child ${stamp}`, gender: "Male", form: "Form 1",
   })).body?.student;
+  if (formChild) onCleanup(`pupil ${formChild.studentId}`, () => teacher.delete(`/api/students/${formChild.id}`));
   const formPupil = new Session();
   await formPupil.post("/api/auth/student/login", { fullName: formChild.fullName, password: "formpw123" });
   const formPlays = await formPupil.get(`/api/students/${formChild.id}/plays`);
@@ -430,6 +437,9 @@ async function main() {
 
   // The dev-only clock helper moves "today" for the streak, and the plays
   // ledger reads the same CAT day, so this is a real day-change test.
+  // The clock is state too: a run that dies mid-simulation would otherwise
+  // leave the whole server pretending it is tomorrow.
+  onCleanup("streak clock", () => teacher.post("/api/dev/streak/sim-date", { date: null }));
   const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   // Today's state, to compare against after the clock has been and come back.
   // Compared rather than hard-coded: how many plays are left here depends on
@@ -476,6 +486,8 @@ async function main() {
   const idleChild = (await teacher.post("/api/students", {
     studentId: `G3I-${stamp}`, fullName: `Idle Test Child ${stamp}`, gender: "Male", form: "Stage 3",
   })).body?.student;
+
+  if (idleChild) onCleanup(`pupil ${idleChild.studentId}`, () => teacher.delete(`/api/students/${idleChild.id}`));
 
   const classView = await teacher.get(`/api/reports/plays?form=Stage%203`);
   check(classView.status === 200 && classView.body?.success === true,
@@ -572,29 +584,16 @@ async function main() {
   const noForm = await teacher.get(`/api/reports/plays`);
   check(noForm.status === 400, "asking without a class is refused", `got ${noForm.status}`);
 
-  if (idleChild) await teacher.delete(`/api/students/${idleChild.id}`);
-
-  // --- Tidy up -------------------------------------------------------------
-  // `extra` belongs here too. It was left out when this section was written,
-  // and every run of this check quietly added one more assignment to a live
-  // register — a test that dirties the database it is pointed at is worse than
-  // no test.
-  for (const a of [a1, a2, a3, a4, extra]) {
-    if (a) await teacher.delete(`/api/assignments/${a.id}`);
-  }
-  await teacher.delete(`/api/students/${child.id}`);
-  await teacher.delete(`/api/students/${formChild.id}`);
-  console.log("\nTest pupils and assignments removed.");
-
-  finish();
 }
 
-// Sets process.exitCode and lets the process end by itself — never
-// process.exit(), which trips a libuv assertion on Node 24 for Windows while
-// fetch's keep-alive sockets are still open and reports a green run as 127.
-function finish() {
+// No tidy-up block at the end on purpose. Everything this check creates
+// registers its own removal with onCleanup() at the moment it is made, and
+// runCheck runs those in a `finally` — so a run that throws partway, or one
+// killed by the dev server restarting under it, still cleans up after itself.
+
+function summary(): boolean {
   console.log(`\n${passed} passed, ${failed} failed\n`);
-  process.exitCode = failed === 0 ? 0 : 1;
+  return failed === 0;
 }
 
-main().catch(err => { console.error(err); process.exitCode = 1; });
+runCheck(main, summary);

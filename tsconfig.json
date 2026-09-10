@@ -1,6 +1,12 @@
 {
-  "include": ["client/src/**/*", "shared/**/*", "server/**/*"],
-  "exclude": ["node_modules", "build", "dist", "**/*.test.ts"],
+  "include": ["client/src/**/*", "shared/**/*", "server/**/*", "script/**/*"],
+  // script/ is included so the check scripts are typechecked — without it a
+  // call to a function that no longer exists sat in check-answer-key.ts and
+  // only showed up when the script was actually run.
+  // generate-icons.ts is the exception: it imports "sharp", a one-off tool
+  // dependency that is not installed, so typechecking it fails on a module
+  // nobody needs to have.
+  "exclude": ["node_modules", "build", "dist", "**/*.test.ts", "script/generate-icons.ts"],
   "compilerOptions": {
     "incremental": true,
     "tsBuildInfoFile": "./node_modules/typescript/tsbuildinfo",

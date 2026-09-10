@@ -12,6 +12,8 @@
 //
 // Run against a live server: npx tsx <this file>
 
+import { onCleanup, runCheck } from "./cleanup";
+
 const BASE = "http://localhost:5000";
 const TEACHER = { email: "onpointeducationcentremoza@gmail.com", password: "onpoint123" };
 
@@ -64,7 +66,8 @@ async function main() {
     studentId: `KEY-${stamp}`, fullName: `Key Test Child ${stamp}`, gender: "Female", form: "Form 2",
   })).body?.student;
   check(!!child, "test pupil created");
-  if (!child) return finish();
+  if (!child) return;
+  onCleanup(`pupil ${child.studentId}`, () => teacher.delete(`/api/students/${child.id}`));
 
   // One assignment covering every auto-marked type plus a written one, so the
   // whole key surface is exercised at once.
@@ -83,7 +86,8 @@ async function main() {
     ],
   })).body?.assignment;
   check(!!assignment, "assignment created");
-  if (!assignment) return finish();
+  if (!assignment) return;
+  onCleanup(`assignment ${assignment.title}`, () => teacher.delete(`/api/assignments/${assignment.id}`));
 
   // A separate written one, to check the model answer is stripped too.
   const written = (await teacher.post("/api/assignments", {
@@ -93,6 +97,7 @@ async function main() {
     questions: [{ id: "wk1", questionText: "Describe your favourite place.", maxScore: 5, type: "written",
       modelAnswer: "A strong answer uses the five senses and at least two adjectives." }],
   })).body?.assignment;
+  if (written) onCleanup(`assignment ${written.title}`, () => teacher.delete(`/api/assignments/${written.id}`));
   check(!!written, "written assignment created");
 
   // =========================================================================
@@ -163,7 +168,7 @@ async function main() {
 
   const submissionId = submitted.body?.submission?.id;
   check(!!submissionId, "the submission was saved");
-  if (!submissionId) return finish();
+  if (!submissionId) return;
 
   const marked = await pupil.get(`/api/marks/${submissionId}`);
   check(marked.status === 200, "it was auto-marked straight away", `status ${marked.status}`);
@@ -212,7 +217,6 @@ async function main() {
   await teacher.delete(`/api/students/${child.id}`);
   console.log("\nTest pupil and assignments removed.");
 
-  finish();
 }
 
 // A note on how this script finishes.
@@ -228,9 +232,14 @@ async function main() {
 //
 // Ending naturally costs a few seconds while those sockets time out, and gives
 // an honest 0 or 1.
-function finish() {
+// No tidy-up block at the end on purpose. Everything this check creates
+// registers its own removal with onCleanup() at the moment it is made, and
+// runCheck runs those in a `finally` — so a run that throws partway, or one
+// killed by the dev server restarting under it, still cleans up after itself.
+
+function summary(): boolean {
   console.log(`\n${passed} passed, ${failed} failed\n`);
-  process.exitCode = failed === 0 ? 0 : 1;
+  return failed === 0;
 }
 
-main().catch(err => { console.error(err); process.exitCode = 1; });
+runCheck(main, summary);

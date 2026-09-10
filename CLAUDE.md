@@ -434,6 +434,44 @@ the length first or the check passes by having nothing to look at.
 When adding a check script, prefer taking a created object from the **POST's own
 reply** rather than fetching it again and guessing the wrapper.
 
+### A check script must tidy up even when it falls over
+
+These scripts run against a LIVE database. Each creates pupils, assignments,
+parent accounts and saved questions — and each used to delete them at the
+bottom of `main()`, which is exactly the wrong place: a run that reaches the
+bottom is the run that least needs saving.
+
+A crash partway through left its fixtures on the register for ever. That is how
+a pupil called "Certificate Child 332988" ended up on a real school's roll: the
+dev server restarted mid-run (it watches for changes now), a `fetch` failed, the
+script threw, and the tidy-up never ran.
+
+So `script/cleanup.ts` holds the pattern every check script uses:
+
+* **`onCleanup(what, fn)`** — call it the moment a fixture EXISTS, not at the
+  end. The whole point is to survive never reaching the end.
+* **`runCheck(main, summary)`** — runs the body, then the cleanups in a
+  `finally`, then the summary. Removals run newest-first, because fixtures are
+  built on each other. A cleanup that fails is reported, never thrown: throwing
+  from a `finally` would replace the real error with a misleading one.
+* **A crash is a FAILED run**, even if every check that managed to execute
+  passed. `runCheck` sets the exit code, so a script that dies after twelve
+  green checks cannot report success.
+
+The dev clock counts as a fixture too — a run that dies mid-simulation would
+otherwise leave the server pretending it is next Tuesday.
+
+### `script/` is typechecked, and was not before
+
+`tsconfig.json` used to include only `client/src`, `shared` and `server`, so
+`npx tsc --noEmit` never looked at a single check script. A call to a function
+that no longer existed sat in `check-answer-key.ts` and surfaced only when the
+script was run. `script/**/*` is now included.
+
+`script/generate-icons.ts` is excluded: it imports `sharp`, a one-off tool
+dependency that is not installed, so typechecking it fails on a module nobody
+needs to have.
+
 ### Never call `process.exit()` in a check script
 
 Both check scripts set `process.exitCode` and let the process end by itself.

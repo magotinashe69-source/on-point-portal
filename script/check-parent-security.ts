@@ -19,6 +19,8 @@
 // Run it with:  npx tsx script/check-parent-security.ts
 // The server must already be running on http://localhost:5000.
 
+import { onCleanup, runCheck } from "./cleanup";
+
 const BASE = process.env.CHECK_BASE_URL || "http://localhost:5000";
 
 const TEACHER = {
@@ -187,6 +189,11 @@ async function main() {
 
   const parentAId = createdA.body.parent.id;
   const parentBId = createdB.body.parent.id;
+  // Registered the moment they exist. This check runs against a live database
+  // and only ever removes accounts it made itself — the two below, and the two
+  // in the game-plays section. A real family's login is never touched.
+  onCleanup(`parent account ${credsA.username}`, () => teacher.delete(`/api/parents/${parentAId}`));
+  onCleanup(`parent account ${credsB.username}`, () => teacher.delete(`/api/parents/${parentBId}`));
 
   // Passwords must never come back out of the server.
   check(createdA.body.parent.password === undefined, "a created parent's password is not returned");
@@ -232,12 +239,11 @@ async function main() {
   // for the wrong reason. Say so once and stop, rather than printing thirty
   // failures that all mean "wait five minutes".
   if (/too many attempts/i.test(String(parentLogin.body?.message || "")) || parentLogin.status === 429) {
-    await teacher.delete(`/api/parents/${parentAId}`);
-    await teacher.delete(`/api/parents/${parentBId}`);
+    // The accounts are removed by the cleanup that runs after this returns.
     abort(
       "\nParent login is rate limited (10 attempts per IP every 5 minutes, and this " +
       "check uses four).\nWait five minutes and run it again — this is the limiter " +
-      "working, not a code failure.\nTest parent accounts removed.",
+      "working, not a code failure.",
     );
     return;
   }
@@ -455,6 +461,8 @@ async function main() {
   if (!gamesChild || !formChild) {
     check(false, "could create the pupils for the game-plays check");
   } else {
+    onCleanup(`pupil ${gamesChild.studentId}`, () => teacher.delete(`/api/students/${gamesChild.id}`));
+    onCleanup(`pupil ${formChild.studentId}`, () => teacher.delete(`/api/students/${formChild.id}`));
     // One assignment, handed in. That is one play of EACH game earned, so two
     // plays in the parent's terms.
     const paper = (await teacher.post("/api/assignments", {
@@ -466,6 +474,7 @@ async function main() {
         { id: "p2", questionText: "what is 3 + 3?", maxScore: 1, type: "numeric", correctNumber: 6, tolerance: 0 },
       ],
     })).body?.assignment;
+    if (paper) onCleanup(`assignment ${paper.title}`, () => teacher.delete(`/api/assignments/${paper.id}`));
 
     const pupil = new Session("pupil");
     await pupil.post("/api/auth/student/login", {
@@ -492,11 +501,19 @@ async function main() {
       fullName: "Test Parent Plays", username: `checkparent_p_${playStamp}`, password: "parentP123",
     })).body;
     gamesParentId = gp?.parent?.id;
+    if (gamesParentId) {
+      onCleanup(`parent account checkparent_p_${playStamp}`,
+        () => teacher.delete(`/api/parents/${gamesParentId}`));
+    }
 
     const fp = (await teacher.post(`/api/students/${formChild.id}/parent`, {
       fullName: "Test Parent Form", username: `checkparent_f_${playStamp}`, password: "parentF123",
     })).body;
     formParentId = fp?.parent?.id;
+    if (formParentId) {
+      onCleanup(`parent account checkparent_f_${playStamp}`,
+        () => teacher.delete(`/api/parents/${formParentId}`));
+    }
 
     const gamesParent = new Session("games parent");
     const gamesLogin = await loginParent(gamesParent, `checkparent_p_${playStamp}`, "parentP123");
@@ -596,14 +613,6 @@ async function main() {
     );
 
     }
-
-    // Tidy up this section's own pupils and accounts. Outside the branch above,
-    // so a rate-limited run still clears up after itself.
-    if (paper) await teacher.delete(`/api/assignments/${paper.id}`);
-    if (gamesParentId) await teacher.delete(`/api/parents/${gamesParentId}`);
-    if (formParentId) await teacher.delete(`/api/parents/${formParentId}`);
-    await teacher.delete(`/api/students/${gamesChild.id}`);
-    await teacher.delete(`/api/students/${formChild.id}`);
   }
 
   // --- The login pages must not log the parent straight back out ----------
@@ -710,19 +719,19 @@ async function main() {
     }
   }
 
-  // --- Tidy up -------------------------------------------------------------
-
-  await teacher.delete(`/api/parents/${parentAId}`);
-  await teacher.delete(`/api/parents/${parentBId}`);
-  console.log("\nTest parent accounts removed.");
-
-  // --- Result --------------------------------------------------------------
-
-  console.log(`\n${passed} passed, ${failed} failed\n`);
-  process.exitCode = failed === 0 ? 0 : 1;
 }
 
-main().catch(err => {
-  console.error(err);
-  process.exitCode = 1;
-});
+// No tidy-up block at the end on purpose. Everything this check creates
+// registers its own removal with onCleanup() at the moment it is made, and
+// runCheck runs those in a `finally` — so a run that throws partway, or one
+// killed by the dev server restarting under it, still cleans up after itself.
+//
+// It still only ever removes what it made. The accounts it recognises by their
+// "checkparent_" usernames are its own; a real family's login is never touched.
+
+function summary(): boolean {
+  console.log(`\n${passed} passed, ${failed} failed\n`);
+  return failed === 0;
+}
+
+runCheck(main, summary);
