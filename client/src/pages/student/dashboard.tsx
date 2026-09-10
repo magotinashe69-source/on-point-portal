@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth";
 import { QueryError } from "@/components/QueryError";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { LanguageToggle } from "@/components/language-toggle";
+import { useT } from "@/lib/i18n";
 import { 
   LogOut, 
   FileText, 
@@ -117,6 +119,8 @@ export default function StudentDashboard() {
     enabled: !!student,
   });
 
+  const t = useT();
+
   const handleLogout = () => {
     logout();
     setLocation("/");
@@ -139,8 +143,8 @@ export default function StudentDashboard() {
 
   const getPriorityBadge = (priority: string | null) => {
     switch (priority) {
-      case "urgent": return <Badge variant="destructive">Urgent</Badge>;
-      case "important": return <Badge className="bg-orange-500">Important</Badge>;
+      case "urgent": return <Badge variant="destructive">{t.studentDash.urgent}</Badge>;
+      case "important": return <Badge className="bg-orange-500">{t.studentDash.important}</Badge>;
       default: return null;
     }
   };
@@ -151,16 +155,17 @@ export default function StudentDashboard() {
         <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-4">
           <div className="flex items-center gap-3">
             <img src={logoPath} alt="On Point" className="h-10 w-auto" />
-            <span className="font-semibold text-primary hidden sm:block">Student Portal</span>
+            <span className="font-semibold text-primary hidden sm:block">{t.studentDash.portal}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground hidden md:block">
               {student.fullName} ({student.form})
             </span>
+            <LanguageToggle />
             <ThemeToggle />
             <Button variant="outline" size="sm" onClick={handleLogout} data-testid="button-logout">
               <LogOut className="h-4 w-4 mr-2" />
-              Logout
+              {t.common.logout}
             </Button>
           </div>
         </div>
@@ -214,53 +219,53 @@ export default function StudentDashboard() {
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-              <CardTitle className="text-sm font-medium">Available</CardTitle>
+              <CardTitle className="text-sm font-medium">{t.studentDash.available}</CardTitle>
               <BookOpen className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
                 {assignmentsLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : pendingAssignments.length}
               </div>
-              <p className="text-xs text-muted-foreground">assignments to complete</p>
+              <p className="text-xs text-muted-foreground">{t.studentDash.toComplete}</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-              <CardTitle className="text-sm font-medium">Handed in</CardTitle>
+              <CardTitle className="text-sm font-medium">{t.studentDash.handedIn}</CardTitle>
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-secondary">
                 {submissionsLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : pendingSubmissions.length}
               </div>
-              <p className="text-xs text-muted-foreground">awaiting review</p>
+              <p className="text-xs text-muted-foreground">{t.studentDash.awaitingReviewNote}</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-              <CardTitle className="text-sm font-medium">Marked</CardTitle>
+              <CardTitle className="text-sm font-medium">{t.studentDash.marked}</CardTitle>
               <CheckCircle className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-primary">
                 {submissionsLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : markedSubmissions.length}
               </div>
-              <p className="text-xs text-muted-foreground">with feedback</p>
+              <p className="text-xs text-muted-foreground">{t.studentDash.withFeedback}</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-              <CardTitle className="text-sm font-medium">Average Score</CardTitle>
+              <CardTitle className="text-sm font-medium">{t.studentDash.averageScore}</CardTitle>
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-primary">
                 {statsLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : `${statsData?.stats?.averageScore || 0}%`}
               </div>
-              <p className="text-xs text-muted-foreground">across all marked work</p>
+              <p className="text-xs text-muted-foreground">{t.studentDash.acrossAllMarked}</p>
             </CardContent>
           </Card>
         </div>
@@ -342,7 +347,7 @@ export default function StudentDashboard() {
             <CardHeader className="pb-3">
               <div className="flex items-center gap-2">
                 <Bell className="h-5 w-5 text-primary" />
-                <CardTitle className="text-lg">Announcements</CardTitle>
+                <CardTitle className="text-lg">{t.studentDash.announcements}</CardTitle>
               </div>
             </CardHeader>
             <CardContent>
@@ -377,10 +382,10 @@ export default function StudentDashboard() {
                 <div className="flex-1">
                   <h3 className="font-semibold flex items-center gap-2">
                     <Map className="h-5 w-5 text-primary" />
-                    Treasure Island
+                    {t.studentDash.treasureIsland}
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    Collect all 12 treasures by finishing your homework.
+                    {t.studentDash.treasureIslandNote}
                   </p>
                 </div>
                 <ArrowRight className="h-5 w-5 text-primary" />
@@ -400,9 +405,9 @@ export default function StudentDashboard() {
               <CardContent className="flex items-center gap-4 py-6">
                 <div className="p-3 rounded-md bg-primary/15"><CircleDot className="h-6 w-6 text-primary" /></div>
                 <div className="flex-1">
-                  <h3 className="font-semibold">Penalty Shootout</h3>
+                  <h3 className="font-semibold">{t.studentDash.penaltyShootout}</h3>
                   <p className="text-sm text-muted-foreground">
-                    Answer correctly to score a penalty and to save one.
+                    {t.studentDash.penaltyShootoutNote}
                   </p>
                 </div>
                 <ArrowRight className="h-5 w-5 text-primary" />
@@ -422,9 +427,9 @@ export default function StudentDashboard() {
               <CardContent className="flex items-center gap-4 py-6">
                 <div className="p-3 rounded-md bg-primary/15"><Target className="h-6 w-6 text-primary" /></div>
                 <div className="flex-1">
-                  <h3 className="font-semibold">Target Blaster</h3>
+                  <h3 className="font-semibold">{t.studentDash.targetBlaster}</h3>
                   <p className="text-sm text-muted-foreground">
-                    Tap the right target before it drifts away. Earn plays by finishing homework.
+                    {t.studentDash.targetBlasterNote}
                   </p>
                 </div>
                 <ArrowRight className="h-5 w-5 text-primary" />
@@ -447,8 +452,8 @@ export default function StudentDashboard() {
                   <Library className="h-6 w-6 text-primary" />
                 </div>
                 <div>
-                  <h3 className="font-semibold">Learning Resources</h3>
-                  <p className="text-sm text-muted-foreground">Access textbooks and study materials</p>
+                  <h3 className="font-semibold">{t.studentDash.resources}</h3>
+                  <p className="text-sm text-muted-foreground">{t.studentDash.resourcesNote}</p>
                 </div>
               </CardContent>
             </Card>
@@ -460,8 +465,8 @@ export default function StudentDashboard() {
                   <Video className="h-6 w-6 text-primary" />
                 </div>
                 <div>
-                  <h3 className="font-semibold">Video & Audio Lessons</h3>
-                  <p className="text-sm text-muted-foreground">Watch and listen to recorded lessons</p>
+                  <h3 className="font-semibold">{t.studentDash.lessons}</h3>
+                  <p className="text-sm text-muted-foreground">{t.studentDash.lessonsNote}</p>
                 </div>
               </CardContent>
             </Card>
@@ -471,8 +476,8 @@ export default function StudentDashboard() {
         <div className="grid gap-6 lg:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle>Available Assignments</CardTitle>
-              <CardDescription>Assignments waiting for your submission</CardDescription>
+              <CardTitle>{t.studentDash.assignments}</CardTitle>
+              <CardDescription>{t.studentDash.assignmentsNote}</CardDescription>
             </CardHeader>
             <CardContent>
               {assignmentsLoading ? (
@@ -497,19 +502,19 @@ export default function StudentDashboard() {
                                 ) : (
                                   <Calendar className="h-3 w-3" />
                                 )}
-                                {isOverdue(assignment.dueDate) ? 'OVERDUE' : `Due: ${new Date(assignment.dueDate).toLocaleDateString()}`}
+                                {isOverdue(assignment.dueDate) ? t.studentDash.overdue : t.studentDash.dueOn(new Date(assignment.dueDate).toLocaleDateString())}
                               </span>
                             </div>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
                           {isOverdue(assignment.dueDate) && (
-                            <Badge variant="destructive">Late</Badge>
+                            <Badge variant="destructive">{t.studentDash.late}</Badge>
                           )}
                           {isDueSoon(assignment.dueDate) && !isOverdue(assignment.dueDate) && (
-                            <Badge className="bg-orange-500">Due Soon</Badge>
+                            <Badge className="bg-orange-500">{t.studentDash.dueSoon}</Badge>
                           )}
-                          <Badge variant="outline">{assignment.totalMarks} {assignment.totalMarks === 1 ? "mark" : "marks"}</Badge>
+                          <Badge variant="outline">{t.studentDash.marks(assignment.totalMarks)}</Badge>
                           <ArrowRight className="h-4 w-4 text-muted-foreground" />
                         </div>
                       </div>
@@ -521,7 +526,7 @@ export default function StudentDashboard() {
               ) : (
                 <div className="text-center py-8">
                   <CheckCircle className="h-12 w-12 mx-auto text-primary mb-4" />
-                  <p className="text-muted-foreground">No homework due right now.</p>
+                  <p className="text-muted-foreground">{t.studentDash.noHomework}</p>
                 </div>
               )}
             </CardContent>
@@ -529,8 +534,8 @@ export default function StudentDashboard() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Your Results</CardTitle>
-              <CardDescription>Marked assignments with feedback</CardDescription>
+              <CardTitle>{t.studentDash.results}</CardTitle>
+              <CardDescription>{t.studentDash.resultsNote}</CardDescription>
             </CardHeader>
             <CardContent>
               {submissionsLoading ? (
@@ -545,14 +550,14 @@ export default function StudentDashboard() {
                         <div className="flex items-center gap-3">
                           <CheckCircle className="h-5 w-5 text-primary" />
                           <div>
-                            <p className="font-medium">{submission.assignmentTitle || 'Assignment'}</p>
+                            <p className="font-medium">{submission.assignmentTitle || t.studentDash.assignmentFallback}</p>
                             <p className="text-sm text-muted-foreground">
-                              Handed in: {new Date(submission.submittedAt).toLocaleDateString()}
+                              {t.studentDash.handedInOn(new Date(submission.submittedAt).toLocaleDateString())}
                             </p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Badge variant="default">View Results</Badge>
+                          <Badge variant="default">{t.studentDash.viewResults}</Badge>
                           <ArrowRight className="h-4 w-4 text-muted-foreground" />
                         </div>
                       </div>
@@ -567,15 +572,15 @@ export default function StudentDashboard() {
                         <div className="flex items-center gap-3">
                           <Clock className="h-5 w-5 text-secondary" />
                           <div>
-                            <p className="font-medium">{submission.assignmentTitle || 'Assignment'}</p>
+                            <p className="font-medium">{submission.assignmentTitle || t.studentDash.assignmentFallback}</p>
                             <p className="text-sm text-muted-foreground">
-                              Handed in: {new Date(submission.submittedAt).toLocaleDateString()}
+                              {t.studentDash.handedInOn(new Date(submission.submittedAt).toLocaleDateString())}
                             </p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2 flex-wrap justify-end">
-                          <Badge variant="outline" className="text-primary border-primary/40">Edit Submission</Badge>
-                          <Badge variant="secondary">Awaiting Review</Badge>
+                          <Badge variant="outline" className="text-primary border-primary/40">{t.studentDash.editSubmission}</Badge>
+                          <Badge variant="secondary">{t.studentDash.awaitingReview}</Badge>
                         </div>
                       </div>
                     </Link>
@@ -586,7 +591,7 @@ export default function StudentDashboard() {
               ) : (
                 <div className="text-center py-8">
                   <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">No results yet. Hand in a piece of homework to see your first mark.</p>
+                  <p className="text-muted-foreground">{t.studentDash.noResults}</p>
                 </div>
               )}
             </CardContent>

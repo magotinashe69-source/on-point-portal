@@ -17,6 +17,8 @@ import { useAuth } from "@/lib/auth";
 import { QueryError } from "@/components/QueryError";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { LanguageToggle } from "@/components/language-toggle";
+import { useT } from "@/lib/i18n";
 import { ArrowLeft, Loader2, Send, Calendar, BookOpen, Edit, AlertTriangle, ImagePlus, X, FileText, Paperclip, Circle, CheckCircle2, Download, CloudOff } from "lucide-react";
 import { AttachmentDisplay } from "@/components/FileAttachmentZone";
 import { Lightbox } from "@/components/Lightbox";
@@ -31,7 +33,7 @@ import logoPath from "@assets/logo.webp";
 // --- Offline mode ---
 // A child with no signal must still be able to open a paper they saved and hand
 // it in. The questions come from this device; the answers wait in the outbox.
-import { OFFLINE_TEXT, newClientId } from "@shared/offline";
+import { newClientId } from "@shared/offline";
 import { readPaper, savePaper } from "@/lib/offline-db";
 import { queueSubmission } from "@/lib/outbox";
 import { useOnline } from "@/hooks/use-offline";
@@ -64,6 +66,7 @@ export default function SubmitAssignment() {
   const [, setLocation] = useLocation();
   const { student } = useAuth();
   const { toast } = useToast();
+  const t = useT();
   const [isLoading, setIsLoading] = useState(false);
   const [lightboxImages, setLightboxImages] = useState<string[]>([]);
   const [lightboxIndex, setLightboxIndex] = useState(0);
@@ -153,9 +156,9 @@ export default function SubmitAssignment() {
       });
       setIsSavedOffline(true);
       setSavedPaper(liveAssignment);
-      toast({ title: OFFLINE_TEXT.savedAlready, description: OFFLINE_TEXT.savedForOffline });
+      toast({ title: t.offline.savedAlready, description: t.offline.savedForOffline });
     } catch {
-      toast({ title: "Not saved", description: OFFLINE_TEXT.cannotSave, variant: "destructive" });
+      toast({ title: t.submit.notSaved, description: t.offline.cannotSave, variant: "destructive" });
     } finally {
       setSavingPaper(false);
     }
@@ -222,8 +225,8 @@ export default function SubmitAssignment() {
       answers: values.answers,
     });
     toast({
-      title: OFFLINE_TEXT.handedInOffline,
-      description: OFFLINE_TEXT.handedInOfflineDetail,
+      title: t.offline.handedInOffline,
+      description: t.offline.handedInOfflineDetail,
     });
     setLocation("/student/dashboard");
   }
@@ -295,14 +298,14 @@ export default function SubmitAssignment() {
 
         // Hand-marked submissions have no instant score or XP — keep it simple.
         toast({
-          title: isEditing ? "Answers updated" : "Handed in",
-          description: isEditing ? "Your changes have been saved." : "Your teacher can now see your work.",
+          title: isEditing ? t.submit.answersUpdated : t.submit.handedIn,
+          description: isEditing ? t.submit.changesSaved : t.submit.teacherCanSee,
         });
         setLocation("/student/dashboard");
       } else {
         toast({
-          title: "Not handed in",
-          description: data.message || "Check the form and try again.",
+          title: t.submit.notHandedIn,
+          description: data.message || t.submit.checkForm,
           variant: "destructive",
         });
       }
@@ -321,8 +324,8 @@ export default function SubmitAssignment() {
         }
       }
       toast({
-        title: "Not handed in",
-        description: "Check your connection and try again.",
+        title: t.submit.notHandedIn,
+        description: t.common.checkConnection,
         variant: "destructive",
       });
     } finally {
@@ -371,7 +374,7 @@ export default function SubmitAssignment() {
     // A photo has to be uploaded to the school, so it cannot wait on the phone
     // the way typed answers can. Say so plainly instead of failing silently.
     if (cannotReachSchool) {
-      toast({ title: OFFLINE_TEXT.offlineBadge, description: OFFLINE_TEXT.noPhotosOffline });
+      toast({ title: t.offline.offlineBadge, description: t.offline.noPhotosOffline });
       return;
     }
     const fileArr = Array.from(files);
@@ -414,36 +417,36 @@ export default function SubmitAssignment() {
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-orange-500" />
-              Some answers look incomplete
+              {t.submit.thinAnswersTitle}
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-3">
-                <p>The following question{thinAnswers.length !== 1 ? "s have" : " has"} a very short answer. Teachers may not be able to give full marks for very brief responses.</p>
+                <p>{t.submit.thinAnswersIntro(thinAnswers.length)}</p>
                 <ul className="space-y-1">
                   {thinAnswers.map(a => (
                     <li key={a.questionNumber} className="flex items-center gap-2 text-sm p-2 rounded-md bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800">
                       <AlertTriangle className="h-3.5 w-3.5 text-orange-500 shrink-0" />
                       <span>
-                        <strong>Question {a.questionNumber}</strong> — {a.charCount} character{a.charCount !== 1 ? "s" : ""} written
-                        <span className="text-muted-foreground ml-1">(minimum {MIN_ANSWER_LENGTH} recommended)</span>
+                        <strong>{t.submit.thinQuestionNumber(a.questionNumber)}</strong> — {t.submit.thinCharacters(a.charCount)}
+                        <span className="text-muted-foreground ml-1">{t.submit.thinMinimum(MIN_ANSWER_LENGTH)}</span>
                       </span>
                     </li>
                   ))}
                 </ul>
-                <p className="text-sm text-muted-foreground">You can go back and add more detail, or submit as-is if you have uploaded a photo of your work.</p>
+                <p className="text-sm text-muted-foreground">{t.submit.thinFooter}</p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={handleGoBack} data-testid="button-go-back-improve">
-              Go Back &amp; Improve
+              {t.submit.goBackImprove}
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleConfirmSubmitAnyway}
               className="bg-orange-500 hover:bg-orange-600 text-white"
               data-testid="button-submit-anyway"
             >
-              Submit Anyway
+              {t.submit.submitAnyway}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -453,10 +456,11 @@ export default function SubmitAssignment() {
         <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-4">
           <Link href="/student/dashboard" className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
-            <span className="text-sm">Back to Dashboard</span>
+            <span className="text-sm">{t.submit.backToDashboard}</span>
           </Link>
           <div className="flex items-center gap-3">
             <img src={logoPath} alt="On Point" className="h-8 w-auto" />
+            <LanguageToggle />
             <ThemeToggle />
           </div>
         </div>
@@ -490,7 +494,7 @@ export default function SubmitAssignment() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="p-4 bg-muted rounded-md">
-                  <h3 className="font-semibold mb-2">Instructions</h3>
+                  <h3 className="font-semibold mb-2">{t.submit.instructions}</h3>
                   <p className="whitespace-pre-wrap text-sm">{assignment.instructions}</p>
                 </div>
 
@@ -514,14 +518,14 @@ export default function SubmitAssignment() {
                       <Download className="h-4 w-4 mr-2" />
                     )}
                     {savingPaper
-                      ? OFFLINE_TEXT.saving
+                      ? t.offline.saving
                       : isSavedOffline
-                        ? OFFLINE_TEXT.savedAlready
-                        : OFFLINE_TEXT.saveForOffline}
+                        ? t.offline.savedAlready
+                        : t.offline.saveForOffline}
                   </Button>
                   {isSavedOffline && (
                     <span className="text-xs text-muted-foreground" data-testid="text-saved-offline">
-                      {OFFLINE_TEXT.savedForOffline}
+                      {t.offline.savedForOffline}
                     </span>
                   )}
                 </div>
@@ -542,8 +546,8 @@ export default function SubmitAssignment() {
                 <CloudOff className="h-4 w-4" />
                 <AlertDescription>
                   {isEditing
-                    ? OFFLINE_TEXT.cannotEditOffline
-                    : `${OFFLINE_TEXT.handedInOfflineDetail} ${OFFLINE_TEXT.markComesLater}`}
+                    ? t.offline.cannotEditOffline
+                    : `${t.offline.handedInOfflineDetail} ${t.offline.markComesLater}`}
                 </AlertDescription>
               </Alert>
             )}
@@ -579,7 +583,7 @@ export default function SubmitAssignment() {
                       {/* Multiple choice — tap an option */}
                       {question.type === "multiple_choice" ? (
                         <FormItem>
-                          <FormLabel>Choose one</FormLabel>
+                          <FormLabel>{t.submit.chooseOne}</FormLabel>
                           <div className="space-y-2">
                             {(question.options || []).map((opt, optIdx) => {
                               const value = form.watch(`answers.${index}.answerText`) || "";
@@ -603,9 +607,9 @@ export default function SubmitAssignment() {
                         </FormItem>
                       ) : question.type === "true_false" ? (
                         <FormItem>
-                          <FormLabel>Choose one</FormLabel>
+                          <FormLabel>{t.submit.chooseOne}</FormLabel>
                           <div className="flex gap-3">
-                            {[{ v: "true", l: "True" }, { v: "false", l: "False" }].map(({ v, l }) => {
+                            {[{ v: "true", l: t.submit.true }, { v: "false", l: t.submit.false }].map(({ v, l }) => {
                               const selected = (form.watch(`answers.${index}.answerText`) || "") === v;
                               return (
                                 <Button
@@ -628,13 +632,13 @@ export default function SubmitAssignment() {
                           name={`answers.${index}.answerText`}
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Your Answer (number)</FormLabel>
+                              <FormLabel>{t.submit.yourAnswerNumber}</FormLabel>
                               <FormControl>
                                 <Input
                                   type="number"
                                   step="any"
                                   inputMode="decimal"
-                                  placeholder="Type a number"
+                                  placeholder={t.submit.typeNumber}
                                   data-testid={`input-number-${index}`}
                                   {...field}
                                 />
@@ -649,10 +653,10 @@ export default function SubmitAssignment() {
                           name={`answers.${index}.answerText`}
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Your Answer</FormLabel>
+                              <FormLabel>{t.submit.yourAnswer}</FormLabel>
                               <FormControl>
                                 <Input
-                                  placeholder="Type a short answer"
+                                  placeholder={t.submit.typeShortAnswer}
                                   data-testid={`input-short-${index}`}
                                   {...field}
                                 />
@@ -667,10 +671,10 @@ export default function SubmitAssignment() {
                           name={`answers.${index}.answerText`}
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Your Answer</FormLabel>
+                              <FormLabel>{t.submit.yourAnswer}</FormLabel>
                               <FormControl>
                                 <Textarea
-                                  placeholder="Type your answer here..."
+                                  placeholder={t.submit.typeAnswerHere}
                                   className="min-h-[120px]"
                                   data-testid={`textarea-answer-${index}`}
                                   {...field}
@@ -701,7 +705,7 @@ export default function SubmitAssignment() {
                           <div className="space-y-3">
                             <p className="text-sm font-medium flex items-center gap-2">
                               <Paperclip className="h-4 w-4" />
-                              Attach Files (photos of handwritten work, PDFs, documents)
+                              {t.submit.attachFiles}
                             </p>
 
                             {currentUrls.length > 0 && (
@@ -776,7 +780,7 @@ export default function SubmitAssignment() {
                                   <ImagePlus className="h-5 w-5 text-muted-foreground" />
                                 )}
                                 <p className="text-xs text-muted-foreground">
-                                  {isUploadingHere ? "Uploading..." : isDraggingHere ? "Drop files here" : "Drag & drop or click — images, PDFs, documents"}
+                                  {isUploadingHere ? t.submit.uploading : isDraggingHere ? t.submit.dropFilesHere : t.submit.dragAndDrop}
                                 </p>
                               </div>
                             </div>
@@ -791,7 +795,7 @@ export default function SubmitAssignment() {
                   <Alert className="mb-4 border-orange-500 bg-orange-50 dark:bg-orange-950/30" data-testid="alert-late-submission">
                     <AlertTriangle className="h-4 w-4 text-orange-600" />
                     <AlertDescription className="text-orange-800 dark:text-orange-300">
-                      <strong>Deadline passed:</strong> The deadline has passed but you can still submit.
+                      <strong>{t.submit.deadlinePassed}</strong> {t.submit.deadlinePassedNote}
                     </AlertDescription>
                   </Alert>
                 )}
@@ -801,10 +805,10 @@ export default function SubmitAssignment() {
                     <Edit className="h-4 w-4" />
                     <AlertDescription>
                       {isAutoMarked && isMarked
-                        ? "You have already had a go at this quiz. Change your answers and hand in again for a fresh instant score."
+                        ? t.submit.canRetryQuiz
                         : isMarked
-                        ? "This assignment has been marked. You can no longer make changes."
-                        : "You have handed this in. You can change your answers until your teacher marks it."}
+                        ? t.submit.alreadyMarked
+                        : t.submit.canStillChange}
                     </AlertDescription>
                   </Alert>
                 )}
@@ -824,17 +828,17 @@ export default function SubmitAssignment() {
                     <Send className="h-4 w-4 mr-2" />
                   )}
                   {isAutoMarked && isMarked
-                    ? "Hand in again"
+                    ? t.submit.handInAgain
                     : isEditing
-                    ? "Update answers"
-                    : "Hand in"}
+                    ? t.submit.updateAnswers
+                    : t.submit.handIn}
                 </Button>
               </form>
             </Form>
           </>
         ) : (
           <div className="text-center py-16">
-            <p className="text-muted-foreground">Assignment not found</p>
+            <p className="text-muted-foreground">{t.submit.notFound}</p>
           </div>
         )}
       </main>

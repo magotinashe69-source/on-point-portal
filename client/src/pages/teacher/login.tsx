@@ -13,12 +13,15 @@ import { apiRequest } from "@/lib/queryClient";
 import { ArrowLeft, LogIn, Loader2, Eye, EyeOff } from "lucide-react";
 import { Link } from "wouter";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { LanguageToggle } from "@/components/language-toggle";
+import { useT } from "@/lib/i18n";
 import logoPath from "@assets/logo.webp";
 
 export default function TeacherLogin() {
   const [location, setLocation] = useLocation();
   const { teacher, setTeacher, forgetRememberedLogins } = useAuth();
   const { toast } = useToast();
+  const t = useT();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -44,8 +47,8 @@ export default function TeacherLogin() {
       
       if (data.success) {
         toast({
-          title: "Logged in",
-          description: `Logged in as ${data.teacher.fullName}`,
+          title: t.login.loggedIn,
+          description: t.login.teacher.loggedInAs(data.teacher.fullName),
         });
         // Forget any student or parent this browser is remembering. The
         // server has already dropped those roles; this keeps the browser's
@@ -54,15 +57,15 @@ export default function TeacherLogin() {
         setTeacher(data.teacher);
       } else {
         toast({
-          title: "Login failed",
-          description: data.message || "Invalid credentials",
+          title: t.login.loginFailed,
+          description: data.message || t.login.student.invalidCredentials,
           variant: "destructive",
         });
       }
     } catch (error) {
       toast({
-        title: "Login failed",
-        description: "Check your email and password, then try again.",
+        title: t.login.loginFailed,
+        description: t.login.teacher.tryAgain,
         variant: "destructive",
       });
     } finally {
@@ -84,9 +87,12 @@ export default function TeacherLogin() {
         <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-4">
           <Link href="/" className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
-            <span className="text-sm">Back to Home</span>
+            <span className="text-sm">{t.common.backToHome}</span>
           </Link>
-          <ThemeToggle />
+          <div className="flex items-center gap-2">
+            <LanguageToggle />
+            <ThemeToggle />
+          </div>
         </div>
       </header>
 
@@ -96,15 +102,15 @@ export default function TeacherLogin() {
             <div className="flex justify-center mb-4">
               <img src={logoPath} alt="On Point Education Centre" className="h-20 w-auto" />
             </div>
-            <CardTitle className="text-2xl">Teacher Login</CardTitle>
+            <CardTitle className="text-2xl">{t.login.teacher.title}</CardTitle>
             <CardDescription>
-              Enter your credentials to access the teacher portal
+              {t.login.teacher.description}
             </CardDescription>
             {/* Shown when we sent the teacher here because their login had quietly
                 ended — otherwise it just looks like the app logged them out. */}
             {window.location.search.includes("expired=1") && (
               <p className="mt-3 rounded-md bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-sm text-amber-800 dark:text-amber-200" data-testid="text-session-expired">
-                Your login had expired, so please sign in again to carry on.
+                {t.login.teacher.expired}
               </p>
             )}
           </CardHeader>
@@ -116,11 +122,11 @@ export default function TeacherLogin() {
                   name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Email</FormLabel>
+                      <FormLabel>{t.login.teacher.emailLabel}</FormLabel>
                       <FormControl>
                         <Input 
                           type="email" 
-                          placeholder="Enter your email" 
+                          placeholder={t.login.teacher.emailPlaceholder} 
                           data-testid="input-email"
                           {...field} 
                         />
@@ -134,12 +140,12 @@ export default function TeacherLogin() {
                   name="password"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Password</FormLabel>
+                      <FormLabel>{t.common.password}</FormLabel>
                       <FormControl>
                         <div className="relative">
                           <Input 
                             type={showPassword ? "text" : "password"}
-                            placeholder="Enter your password" 
+                            placeholder={t.login.teacher.passwordPlaceholder} 
                             className="pr-10"
                             data-testid="input-password"
                             {...field} 
@@ -150,7 +156,7 @@ export default function TeacherLogin() {
                             size="icon"
                             className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
                             onClick={() => setShowPassword(!showPassword)}
-                            aria-label={showPassword ? "Hide password" : "Show password"}
+                            aria-label={showPassword ? t.common.hidePassword : t.common.showPassword}
                             data-testid="button-toggle-password"
                           >
                             {showPassword ? (
@@ -176,7 +182,7 @@ export default function TeacherLogin() {
                   ) : (
                     <LogIn className="h-4 w-4 mr-2" />
                   )}
-                  Login
+                  {t.login.signIn}
                 </Button>
               </form>
             </Form>

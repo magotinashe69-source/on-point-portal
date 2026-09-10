@@ -1246,12 +1246,127 @@ Assignments and students are grouped by class:
 - **Primary:** Stage 3, Stage 4, Stage 5, Stage 6
 - **Secondary:** Form 1, Form 2
 
-## Language
+## Language — English and Portuguese
 
-- The app is **English** for now.
-- It should be built **ready to add Portuguese later** — prefer keeping
-  user-facing text easy to translate (avoid hard-coding strings in awkward places;
-  group display text so it can be swapped out for another language later).
+The interface is in both, switched by a toggle in the header, and the choice is
+remembered on the device.
+
+Portuguese here is **European / Mozambican**, not Brazilian: the school and its
+families are in Mozambique. So "palavra-passe" rather than "senha", "a carregar"
+rather than "carregando". A child is **"o seu educando"** throughout — the
+register a Mozambican school uses for the pupil an encarregado de educação is
+responsible for, and it does not guess whether the child is a boy or a girl.
+
+- `client/src/lib/i18n/en.ts` — the English text.
+- `client/src/lib/i18n/pt.ts` — the Portuguese text.
+- `client/src/lib/i18n/index.tsx` — the provider, `useT()`, and the type below.
+- `client/src/components/language-toggle.tsx` — the toggle.
+
+### The one rule
+
+> **Only INTERFACE text is translated. Nothing a person typed ever is.**
+
+A question's wording, an assignment title, a pupil's name, a teacher's written
+feedback, a topic, an announcement — shown exactly as written, in whatever
+language they were written in. Translating a question would change the meaning of
+the thing a child is being marked on, and translating a teacher's feedback would
+put words in their mouth. `npm run check:language` opens a real paper in
+Portuguese and checks the teacher's question is still character for character
+what they typed.
+
+Class names ("Stage 4", "Form 1") are the school's own and are never translated
+either. Where a label wraps one — "Stage 4 Only" — only the wrapper is ours:
+`t.teacherDash.onlyClass("Stage 4")`.
+
+### Portuguese cannot silently fall behind
+
+`pt.ts` is typed as `Translation`, which is `typeof en` with every string
+widened back to `string` (see `Widen` in index.tsx — the wording groups in
+`shared/` are `as const`, so without widening Portuguese would be required to
+say the English words). The effect:
+
+* a key in `en.ts` with nothing in `pt.ts` is a **build error** from
+  `npm run check`, not a blank label a family finds first;
+* a misspelled key is a build error too, and tsc suggests the right name.
+
+What a type CANNOT see is English **pasted** into `pt.ts` — that typechecks
+perfectly. `npm run check:language` compares every string against its English
+twin and fails if any is identical, with a short, argued list of the ones that
+are the same in both languages on purpose ("Normal", the school's name, a bare
+dash).
+
+### Adding a string
+
+Put it in `en.ts`, run `npm run check`, and TypeScript will tell you what is
+missing from `pt.ts`. Use a function when a value goes inside a sentence —
+`handedInOn: (date) => ...` — rather than gluing fragments together at the call
+site, because word order differs between the two languages.
+
+### Where the wording already lived
+
+The parent portal's text was already grouped in `shared/` — `REPORT_TEXT`,
+`OVERVIEW_TEXT`, `WORK_TEXT`, `PLAYS_PARENT_TEXT`, `OFFLINE_TEXT` — exactly as
+the note at the top of `weekly-report.ts` intended ("so it can be swapped for
+Portuguese later without hunting through the logic"). Those files are **spread
+into `en.ts`** rather than copied, so English still has one source and nothing
+had to move. The server never used them: it sends data, the client supplies the
+words, which is what made this cheap.
+
+`summarise()` in `shared/offline.ts` is the exception — it works out the offline
+queue's counts AND an English sentence. The counts are what `SyncStatus` uses;
+its sentence is left alone because `npm run check:offline` reads it.
+
+### The toggle
+
+Both languages are shown side by side with the current one filled in, rather
+than one button reading "PT". A single button is ambiguous in the worst possible
+place: a parent unsure whether it means "you are reading Portuguese" or "tap for
+Portuguese" has to tap to find out, and that is the tap they are afraid of.
+
+Each name is written in its own language — "English", "Português" — because
+somebody looking for Portuguese is looking for that word.
+
+It is on the **login pages** too. A family that reads Portuguese needs the login
+page in Portuguese to get as far as logging in.
+
+### Where the choice is kept
+
+`localStorage["onpoint-language"]`, on the device, read in the `useState`
+initialiser rather than in an effect — an effect runs after the first paint, so
+the page would flash up in English and change under them. It also sets
+`<html lang>`, which is how a screen reader picks a voice.
+
+Deliberately not on the account: it has to work on the login page, where nobody
+is signed in yet. On a shared family phone this means siblings share the
+setting. Moving it to the account later would still need this as the fallback.
+
+### Covered so far, and what is not
+
+Done: the three login pages, the student dashboard, the teacher dashboard, the
+assignment screen, the parent portal, and `SyncStatus`.
+
+**Still English, and worth knowing:**
+
+* **Messages the SERVER writes.** "That name is not on the class list", and
+  every other `data.message`, is composed in `server/routes.ts` and shown as it
+  arrives. Translating those means sending a code the client can look up, or
+  telling the server which language to answer in — neither is a small change.
+* **`QueryError`.** Its sentences are built from a `what` phrase passed at
+  around thirty call sites across every screen. Doing it properly means
+  translating the component AND every one of those phrases, which is a pass of
+  its own rather than part of this one.
+* **The other screens** — results, resources, lessons, the games, the report
+  cards, the question bank, mark-submission.
+* **Dates** still use the browser's own locale rather than the chosen language.
+
+### Proving it — `npm run check:language`
+
+`script/check-language.ts`, in two halves. The dictionaries on their own (nothing
+missing, nothing blank, nothing left in English). Then a real browser, driven
+with `script/chrome.ts`: switch to Portuguese on the login page, reload to prove
+it stuck, walk a child's dashboard and a real paper, switch back to English,
+then a teacher's dashboard and a parent's portal — checking at each step that
+the interface changed and the teacher's own words did not. 41 checks.
 
 ## How to work in this codebase (important)
 

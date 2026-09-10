@@ -13,7 +13,7 @@
 
 import { useState } from "react";
 import { Link } from "wouter";
-import { OFFLINE_TEXT } from "@shared/offline";
+import { useT } from "@/lib/i18n";
 import { useOnline, useOutbox } from "@/hooks/use-offline";
 import { dismiss, recentlySent } from "@/lib/outbox";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,7 @@ interface Props {
 }
 
 export function SyncStatus({ studentId, driveSync = false }: Props) {
+  const t = useT();
   const online = useOnline();
   const { items, summary, retry } = useOutbox(studentId, driveSync);
   const [open, setOpen] = useState(false);
@@ -48,7 +49,7 @@ export function SyncStatus({ studentId, driveSync = false }: Props) {
         {!online && (
           <span className="inline-flex items-center gap-1.5 text-sm font-medium" data-testid="badge-offline">
             <CloudOff className="h-4 w-4 shrink-0" />
-            {OFFLINE_TEXT.offlineBadge}
+            {t.offline.offlineBadge}
           </span>
         )}
 
@@ -58,7 +59,7 @@ export function SyncStatus({ studentId, driveSync = false }: Props) {
                 is told is exactly the sentence and nothing else. */}
             {!online && <span className="text-muted-foreground" aria-hidden="true">·</span>}
             <span className="text-sm font-medium" data-testid="text-sync-summary">
-              {summary.text}
+              {t.sync.summary(summary.waiting, summary.blocked, summary.sending)}
             </span>
           </>
         )}
@@ -66,7 +67,7 @@ export function SyncStatus({ studentId, driveSync = false }: Props) {
         {online && waiting.length === 0 && blocked.length === 0 && sent.length > 0 && (
           <span className="inline-flex items-center gap-1.5 text-sm font-medium text-green-700 dark:text-green-400" data-testid="text-sync-done">
             <CheckCircle2 className="h-4 w-4 shrink-0" />
-            {OFFLINE_TEXT.syncedJustNow}
+            {t.offline.syncedJustNow}
           </span>
         )}
 
@@ -91,7 +92,7 @@ export function SyncStatus({ studentId, driveSync = false }: Props) {
           {waiting.length > 0 && (
             <div>
               <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
-                {OFFLINE_TEXT.waitingHeading}
+                {t.offline.waitingHeading}
               </div>
               <ul className="space-y-1">
                 {waiting.map((item) => (
@@ -113,7 +114,7 @@ export function SyncStatus({ studentId, driveSync = false }: Props) {
           {blocked.length > 0 && (
             <div>
               <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
-                {OFFLINE_TEXT.blockedHeading}
+                {t.offline.blockedHeading}
               </div>
               <ul className="space-y-2">
                 {blocked.map((item) => (
@@ -143,7 +144,7 @@ export function SyncStatus({ studentId, driveSync = false }: Props) {
           {sent.length > 0 && (
             <div>
               <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
-                {OFFLINE_TEXT.syncedJustNow}
+                {t.offline.syncedJustNow}
               </div>
               <ul className="space-y-1">
                 {sent.map((s) => (

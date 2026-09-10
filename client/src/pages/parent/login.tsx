@@ -12,12 +12,15 @@ import { parentLoginSchema, type ParentLogin } from "@shared/schema";
 import { ArrowLeft, LogIn, Loader2, Eye, EyeOff } from "lucide-react";
 import { Link } from "wouter";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { LanguageToggle } from "@/components/language-toggle";
+import { useT } from "@/lib/i18n";
 import logoPath from "@assets/logo.webp";
 
 export default function ParentLoginPage() {
   const [, setLocation] = useLocation();
   const { parent, setParent, forgetRememberedLogins } = useAuth();
   const { toast } = useToast();
+  const t = useT();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -61,20 +64,20 @@ export default function ParentLoginPage() {
         forgetRememberedLogins();
         setParent(data.parent);
         toast({
-          title: "Logged in",
-          description: `Welcome, ${data.parent.fullName}.`,
+          title: t.login.loggedIn,
+          description: t.login.parent.welcome(data.parent.fullName),
         });
       } else {
         toast({
-          title: "Login failed",
-          description: data.message || "Check your username and password, then try again.",
+          title: t.login.loginFailed,
+          description: data.message || t.login.parent.tryAgain,
           variant: "destructive",
         });
       }
     } catch (error) {
       toast({
-        title: "Login failed",
-        description: "Check your connection and try again.",
+        title: t.login.loginFailed,
+        description: t.common.checkConnection,
         variant: "destructive",
       });
     } finally {
@@ -96,9 +99,12 @@ export default function ParentLoginPage() {
         <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-4">
           <Link href="/" className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
-            <span className="text-sm">Back to Home</span>
+            <span className="text-sm">{t.common.backToHome}</span>
           </Link>
-          <ThemeToggle />
+          <div className="flex items-center gap-2">
+            <LanguageToggle />
+            <ThemeToggle />
+          </div>
         </div>
       </header>
 
@@ -108,16 +114,16 @@ export default function ParentLoginPage() {
             <div className="flex justify-center mb-4">
               <img src={logoPath} alt="On Point Education Centre" className="h-20 w-auto" />
             </div>
-            <CardTitle className="text-2xl">Parent Login</CardTitle>
+            <CardTitle className="text-2xl">{t.login.parent.title}</CardTitle>
             <CardDescription>
-              Enter the username and password the school gave you
+              {t.login.parent.description}
             </CardDescription>
             {/* Shown when we sent the parent here because their login had
                 quietly ended — otherwise it just looks like the app logged
                 them out for no reason. */}
             {window.location.search.includes("expired=1") && (
               <p className="mt-3 rounded-md bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-sm text-amber-800 dark:text-amber-200" data-testid="text-session-expired">
-                Your login had expired. Log in again to carry on.
+                {t.login.parent.expired}
               </p>
             )}
           </CardHeader>
@@ -129,10 +135,10 @@ export default function ParentLoginPage() {
                   name="username"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Username</FormLabel>
+                      <FormLabel>{t.login.parent.usernameLabel}</FormLabel>
                       <FormControl>
                         <Input
-                          placeholder="Enter your username"
+                          placeholder={t.login.parent.usernamePlaceholder}
                           autoCapitalize="none"
                           autoCorrect="off"
                           data-testid="input-parent-username"
@@ -148,12 +154,12 @@ export default function ParentLoginPage() {
                   name="password"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Password</FormLabel>
+                      <FormLabel>{t.common.password}</FormLabel>
                       <FormControl>
                         <div className="relative">
                           <Input
                             type={showPassword ? "text" : "password"}
-                            placeholder="Enter your password"
+                            placeholder={t.login.parent.passwordPlaceholder}
                             className="pr-10"
                             data-testid="input-parent-password"
                             {...field}
@@ -164,7 +170,7 @@ export default function ParentLoginPage() {
                             size="icon"
                             className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
                             onClick={() => setShowPassword(!showPassword)}
-                            aria-label={showPassword ? "Hide password" : "Show password"}
+                            aria-label={showPassword ? t.common.hidePassword : t.common.showPassword}
                             data-testid="button-toggle-parent-password"
                           >
                             {showPassword ? (
@@ -190,7 +196,7 @@ export default function ParentLoginPage() {
                   ) : (
                     <LogIn className="h-4 w-4 mr-2" />
                   )}
-                  Login
+                  {t.login.signIn}
                 </Button>
               </form>
             </Form>

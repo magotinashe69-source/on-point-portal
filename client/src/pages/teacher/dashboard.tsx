@@ -10,6 +10,8 @@ import { PublishAssignmentButton } from "@/components/PublishAssignmentButton";
 import { useAuth } from "@/lib/auth";
 import { QueryError } from "@/components/QueryError";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { LanguageToggle } from "@/components/language-toggle";
+import { useT } from "@/lib/i18n";
 import { 
   PlusCircle, 
   FileText, 
@@ -100,6 +102,7 @@ export default function TeacherDashboard() {
   });
 
   const { toast } = useToast();
+  const t = useT();
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [archivingId, setArchivingId] = useState<number | null>(null);
   const [showArchived, setShowArchived] = useState(false);
@@ -120,8 +123,8 @@ export default function TeacherDashboard() {
     },
     onSuccess: () => {
       toast({
-        title: "Assignment deleted",
-        description: "The assignment has been removed successfully.",
+        title: t.teacherDash.assignmentDeleted,
+        description: t.teacherDash.assignmentDeletedNote,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/assignments"] });
       queryClient.invalidateQueries({ queryKey: ["/api/submissions"] });
@@ -129,8 +132,8 @@ export default function TeacherDashboard() {
     },
     onError: () => {
       toast({
-        title: "Assignment not deleted",
-        description: "Check your connection and try again.",
+        title: t.teacherDash.assignmentNotDeleted,
+        description: t.common.checkConnection,
         variant: "destructive",
       });
       setDeletingId(null);
@@ -144,16 +147,16 @@ export default function TeacherDashboard() {
     },
     onSuccess: (_, { archived }) => {
       toast({
-        title: archived ? "Assignment Archived" : "Assignment Restored",
-        description: archived ? "The assignment has been moved to the archive." : "The assignment has been restored to active assignments.",
+        title: archived ? t.teacherDash.assignmentArchived : t.teacherDash.assignmentRestored,
+        description: archived ? t.teacherDash.movedToArchive : t.teacherDash.restoredToActive,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/assignments"] });
       setArchivingId(null);
     },
     onError: () => {
       toast({
-        title: "Assignment not updated",
-        description: "Check your connection and try again.",
+        title: t.teacherDash.assignmentNotUpdated,
+        description: t.common.checkConnection,
         variant: "destructive",
       });
       setArchivingId(null);
@@ -185,7 +188,7 @@ export default function TeacherDashboard() {
       return response.json();
     },
     onSuccess: () => {
-      toast({ title: "Announcement posted", description: "Students can now see it." });
+      toast({ title: t.teacherDash.announcementPosted, description: t.teacherDash.announcementPostedNote });
       queryClient.invalidateQueries({ queryKey: ["/api/announcements"] });
       setIsAnnouncementDialogOpen(false);
       setAnnouncementTitle("");
@@ -194,7 +197,7 @@ export default function TeacherDashboard() {
       setAnnouncementPriority("normal");
     },
     onError: () => {
-      toast({ title: "Announcement not posted", description: "Check your connection and try again.", variant: "destructive" });
+      toast({ title: t.teacherDash.announcementNotPosted, description: t.common.checkConnection, variant: "destructive" });
     },
   });
 
@@ -204,14 +207,14 @@ export default function TeacherDashboard() {
       return response.json();
     },
     onSuccess: () => {
-      toast({ title: "Announcement deleted" });
+      toast({ title: t.teacherDash.announcementDeleted });
       queryClient.invalidateQueries({ queryKey: ["/api/announcements"] });
     },
   });
 
   const handlePostAnnouncement = () => {
     if (!announcementTitle.trim() || !announcementContent.trim()) {
-      toast({ title: "Announcement not posted", description: "Add a title and content before posting.", variant: "destructive" });
+      toast({ title: t.teacherDash.announcementNotPosted, description: t.teacherDash.announcementNeedsBoth, variant: "destructive" });
       return;
     }
     createAnnouncementMutation.mutate({
@@ -224,23 +227,23 @@ export default function TeacherDashboard() {
 
   const getPriorityBadge = (priority: string | null) => {
     switch (priority) {
-      case "urgent": return <Badge variant="destructive">Urgent</Badge>;
-      case "important": return <Badge className="bg-orange-500">Important</Badge>;
-      default: return <Badge variant="secondary">Normal</Badge>;
+      case "urgent": return <Badge variant="destructive">{t.teacherDash.priorityUrgent}</Badge>;
+      case "important": return <Badge className="bg-orange-500">{t.teacherDash.priorityImportant}</Badge>;
+      default: return <Badge variant="secondary">{t.teacherDash.priorityNormal}</Badge>;
     }
   };
 
   const getAssignmentTargetLabel = (assignment: Assignment): string => {
     const targetIds = assignment.targetStudentIds || [];
     if (targetIds.length === 0) {
-      return `All ${assignment.form}`;
+      return t.teacherDash.allOfClass(assignment.form);
     }
-    if (!students) return `${targetIds.length} student(s)`;
+    if (!students) return t.teacherDash.studentCount(targetIds.length);
     const targetStudents = students.filter(s => targetIds.includes(s.id));
     if (targetStudents.length <= 2) {
       return targetStudents.map(s => s.fullName.split(' ')[0]).join(', ');
     }
-    return `${targetStudents.length} ${targetStudents.length === 1 ? "student" : "students"}`;
+    return t.teacherDash.studentCount(targetStudents.length);
   };
 
   const handleLogout = () => {
@@ -296,7 +299,7 @@ export default function TeacherDashboard() {
                 className="bg-amber-500 text-white hover:bg-amber-500"
                 data-testid={`badge-draft-${assignment.id}`}
               >
-                Draft
+                {t.teacherDash.draft}
               </Badge>
             )}
           </p>
@@ -314,7 +317,7 @@ export default function TeacherDashboard() {
               <Users className="h-3 w-3 mr-1" />
               {getAssignmentTargetLabel(assignment)}
             </Badge>
-            <Badge variant="outline">{assignment.totalMarks} {assignment.totalMarks === 1 ? "mark" : "marks"}</Badge>
+            <Badge variant="outline">{t.teacherDash.marks(assignment.totalMarks)}</Badge>
           </>
         )}
         <Link href={`/teacher/assignments/${assignment.id}/edit`}>
@@ -322,7 +325,7 @@ export default function TeacherDashboard() {
             variant="ghost"
             size="icon"
             data-testid={`button-edit-assignment-${assignment.id}`}
-            title={isDraft ? "Edit draft" : "Edit assignment"}
+            title={isDraft ? t.teacherDash.editDraft : t.teacherDash.editAssignment}
           >
             <Pencil className="h-4 w-4 text-muted-foreground" />
           </Button>
@@ -336,7 +339,7 @@ export default function TeacherDashboard() {
             onClick={(e) => handleArchiveAssignment(e, assignment.id, true)}
             disabled={archivingId === assignment.id}
             data-testid={`button-archive-assignment-${assignment.id}`}
-            title="Archive assignment"
+            title={t.teacherDash.archiveAssignment}
           >
             {archivingId === assignment.id ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -351,7 +354,7 @@ export default function TeacherDashboard() {
           onClick={(e) => handleDeleteAssignment(e, assignment.id)}
           disabled={deletingId === assignment.id}
           data-testid={`button-delete-assignment-${assignment.id}`}
-          title={isDraft ? "Delete draft" : "Delete assignment"}
+          title={isDraft ? t.teacherDash.deleteDraft : t.teacherDash.deleteAssignment}
         >
           {deletingId === assignment.id ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -369,16 +372,17 @@ export default function TeacherDashboard() {
         <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-4">
           <div className="flex items-center gap-3">
             <img src={logoPath} alt="On Point" className="h-10 w-auto" />
-            <span className="font-semibold text-primary hidden sm:block">Teacher Portal</span>
+            <span className="font-semibold text-primary hidden sm:block">{t.teacherDash.portal}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground hidden md:block">
               Welcome, {teacher.fullName}
             </span>
+            <LanguageToggle />
             <ThemeToggle />
             <Button variant="outline" size="sm" onClick={handleLogout} data-testid="button-logout">
               <LogOut className="h-4 w-4 mr-2" />
-              Logout
+              {t.common.logout}
             </Button>
           </div>
         </div>
@@ -386,14 +390,14 @@ export default function TeacherDashboard() {
 
       <main className="container mx-auto px-4 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Dashboard</h1>
-          <p className="text-muted-foreground">Manage your assignments and student submissions</p>
+          <h1 className="text-3xl font-bold mb-2">{t.teacherDash.title}</h1>
+          <p className="text-muted-foreground">{t.teacherDash.subtitle}</p>
         </div>
 
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-              <CardTitle className="text-sm font-medium">Total Students</CardTitle>
+              <CardTitle className="text-sm font-medium">{t.teacherDash.totalStudents}</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -405,7 +409,7 @@ export default function TeacherDashboard() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-              <CardTitle className="text-sm font-medium">Total Assignments</CardTitle>
+              <CardTitle className="text-sm font-medium">{t.teacherDash.totalAssignments}</CardTitle>
               <BookOpen className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -417,7 +421,7 @@ export default function TeacherDashboard() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-              <CardTitle className="text-sm font-medium">Pending Review</CardTitle>
+              <CardTitle className="text-sm font-medium">{t.teacherDash.pendingReview}</CardTitle>
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -429,7 +433,7 @@ export default function TeacherDashboard() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-              <CardTitle className="text-sm font-medium">Marked</CardTitle>
+              <CardTitle className="text-sm font-medium">{t.teacherDash.marked}</CardTitle>
               <CheckCircle className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -441,7 +445,7 @@ export default function TeacherDashboard() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-              <CardTitle className="text-sm font-medium">Total Submissions</CardTitle>
+              <CardTitle className="text-sm font-medium">{t.teacherDash.totalSubmissions}</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -493,13 +497,13 @@ export default function TeacherDashboard() {
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-orange-700 dark:text-orange-400 text-base">
                     <AlertCircle className="h-5 w-5" />
-                    Missing Submissions Today
-                    <Badge className="bg-orange-600 text-white">{missingSummary.length} assignment{missingSummary.length !== 1 ? "s" : ""}</Badge>
+                    {t.teacherDash.missingToday}
+                    <Badge className="bg-orange-600 text-white">{t.teacherDash.assignmentCount(missingSummary.length)}</Badge>
                     <span className="ml-auto">
                       {showMissingSubmissions ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                     </span>
                   </CardTitle>
-                  <CardDescription>Due today or yesterday — students who haven't submitted yet</CardDescription>
+                  <CardDescription>{t.teacherDash.missingTodayNote}</CardDescription>
                 </CardHeader>
               </button>
               {showMissingSubmissions && (
@@ -533,8 +537,8 @@ export default function TeacherDashboard() {
                   <Library className="h-6 w-6 text-primary" />
                 </div>
                 <div>
-                  <h3 className="font-semibold">Learning Resources</h3>
-                  <p className="text-sm text-muted-foreground">Manage textbooks, videos, lesson plans</p>
+                  <h3 className="font-semibold">{t.teacherDash.resources}</h3>
+                  <p className="text-sm text-muted-foreground">{t.teacherDash.resourcesNote}</p>
                 </div>
               </CardContent>
             </Card>
@@ -547,8 +551,8 @@ export default function TeacherDashboard() {
                   <Video className="h-6 w-6 text-primary" />
                 </div>
                 <div>
-                  <h3 className="font-semibold">Video & Audio Lessons</h3>
-                  <p className="text-sm text-muted-foreground">Upload or record lessons for students</p>
+                  <h3 className="font-semibold">{t.teacherDash.lessons}</h3>
+                  <p className="text-sm text-muted-foreground">{t.teacherDash.lessonsNote}</p>
                 </div>
               </CardContent>
             </Card>
@@ -561,8 +565,8 @@ export default function TeacherDashboard() {
                   <Users className="h-6 w-6 text-primary" />
                 </div>
                 <div>
-                  <h3 className="font-semibold">Manage Students</h3>
-                  <p className="text-sm text-muted-foreground">Add, edit, or remove students</p>
+                  <h3 className="font-semibold">{t.teacherDash.students}</h3>
+                  <p className="text-sm text-muted-foreground">{t.teacherDash.studentsNote}</p>
                 </div>
               </CardContent>
             </Card>
@@ -575,8 +579,8 @@ export default function TeacherDashboard() {
                   <FileText className="h-6 w-6 text-primary" />
                 </div>
                 <div>
-                  <h3 className="font-semibold">Reports & Analytics</h3>
-                  <p className="text-sm text-muted-foreground">View charts and track progress</p>
+                  <h3 className="font-semibold">{t.teacherDash.reports}</h3>
+                  <p className="text-sm text-muted-foreground">{t.teacherDash.reportsNote}</p>
                 </div>
               </CardContent>
             </Card>
@@ -589,8 +593,8 @@ export default function TeacherDashboard() {
                   <ClipboardList className="h-6 w-6 text-primary" />
                 </div>
                 <div>
-                  <h3 className="font-semibold">Grade Book</h3>
-                  <p className="text-sm text-muted-foreground">Track submissions and scores</p>
+                  <h3 className="font-semibold">{t.teacherDash.gradeBook}</h3>
+                  <p className="text-sm text-muted-foreground">{t.teacherDash.gradeBookNote}</p>
                 </div>
               </CardContent>
             </Card>
@@ -603,8 +607,8 @@ export default function TeacherDashboard() {
                   <ClipboardList className="h-6 w-6 text-primary" />
                 </div>
                 <div>
-                  <h3 className="font-semibold">Export Data</h3>
-                  <p className="text-sm text-muted-foreground">Download filtered CSV reports</p>
+                  <h3 className="font-semibold">{t.teacherDash.exportData}</h3>
+                  <p className="text-sm text-muted-foreground">{t.teacherDash.exportDataNote}</p>
                 </div>
               </CardContent>
             </Card>
@@ -617,8 +621,8 @@ export default function TeacherDashboard() {
                   <Bell className="h-6 w-6 text-secondary" />
                 </div>
                 <div>
-                  <h3 className="font-semibold">Daily Report</h3>
-                  <p className="text-sm text-muted-foreground">WhatsApp-ready submission snapshot</p>
+                  <h3 className="font-semibold">{t.teacherDash.dailyReport}</h3>
+                  <p className="text-sm text-muted-foreground">{t.teacherDash.dailyReportNote}</p>
                 </div>
               </CardContent>
             </Card>
@@ -631,8 +635,8 @@ export default function TeacherDashboard() {
                   <FileText className="h-6 w-6 text-secondary" />
                 </div>
                 <div>
-                  <h3 className="font-semibold">Report Cards</h3>
-                  <p className="text-sm text-muted-foreground">Build a term's cards for a class</p>
+                  <h3 className="font-semibold">{t.teacherDash.reportCards}</h3>
+                  <p className="text-sm text-muted-foreground">{t.teacherDash.reportCardsNote}</p>
                 </div>
               </CardContent>
             </Card>
@@ -645,8 +649,8 @@ export default function TeacherDashboard() {
                   <Award className="h-6 w-6 text-secondary" />
                 </div>
                 <div>
-                  <h3 className="font-semibold">Most Improved</h3>
-                  <p className="text-sm text-muted-foreground">Award the biggest climb in a subject</p>
+                  <h3 className="font-semibold">{t.teacherDash.mostImproved}</h3>
+                  <p className="text-sm text-muted-foreground">{t.teacherDash.mostImprovedNote}</p>
                 </div>
               </CardContent>
             </Card>
@@ -659,8 +663,8 @@ export default function TeacherDashboard() {
                   <GraduationCap className="h-6 w-6 text-secondary" />
                 </div>
                 <div>
-                  <h3 className="font-semibold">Class skills</h3>
-                  <p className="text-sm text-muted-foreground">What to reteach, and who needs help</p>
+                  <h3 className="font-semibold">{t.teacherDash.classSkills}</h3>
+                  <p className="text-sm text-muted-foreground">{t.teacherDash.classSkillsNote}</p>
                 </div>
               </CardContent>
             </Card>
@@ -673,8 +677,8 @@ export default function TeacherDashboard() {
                   <Library className="h-6 w-6 text-secondary" />
                 </div>
                 <div>
-                  <h3 className="font-semibold">Question Bank</h3>
-                  <p className="text-sm text-muted-foreground">Saved questions, ready to reuse</p>
+                  <h3 className="font-semibold">{t.teacherDash.questionBank}</h3>
+                  <p className="text-sm text-muted-foreground">{t.teacherDash.questionBankNote}</p>
                 </div>
               </CardContent>
             </Card>
@@ -687,8 +691,8 @@ export default function TeacherDashboard() {
                   <Gamepad2 className="h-6 w-6 text-secondary" />
                 </div>
                 <div>
-                  <h3 className="font-semibold">Games and homework</h3>
-                  <p className="text-sm text-muted-foreground">Who is earning their game plays</p>
+                  <h3 className="font-semibold">{t.teacherDash.gamePlays}</h3>
+                  <p className="text-sm text-muted-foreground">{t.teacherDash.gamePlaysNote}</p>
                 </div>
               </CardContent>
             </Card>
@@ -702,65 +706,65 @@ export default function TeacherDashboard() {
                     <Megaphone className="h-6 w-6 text-secondary" />
                   </div>
                   <div>
-                    <h3 className="font-semibold">Post announcement</h3>
-                    <p className="text-sm text-muted-foreground">Send notices to students</p>
+                    <h3 className="font-semibold">{t.teacherDash.postAnnouncement}</h3>
+                    <p className="text-sm text-muted-foreground">{t.teacherDash.postAnnouncementNote}</p>
                   </div>
                 </CardContent>
               </Card>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Post announcement</DialogTitle>
-                <DialogDescription>Send a notice to all students or a specific form</DialogDescription>
+                <DialogTitle>{t.teacherDash.postAnnouncement}</DialogTitle>
+                <DialogDescription>{t.teacherDash.announcementFormNote}</DialogDescription>
               </DialogHeader>
               <div className="space-y-4 pt-4">
                 <div>
-                  <label className="text-sm font-medium">Title</label>
+                  <label className="text-sm font-medium">{t.teacherDash.announcementTitle}</label>
                   <Input
                     value={announcementTitle}
                     onChange={(e) => setAnnouncementTitle(e.target.value)}
-                    placeholder="Announcement title"
+                    placeholder={t.teacherDash.announcementTitlePlaceholder}
                     data-testid="input-announcement-title"
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium">Content</label>
+                  <label className="text-sm font-medium">{t.teacherDash.announcementContent}</label>
                   <Textarea
                     value={announcementContent}
                     onChange={(e) => setAnnouncementContent(e.target.value)}
-                    placeholder="Write your announcement..."
+                    placeholder={t.teacherDash.announcementContentPlaceholder}
                     className="min-h-[100px]"
                     data-testid="textarea-announcement-content"
                   />
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="text-sm font-medium">Target Audience</label>
+                    <label className="text-sm font-medium">{t.teacherDash.targetAudience}</label>
                     <Select value={announcementForm} onValueChange={setAnnouncementForm}>
                       <SelectTrigger data-testid="select-announcement-form">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">All Students</SelectItem>
-                        <SelectItem value="Stage 3">Stage 3 Only</SelectItem>
-                        <SelectItem value="Stage 4">Stage 4 Only</SelectItem>
-                        <SelectItem value="Stage 5">Stage 5 Only</SelectItem>
-                        <SelectItem value="Stage 6">Stage 6 Only</SelectItem>
-                        <SelectItem value="Form 1">Form 1 Only</SelectItem>
-                        <SelectItem value="Form 2">Form 2 Only</SelectItem>
+                        <SelectItem value="all">{t.teacherDash.allStudents}</SelectItem>
+                        <SelectItem value="Stage 3">{t.teacherDash.onlyClass("Stage 3")}</SelectItem>
+                        <SelectItem value="Stage 4">{t.teacherDash.onlyClass("Stage 4")}</SelectItem>
+                        <SelectItem value="Stage 5">{t.teacherDash.onlyClass("Stage 5")}</SelectItem>
+                        <SelectItem value="Stage 6">{t.teacherDash.onlyClass("Stage 6")}</SelectItem>
+                        <SelectItem value="Form 1">{t.teacherDash.onlyClass("Form 1")}</SelectItem>
+                        <SelectItem value="Form 2">{t.teacherDash.onlyClass("Form 2")}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div>
-                    <label className="text-sm font-medium">Priority</label>
+                    <label className="text-sm font-medium">{t.teacherDash.priority}</label>
                     <Select value={announcementPriority} onValueChange={setAnnouncementPriority}>
                       <SelectTrigger data-testid="select-announcement-priority">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="normal">Normal</SelectItem>
-                        <SelectItem value="important">Important</SelectItem>
-                        <SelectItem value="urgent">Urgent</SelectItem>
+                        <SelectItem value="normal">{t.teacherDash.priorityNormal}</SelectItem>
+                        <SelectItem value="important">{t.teacherDash.priorityImportant}</SelectItem>
+                        <SelectItem value="urgent">{t.teacherDash.priorityUrgent}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -784,7 +788,7 @@ export default function TeacherDashboard() {
             <CardHeader>
               <div className="flex items-center gap-2">
                 <Bell className="h-5 w-5 text-primary" />
-                <CardTitle className="text-lg">Active Announcements</CardTitle>
+                <CardTitle className="text-lg">{t.teacherDash.activeAnnouncements}</CardTitle>
               </div>
             </CardHeader>
             <CardContent>
@@ -818,7 +822,7 @@ export default function TeacherDashboard() {
         )}
 
         <div className="mb-6">
-          <h2 className="text-lg font-semibold mb-3">Filter by Class</h2>
+          <h2 className="text-lg font-semibold mb-3">{t.teacherDash.filterByClass}</h2>
           <div className="flex flex-wrap gap-2">
             <Button
               variant={activeClassFilter === "all" ? "default" : "outline"}
@@ -826,7 +830,7 @@ export default function TeacherDashboard() {
               onClick={() => setActiveClassFilter("all")}
               data-testid="filter-class-all"
             >
-              All Classes
+              {t.teacherDash.allClasses}
             </Button>
             {classLevels.map((level) => {
               const count = assignments?.filter(a => a.form === level).length || 0;
@@ -858,15 +862,15 @@ export default function TeacherDashboard() {
             <CardHeader>
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div>
-                  <CardTitle>Assignments {activeClassFilter !== "all" ? `— ${activeClassFilter}` : ""}</CardTitle>
+                  <CardTitle>{t.teacherDash.assignments} {activeClassFilter !== "all" ? t.teacherDash.forClass(activeClassFilter) : ""}</CardTitle>
                   <CardDescription>
-                    {activeClassFilter === "all" ? "Your created assignments" : `Assignments for ${activeClassFilter}`}
+                    {activeClassFilter === "all" ? t.teacherDash.assignmentsAll : t.teacherDash.assignmentsFor(activeClassFilter)}
                   </CardDescription>
                 </div>
                 <Link href="/teacher/assignments/new">
                   <Button size="sm" data-testid="button-create-assignment">
                     <PlusCircle className="h-4 w-4 mr-2" />
-                    Create assignment
+                    {t.teacherDash.createAssignment}
                   </Button>
                 </Link>
               </div>
@@ -886,10 +890,10 @@ export default function TeacherDashboard() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <FileClock className="h-4 w-4 text-amber-600" />
                         <h3 className="text-sm font-semibold" data-testid="heading-drafts">
-                          Drafts ({draftAssignments.length})
+                          {t.teacherDash.drafts(draftAssignments.length)}
                         </h3>
                         <span className="text-xs text-muted-foreground">
-                          Ready to publish — students can't see these yet
+                          {t.teacherDash.draftNote}
                         </span>
                       </div>
                       {draftAssignments.map((assignment) => renderAssignmentRow(assignment, true))}
@@ -915,10 +919,10 @@ export default function TeacherDashboard() {
                 <div className="text-center py-8">
                   <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                   <p className="text-muted-foreground mb-4">
-                    {activeClassFilter === "all" ? "No assignments yet" : `No assignments for ${activeClassFilter}`}
+                    {activeClassFilter === "all" ? t.teacherDash.noAssignments : t.teacherDash.noAssignmentsFor(activeClassFilter)}
                   </p>
                   <Link href="/teacher/assignments/new">
-                    <Button size="sm">Create an assignment</Button>
+                    <Button size="sm">{t.teacherDash.createAnAssignment}</Button>
                   </Link>
                 </div>
               )}
@@ -927,9 +931,9 @@ export default function TeacherDashboard() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Pending Submissions {activeClassFilter !== "all" ? `— ${activeClassFilter}` : ""}</CardTitle>
+              <CardTitle>{t.teacherDash.pendingSubmissions} {activeClassFilter !== "all" ? t.teacherDash.forClass(activeClassFilter) : ""}</CardTitle>
               <CardDescription>
-                {activeClassFilter === "all" ? "Submissions awaiting your review" : `Submissions for ${activeClassFilter} awaiting review`}
+                {activeClassFilter === "all" ? t.teacherDash.pendingAll : t.teacherDash.pendingFor(activeClassFilter)}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -953,7 +957,7 @@ export default function TeacherDashboard() {
                             </p>
                           </div>
                         </div>
-                        <Badge variant="secondary">Needs Review</Badge>
+                        <Badge variant="secondary">{t.teacherDash.needsReview}</Badge>
                       </div>
                     </Link>
                   ))}
@@ -962,7 +966,7 @@ export default function TeacherDashboard() {
                 <div className="text-center py-8">
                   <CheckCircle className="h-12 w-12 mx-auto text-primary mb-4" />
                   <p className="text-muted-foreground">
-                    {activeClassFilter === "all" ? "Nothing waiting to be marked." : `Nothing waiting to be marked for ${activeClassFilter}.`}
+                    {activeClassFilter === "all" ? t.teacherDash.nothingToMark : t.teacherDash.nothingToMarkFor(activeClassFilter)}
                   </p>
                 </div>
               )}
@@ -979,7 +983,7 @@ export default function TeacherDashboard() {
               data-testid="button-toggle-archived"
             >
               <Archive className="h-4 w-4" />
-              Archived Assignments ({archivedAssignments.length})
+              {t.teacherDash.archivedCount(archivedAssignments.length)}
               {showArchived ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             </Button>
             {showArchived && (
@@ -987,9 +991,9 @@ export default function TeacherDashboard() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Archive className="h-5 w-5" />
-                    Archived Assignments
+                    {t.teacherDash.archived}
                   </CardTitle>
-                  <CardDescription>These assignments are hidden from your active list</CardDescription>
+                  <CardDescription>{t.teacherDash.archivedNote}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
@@ -1005,7 +1009,7 @@ export default function TeacherDashboard() {
                           </div>
                         </Link>
                         <div className="flex items-center gap-2">
-                          <Badge variant="outline">{assignment.totalMarks} {assignment.totalMarks === 1 ? "mark" : "marks"}</Badge>
+                          <Badge variant="outline">{t.teacherDash.marks(assignment.totalMarks)}</Badge>
                           <Button
                             variant="ghost"
                             size="icon"

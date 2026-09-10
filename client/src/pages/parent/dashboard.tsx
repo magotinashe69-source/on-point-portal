@@ -6,12 +6,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { LanguageToggle } from "@/components/language-toggle";
+import { useT } from "@/lib/i18n";
 import { QueryError } from "@/components/QueryError";
-import { REPORT_TEXT, subjectLabel, type WeeklyReport } from "@shared/weekly-report";
-import { OVERVIEW_TEXT, type ParentOverview } from "@shared/parent-overview";
-import { WORK_TEXT } from "@shared/parent-work";
+import { subjectLabel, type WeeklyReport } from "@shared/weekly-report";
+import { type ParentOverview } from "@shared/parent-overview";
 import {
-  PLAYS_PARENT_TEXT, earnedToday, leftToday, usedToday,
+  earnedToday, leftToday, usedToday,
   weekActiveDays, weekEarned, weekUsed, type ParentPlays,
 } from "@shared/parent-plays";
 import { LogOut, Loader2, GraduationCap, CalendarDays, TrendingUp, AlertCircle, Flame, ClipboardList, MessageSquare, Megaphone, Eye, Target, ChevronRight, Gamepad2, Trophy } from "lucide-react";
@@ -49,6 +50,7 @@ function Stat({
 }
 
 export default function ParentDashboard() {
+  const t = useT();
   const [, setLocation] = useLocation();
   const { parent, logout } = useAuth();
 
@@ -129,9 +131,10 @@ export default function ParentDashboard() {
         <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-4">
           <div className="flex items-center gap-3">
             <img src={logoPath} alt="On Point" className="h-8 w-auto" />
-            <span className="text-sm font-semibold hidden sm:inline">Parent Portal</span>
+            <span className="text-sm font-semibold hidden sm:inline">{t.parentDash.portal}</span>
           </div>
           <div className="flex items-center gap-2">
+            <LanguageToggle />
             <ThemeToggle />
             <Button
               variant="ghost"
@@ -143,7 +146,7 @@ export default function ParentDashboard() {
               data-testid="button-parent-logout"
             >
               <LogOut className="h-4 w-4 mr-2" />
-              Log out
+              {t.common.logOut}
             </Button>
           </div>
         </div>
@@ -154,24 +157,24 @@ export default function ParentDashboard() {
           <h1 className="text-2xl font-bold" data-testid="text-parent-welcome">
             Welcome, {parent.fullName}
           </h1>
-          <p className="text-muted-foreground">Quality Beyond Measure</p>
+          <p className="text-muted-foreground">{t.common.tagline}</p>
         </div>
 
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <GraduationCap className="h-5 w-5" />
-              Your child
+              {t.parentDash.yourChild}
             </CardTitle>
             <CardDescription>
-              This account is linked to one pupil, and shows only their information.
+              {t.parentDash.linkedNote}
             </CardDescription>
           </CardHeader>
           <CardContent>
             {isLoading && (
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Loading…
+                {t.common.loading}
               </div>
             )}
 
@@ -203,13 +206,13 @@ export default function ParentDashboard() {
           <Link href="/parent/work">
             <Button variant="outline" className="w-full h-auto py-4 flex-col gap-2" data-testid="button-completed-work">
               <ClipboardList className="h-5 w-5" />
-              <span className="text-sm font-medium">{WORK_TEXT.completedTitle}</span>
+              <span className="text-sm font-medium">{t.work.completedTitle}</span>
             </Button>
           </Link>
           <Link href="/parent/support">
             <Button variant="outline" className="w-full h-auto py-4 flex-col gap-2" data-testid="button-support-report">
               <Target className="h-5 w-5" />
-              <span className="text-sm font-medium">{WORK_TEXT.supportTitle}</span>
+              <span className="text-sm font-medium">{t.work.supportTitle}</span>
             </Button>
           </Link>
         </div>
@@ -219,7 +222,7 @@ export default function ParentDashboard() {
           <CardHeader>
             <div className="flex items-start justify-between flex-wrap gap-3">
               <div>
-                <CardTitle>{REPORT_TEXT.title}</CardTitle>
+                <CardTitle>{t.report.title}</CardTitle>
                 <CardDescription data-testid="text-report-week">
                   {report ? report.week.label : " "}
                 </CardDescription>
@@ -233,7 +236,7 @@ export default function ParentDashboard() {
                   onClick={() => setWeek("this")}
                   data-testid="button-week-this"
                 >
-                  This week
+                  {t.parentDash.thisWeek}
                 </Button>
                 <Button
                   size="sm"
@@ -241,7 +244,7 @@ export default function ParentDashboard() {
                   onClick={() => setWeek("last")}
                   data-testid="button-week-last"
                 >
-                  Last week
+                  {t.parentDash.lastWeek}
                 </Button>
               </div>
             </div>
@@ -250,7 +253,7 @@ export default function ParentDashboard() {
             {reportLoading && (
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Loading…
+                {t.common.loading}
               </div>
             )}
 
@@ -269,25 +272,25 @@ export default function ParentDashboard() {
                 <div className="grid grid-cols-2 gap-3">
                   <Stat
                     icon={<CalendarDays className="h-4 w-4" />}
-                    label={REPORT_TEXT.daysActive}
+                    label={t.report.daysActive}
                     value={String(report.daysActive)}
                     testId="stat-days-active"
                   />
                   <Stat
                     icon={<GraduationCap className="h-4 w-4" />}
-                    label={REPORT_TEXT.homework}
+                    label={t.report.homework}
                     value={`${report.homework.completed} of ${report.homework.due}`}
                     testId="stat-homework"
                   />
                   <Stat
                     icon={<TrendingUp className="h-4 w-4" />}
-                    label={REPORT_TEXT.average}
+                    label={t.report.average}
                     value={report.averagePercent === null ? "—" : `${report.averagePercent}%`}
                     testId="stat-average"
                   />
                   <Stat
                     icon={<Flame className="h-4 w-4" />}
-                    label={REPORT_TEXT.streak}
+                    label={t.report.streak}
                     value={`${report.streak.current} ${report.streak.current === 1 ? "day" : "days"}`}
                     testId="stat-streak"
                   />
@@ -297,7 +300,7 @@ export default function ParentDashboard() {
                     0% average, which would read as a bad week. */}
                 {report.averagePercent === null && (
                   <p className="text-sm text-muted-foreground" data-testid="text-nothing-marked">
-                    No work has been marked for this week yet.
+                    {t.parentDash.nothingMarkedThisWeek}
                   </p>
                 )}
 
@@ -305,7 +308,7 @@ export default function ParentDashboard() {
                   <div className="rounded-md border p-4" data-testid="row-strongest">
                     <div className="flex items-center gap-2 text-muted-foreground mb-1">
                       <TrendingUp className="h-4 w-4" />
-                      <span className="text-xs">{REPORT_TEXT.strongest}</span>
+                      <span className="text-xs">{t.report.strongest}</span>
                     </div>
                     <p className="font-semibold">
                       {subjectLabel(report.strongest.subject)} — {report.strongest.averagePercent}%
@@ -317,7 +320,7 @@ export default function ParentDashboard() {
                   <div className="rounded-md border p-4" data-testid="row-needs-attention">
                     <div className="flex items-center gap-2 text-muted-foreground mb-1">
                       <AlertCircle className="h-4 w-4" />
-                      <span className="text-xs">{REPORT_TEXT.needsAttention}</span>
+                      <span className="text-xs">{t.report.needsAttention}</span>
                     </div>
                     <p className="font-semibold">
                       {subjectLabel(report.needsAttention.subject)} — {report.needsAttention.averagePercent}%
@@ -328,7 +331,7 @@ export default function ParentDashboard() {
                 {/* Said plainly so "Days active" is never mistaken for a record
                     of the child being at school. */}
                 <p className="text-xs text-muted-foreground border-t pt-4">
-                  "{REPORT_TEXT.daysActive}" counts the days your child handed work in.
+                  "{t.report.daysActive}" counts the days your child handed work in.
                   It is not a record of school attendance.
                 </p>
               </div>
@@ -343,7 +346,7 @@ export default function ParentDashboard() {
         {overviewLoading && (
           <div className="flex items-center gap-2 text-muted-foreground mt-6">
             <Loader2 className="h-4 w-4 animate-spin" />
-            Loading…
+            {t.common.loading}
           </div>
         )}
 
@@ -366,9 +369,9 @@ export default function ParentDashboard() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <TrendingUp className="h-5 w-5" />
-                  {OVERVIEW_TEXT.average}
+                  {t.overview.average}
                 </CardTitle>
-                <CardDescription>{OVERVIEW_TEXT.averageNote}</CardDescription>
+                <CardDescription>{t.overview.averageNote}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {/* An average of nothing is said out loud rather than shown as
@@ -378,14 +381,14 @@ export default function ParentDashboard() {
                 </p>
                 {overview.averagePercent === null && (
                   <p className="text-sm text-muted-foreground" data-testid="text-overview-nothing-marked">
-                    {OVERVIEW_TEXT.nothingMarked}
+                    {t.overview.nothingMarked}
                   </p>
                 )}
 
                 <div className="border-t pt-4">
-                  <p className="text-sm font-semibold mb-3">{OVERVIEW_TEXT.subjects}</p>
+                  <p className="text-sm font-semibold mb-3">{t.overview.subjects}</p>
                   {overview.subjects.length === 0 && (
-                    <p className="text-sm text-muted-foreground">{OVERVIEW_TEXT.subjectsEmpty}</p>
+                    <p className="text-sm text-muted-foreground">{t.overview.subjectsEmpty}</p>
                   )}
                   <div className="space-y-2">
                     {overview.subjects.map(s => (
@@ -413,13 +416,13 @@ export default function ParentDashboard() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <ClipboardList className="h-5 w-5" />
-                  {OVERVIEW_TEXT.recentMarks}
+                  {t.overview.recentMarks}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {overview.recentMarks.length === 0 && (
                   <p className="text-sm text-muted-foreground" data-testid="text-no-recent-marks">
-                    {OVERVIEW_TEXT.recentMarksEmpty}
+                    {t.overview.recentMarksEmpty}
                   </p>
                 )}
                 {/* Each row opens that piece of work, question by question.
@@ -459,7 +462,7 @@ export default function ParentDashboard() {
 
                 {overview.recentMarks.length > 0 && (
                   <p className="text-xs text-muted-foreground mt-3">
-                    Tap any piece to see each question, your child's answer and the right answer.
+                    {t.parentDash.tapAnyPiece}
                   </p>
                 )}
               </CardContent>
@@ -470,30 +473,30 @@ export default function ParentDashboard() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <GraduationCap className="h-5 w-5" />
-                  {OVERVIEW_TEXT.homework}
+                  {t.overview.homework}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
                   <Stat
                     icon={<ClipboardList className="h-4 w-4" />}
-                    label={OVERVIEW_TEXT.homeworkSet}
+                    label={t.overview.homeworkSet}
                     value={String(overview.homework.assigned)}
                     testId="stat-homework-assigned"
                   />
                   <Stat
                     icon={<GraduationCap className="h-4 w-4" />}
-                    label={OVERVIEW_TEXT.homeworkDone}
+                    label={t.overview.homeworkDone}
                     value={String(overview.homework.completed)}
                     testId="stat-homework-completed"
                   />
                 </div>
 
                 <div className="border-t pt-4">
-                  <p className="text-sm font-semibold mb-3">{OVERVIEW_TEXT.outstanding}</p>
+                  <p className="text-sm font-semibold mb-3">{t.overview.outstanding}</p>
                   {overview.homework.outstanding.length === 0 && (
                     <p className="text-sm text-muted-foreground" data-testid="text-nothing-outstanding">
-                      {OVERVIEW_TEXT.outstandingEmpty}
+                      {t.overview.outstandingEmpty}
                     </p>
                   )}
                   <div className="space-y-2">
@@ -533,11 +536,11 @@ export default function ParentDashboard() {
                 <div className="border-t pt-4">
                   <Stat
                     icon={<CalendarDays className="h-4 w-4" />}
-                    label={OVERVIEW_TEXT.activity}
+                    label={t.overview.activity}
                     value={String(overview.attendance.daysActiveLast4Weeks)}
                     testId="stat-days-active-4-weeks"
                   />
-                  <p className="text-xs text-muted-foreground mt-2">{OVERVIEW_TEXT.activityNote}</p>
+                  <p className="text-xs text-muted-foreground mt-2">{t.overview.activityNote}</p>
                 </div>
               </CardContent>
             </Card>
@@ -549,14 +552,14 @@ export default function ParentDashboard() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Gamepad2 className="h-5 w-5" />
-                  {PLAYS_PARENT_TEXT.title}
+                  {t.plays.title}
                 </CardTitle>
-                <CardDescription>{PLAYS_PARENT_TEXT.howItWorks}</CardDescription>
+                <CardDescription>{t.plays.howItWorks}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {playsLoading && (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+                    <Loader2 className="h-4 w-4 animate-spin" /> {t.common.loading}
                   </div>
                 )}
 
@@ -578,7 +581,7 @@ export default function ParentDashboard() {
                     of zeros would read as "your child has earned nothing". */}
                 {!playsLoading && !playsError && plays && !plays.available && (
                   <p className="text-sm text-muted-foreground" data-testid="text-plays-not-available">
-                    {PLAYS_PARENT_TEXT.notAvailable}
+                    {t.plays.notAvailable}
                   </p>
                 )}
 
@@ -590,64 +593,64 @@ export default function ParentDashboard() {
                           the lines underneath. */}
                       <Stat
                         icon={<ClipboardList className="h-4 w-4" />}
-                        label={PLAYS_PARENT_TEXT.earnedToday}
+                        label={t.plays.earnedToday}
                         value={String(earnedToday(plays.today.games))}
                         testId="stat-plays-earned-today"
                       />
                       <Stat
                         icon={<Gamepad2 className="h-4 w-4" />}
-                        label={PLAYS_PARENT_TEXT.usedToday}
+                        label={t.plays.usedToday}
                         value={String(usedToday(plays.today.games))}
                         testId="stat-plays-used-today"
                       />
                       <Stat
                         icon={<Target className="h-4 w-4" />}
-                        label={PLAYS_PARENT_TEXT.leftToday}
+                        label={t.plays.leftToday}
                         value={String(leftToday(plays.today.games))}
                         testId="stat-plays-left-today"
                       />
                     </div>
 
-                    <p className="text-xs text-muted-foreground">{PLAYS_PARENT_TEXT.bothGamesNote}</p>
+                    <p className="text-xs text-muted-foreground">{t.plays.bothGamesNote}</p>
 
                     {/* Where today's plays came from, in the child's own terms. */}
                     {plays.today.assignmentsHandedIn === 0 ? (
                       <p className="text-sm text-muted-foreground" data-testid="text-plays-nothing-today">
-                        {PLAYS_PARENT_TEXT.nothingToday}
+                        {t.plays.nothingToday}
                       </p>
                     ) : (
                       <div className="space-y-1">
                         {plays.today.games.map((g) => (
                           <p key={g.game} className="text-sm" data-testid={`text-plays-${g.game}`}>
-                            {PLAYS_PARENT_TEXT.gameLine(g.label, g.left, g.earned)}
+                            {t.plays.gameLine(g.label, g.left, g.earned)}
                           </p>
                         ))}
                       </div>
                     )}
 
-                    <p className="text-xs text-muted-foreground">{PLAYS_PARENT_TEXT.resetNote}</p>
+                    <p className="text-xs text-muted-foreground">{t.plays.resetNote}</p>
 
                     {/* The week, so a parent who looks in once can still read
                         the pattern rather than only the day they happened to
                         open it. */}
                     <div className="border-t pt-4">
-                      <p className="text-sm font-semibold mb-3">{PLAYS_PARENT_TEXT.week}</p>
+                      <p className="text-sm font-semibold mb-3">{t.plays.week}</p>
                       <div className="grid grid-cols-3 gap-3 mb-3">
                         <Stat
                           icon={<ClipboardList className="h-4 w-4" />}
-                          label={PLAYS_PARENT_TEXT.weekEarned}
+                          label={t.plays.weekEarned}
                           value={String(weekEarned(plays.week))}
                           testId="stat-plays-week-earned"
                         />
                         <Stat
                           icon={<Gamepad2 className="h-4 w-4" />}
-                          label={PLAYS_PARENT_TEXT.weekUsed}
+                          label={t.plays.weekUsed}
                           value={String(weekUsed(plays.week))}
                           testId="stat-plays-week-used"
                         />
                         <Stat
                           icon={<CalendarDays className="h-4 w-4" />}
-                          label={PLAYS_PARENT_TEXT.weekActive}
+                          label={t.plays.weekActive}
                           value={String(weekActiveDays(plays.week))}
                           testId="stat-plays-week-active"
                         />
@@ -678,11 +681,11 @@ export default function ParentDashboard() {
                     <div className="border-t pt-4">
                       <p className="text-sm font-semibold mb-3 flex items-center gap-2">
                         <Trophy className="h-4 w-4" />
-                        {PLAYS_PARENT_TEXT.records}
+                        {t.plays.records}
                       </p>
                       {plays.records.length === 0 ? (
                         <p className="text-sm text-muted-foreground" data-testid="text-plays-no-records">
-                          {PLAYS_PARENT_TEXT.recordsEmpty}
+                          {t.plays.recordsEmpty}
                         </p>
                       ) : (
                         <div className="space-y-2">
@@ -700,7 +703,7 @@ export default function ParentDashboard() {
                                 </p>
                               </div>
                               <Badge variant="secondary">
-                                {PLAYS_PARENT_TEXT.recordLine(r.bestScore, r.bestOutOf)}
+                                {t.plays.recordLine(r.bestScore, r.bestOutOf)}
                               </Badge>
                             </div>
                           ))}
@@ -712,7 +715,7 @@ export default function ParentDashboard() {
                         this is plays, not minutes, and must not be read as a
                         record of time spent. */}
                     <p className="text-xs text-muted-foreground border-t pt-4">
-                      {PLAYS_PARENT_TEXT.notMinutes}
+                      {t.plays.notMinutes}
                     </p>
                   </>
                 )}
@@ -724,13 +727,13 @@ export default function ParentDashboard() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <MessageSquare className="h-5 w-5" />
-                  {OVERVIEW_TEXT.feedback}
+                  {t.overview.feedback}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {feedback.length === 0 && (
                   <p className="text-sm text-muted-foreground" data-testid="text-no-feedback">
-                    {OVERVIEW_TEXT.feedbackEmpty}
+                    {t.overview.feedbackEmpty}
                   </p>
                 )}
                 <div className="space-y-3">
@@ -767,13 +770,13 @@ export default function ParentDashboard() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Megaphone className="h-5 w-5" />
-                  {OVERVIEW_TEXT.announcements}
+                  {t.overview.announcements}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {overview.announcements.length === 0 && (
                   <p className="text-sm text-muted-foreground" data-testid="text-no-announcements">
-                    {OVERVIEW_TEXT.announcementsEmpty}
+                    {t.overview.announcementsEmpty}
                   </p>
                 )}
                 <div className="space-y-3">
@@ -797,7 +800,7 @@ export default function ParentDashboard() {
             {/* A plain reminder of what this account is. */}
             <p className="text-xs text-muted-foreground flex items-center gap-2" data-testid="text-read-only">
               <Eye className="h-3 w-3" />
-              {OVERVIEW_TEXT.readOnly}
+              {t.overview.readOnly}
             </p>
           </div>
         )}

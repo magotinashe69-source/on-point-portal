@@ -14,12 +14,15 @@ import { QrScanDialog } from "@/components/QrScanDialog";
 import { ArrowLeft, LogIn, Loader2, Eye, EyeOff, Camera } from "lucide-react";
 import { Link } from "wouter";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { LanguageToggle } from "@/components/language-toggle";
+import { useT } from "@/lib/i18n";
 import logoPath from "@assets/logo.webp";
 
 export default function StudentLoginPage() {
   const [location, setLocation] = useLocation();
   const { student, setStudent, forgetRememberedLogins } = useAuth();
   const { toast } = useToast();
+  const t = useT();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -70,7 +73,7 @@ export default function StudentLoginPage() {
         body: JSON.stringify({ code }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!data.success) return data.message || "Card not recognised. Ask your teacher to check it.";
+      if (!data.success) return data.message || t.login.student.cardNotRecognised;
 
       // Same as the form login below: forget any teacher or parent this
       // browser is remembering, without posting a logout that would destroy
@@ -78,11 +81,11 @@ export default function StudentLoginPage() {
       forgetRememberedLogins();
       setStudent(data.student);
       setScanOpen(false);
-      toast({ title: `Welcome, ${String(data.student.fullName || "").split(" ")[0]}` });
+      toast({ title: t.login.student.welcome(String(data.student.fullName || "").split(" ")[0]) });
       setLocation("/student/dashboard");
       return null;
     } catch {
-      return "Check your connection and try again.";
+      return t.common.checkConnection;
     }
   }
 
@@ -99,24 +102,24 @@ export default function StudentLoginPage() {
         // created, leaving every request 401 afterwards.
         forgetRememberedLogins();
         const message = data.isFirstLogin 
-          ? "Your password is set. Use it next time you log in."
-          : `Welcome back, ${data.student.fullName}!`;
+          ? t.login.student.passwordSet
+          : t.login.student.welcomeBack(data.student.fullName);
         toast({
-          title: "Logged in",
+          title: t.login.loggedIn,
           description: message,
         });
         setStudent(data.student);
       } else {
         toast({
-          title: "Login failed",
-          description: data.message || "Invalid credentials",
+          title: t.login.loginFailed,
+          description: data.message || t.login.student.invalidCredentials,
           variant: "destructive",
         });
       }
     } catch (error) {
       toast({
-        title: "Login failed",
-        description: "Check your name and password, then try again.",
+        title: t.login.loginFailed,
+        description: t.login.student.tryAgain,
         variant: "destructive",
       });
     } finally {
@@ -138,9 +141,12 @@ export default function StudentLoginPage() {
         <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-4">
           <Link href="/" className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
-            <span className="text-sm">Back to Home</span>
+            <span className="text-sm">{t.common.backToHome}</span>
           </Link>
-          <ThemeToggle />
+          <div className="flex items-center gap-2">
+            <LanguageToggle />
+            <ThemeToggle />
+          </div>
         </div>
       </header>
 
@@ -150,9 +156,9 @@ export default function StudentLoginPage() {
             <div className="flex justify-center mb-4">
               <img src={logoPath} alt="On Point Education Centre" className="h-20 w-auto" />
             </div>
-            <CardTitle className="text-2xl">Student Login</CardTitle>
+            <CardTitle className="text-2xl">{t.login.student.title}</CardTitle>
             <CardDescription>
-              Enter your name and password to access your assignments
+              {t.login.student.description}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -163,10 +169,10 @@ export default function StudentLoginPage() {
                   name="fullName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Your Name</FormLabel>
+                      <FormLabel>{t.login.student.nameLabel}</FormLabel>
                       <FormControl>
                         <Input 
-                          placeholder="Enter your name" 
+                          placeholder={t.login.student.namePlaceholder} 
                           data-testid="input-fullname"
                           {...field} 
                         />
@@ -180,12 +186,12 @@ export default function StudentLoginPage() {
                   name="password"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Password</FormLabel>
+                      <FormLabel>{t.common.password}</FormLabel>
                       <FormControl>
                         <div className="relative">
                           <Input 
                             type={showPassword ? "text" : "password"}
-                            placeholder="Enter your password" 
+                            placeholder={t.login.student.passwordPlaceholder} 
                             className="pr-10"
                             data-testid="input-password"
                             {...field} 
@@ -196,7 +202,7 @@ export default function StudentLoginPage() {
                             size="icon"
                             className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
                             onClick={() => setShowPassword(!showPassword)}
-                            aria-label={showPassword ? "Hide password" : "Show password"}
+                            aria-label={showPassword ? t.common.hidePassword : t.common.showPassword}
                             data-testid="button-toggle-password"
                           >
                             {showPassword ? (
@@ -222,7 +228,7 @@ export default function StudentLoginPage() {
                   ) : (
                     <LogIn className="h-4 w-4 mr-2" />
                   )}
-                  Login
+                  {t.login.signIn}
                 </Button>
               </form>
             </Form>
@@ -240,7 +246,7 @@ export default function StudentLoginPage() {
                 data-testid="button-scan-login"
               >
                 <Camera className="h-5 w-5 mr-2" />
-                Scan QR card to log in
+                {t.login.student.scanCard}
               </Button>
             )}
 
@@ -251,7 +257,7 @@ export default function StudentLoginPage() {
             />
             <div className="mt-6 p-4 bg-muted rounded-md">
               <p className="text-sm text-muted-foreground text-center">
-                First time logging in? Enter your name exactly as registered and create a password.
+                {t.login.student.firstTime}
               </p>
             </div>
           </CardContent>
