@@ -177,7 +177,7 @@ export function AddFromBankDialog({
                       <Badge variant="outline" className="text-xs">{subjectLabel(q.subject)}</Badge>
                       <Badge variant="outline" className="text-xs">{q.topic}</Badge>
                       <Badge variant="outline" className="text-xs">{q.form}</Badge>
-                      <Badge variant="secondary" className="text-xs">{BANK_TEXT.difficulties[q.difficulty]}</Badge>
+                      <Badge variant="outline" className="text-xs">{BANK_TEXT.difficulties[q.difficulty]}</Badge>
                       {/* Pointed out, not blocked: a teacher may well want the
                           same question twice, and only they can say. */}
                       {repeat && (

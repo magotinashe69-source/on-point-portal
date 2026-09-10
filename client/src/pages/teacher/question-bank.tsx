@@ -251,13 +251,17 @@ export default function QuestionBankPage() {
                 <p className="text-xs text-muted-foreground">{q.explanation}</p>
               )}
 
+              {/* All outline: these are neutral facts about a question. The
+                  `secondary` variant is the school's RED (see --secondary in
+                  index.css), which made a difficulty of "Easy" read as an
+                  alarm. Red is kept for things that actually want attention. */}
               <div className="flex items-center gap-2 flex-wrap">
-                <Badge variant="secondary">{typeLabel(q.type)}</Badge>
+                <Badge variant="outline">{typeLabel(q.type)}</Badge>
                 <Badge variant="outline">{q.maxScore === 1 ? "1 mark" : `${q.maxScore} marks`}</Badge>
                 <Badge variant="outline">{subjectLabel(q.subject)}</Badge>
                 <Badge variant="outline">{q.topic}</Badge>
                 <Badge variant="outline">{q.form}</Badge>
-                <Badge variant="secondary">{BANK_TEXT.difficulties[q.difficulty]}</Badge>
+                <Badge variant="outline">{BANK_TEXT.difficulties[q.difficulty]}</Badge>
               </div>
 
               <div className="flex items-center gap-2">

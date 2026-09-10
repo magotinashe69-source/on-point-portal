@@ -288,7 +288,7 @@ export default function TeacherGamePlays() {
                             {/* Only today has leftovers worth naming — plays do
                                 not carry over, so a past day has none. */}
                             {r.playsLeft !== null && r.playsLeft > 0 && (
-                              <Badge variant="secondary">{r.playsLeft} left</Badge>
+                              <Badge variant="outline">{r.playsLeft} left</Badge>
                             )}
                           </div>
                         </div>
