@@ -237,6 +237,23 @@ export class DatabaseStorage implements IStorage {
     // The child's parent account goes with them. Leaving it behind would mean a
     // working login pointing at a pupil who no longer exists.
     await db.delete(parents).where(eq(parents.studentId, id));
+
+    // Everything the gamification side remembers about them. This used to be
+    // left behind: removing 74 pupils once left over a thousand dead rows
+    // across these seven tables, all keyed to children who no longer existed.
+    //
+    // It was never dangerous — ids are AUTOINCREMENT in SQLite and serial in
+    // PostgreSQL, so a new pupil can never be handed a deleted one's id and
+    // inherit their XP — but it is a child's record, and when they are removed
+    // it should go with them rather than linger.
+    await db.delete(studentXp).where(eq(studentXp.studentId, id));
+    await db.delete(studentStreaks).where(eq(studentStreaks.studentId, id));
+    await db.delete(studentRewards).where(eq(studentRewards.studentId, id));
+    await db.delete(penaltyBest).where(eq(penaltyBest.studentId, id));
+    await db.delete(blasterBest).where(eq(blasterBest.studentId, id));
+    await db.delete(gamePlays).where(eq(gamePlays.studentId, id));
+    await db.delete(dreamWorld).where(eq(dreamWorld.studentId, id));
+
     await db.delete(students).where(eq(students.id, id));
   }
 
