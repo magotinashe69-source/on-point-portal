@@ -22,6 +22,8 @@ import { buildTeacherPlays } from "./teacher-plays";
 import { buildMastery, buildClassMastery } from "./mastery";
 import { certificatesFor, certificateFor, awardMostImproved } from "./certificates";
 import { improvementFor } from "./most-improved";
+import { buildClassReportCards, boundaries as reportBoundaries, termKeyFor } from "./report-card";
+import { validateBoundaries, sortBoundaries, type GradeBoundary } from "@shared/report-card";
 import {
   validateBankQuestion, isDifficulty, isBankType,
   type BankType, type Difficulty,
@@ -2694,6 +2696,131 @@ export async function registerRoutes(
       res.json({ success: true, mastery });
     } catch (error) {
       console.error("Mastery error:", error);
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
+    }
+  });
+
+  // ─── Report cards ─────────────────────────────────────────────────────────
+  //
+  // A term's marks assembled into a printable card. Everything here READS —
+  // no mark is recalculated and no score altered.
+  //
+  // Teacher-only, all of it: a card names a child, their grades and how they
+  // compare with the class, which is not something another pupil should read.
+  // (A parent sees their own child through the parent portal, which has its own
+  // wall; nothing here is reachable from a parent session.)
+
+  /** The school's grade boundaries, or the Cambridge defaults. */
+  app.get("/api/report-cards/boundaries", async (req, res) => {
+    try {
+      if (!(await requireTeacher(req, res))) return;
+      const stored = await storage.getReportSettings();
+      res.json({
+        success: true,
+        boundaries: await reportBoundaries(),
+        // So the screen can say whether the school has set its own yet.
+        isDefault: !stored,
+      });
+    } catch (error) {
+      console.error("Boundaries read error:", error);
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
+    }
+  });
+
+  /** Set the school's grade boundaries. */
+  app.put("/api/report-cards/boundaries", async (req, res) => {
+    try {
+      if (!(await requireTeacher(req, res))) return;
+      const teacherId = req.session.teacherId ?? null;
+
+      const incoming = Array.isArray(req.body?.boundaries) ? req.body.boundaries : null;
+      if (!incoming) {
+        return res.status(400).json({ success: false, message: "Send the grade boundaries to save." });
+      }
+
+      // Refused rather than stored when they do not hold together. A gap or an
+      // overlap mis-grades a child quietly, and nobody checks a grade that
+      // looks plausible.
+      const problems = validateBoundaries(incoming as GradeBoundary[]);
+      if (problems.length > 0) {
+        return res.status(400).json({ success: false, message: problems.join(" "), problems });
+      }
+
+      const saved = await storage.saveReportSettings(sortBoundaries(incoming as GradeBoundary[]), teacherId);
+      res.json({ success: true, boundaries: saved.boundaries });
+    } catch (error) {
+      console.error("Boundaries save error:", error);
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
+    }
+  });
+
+  /** Save a pupil's comment for one term. */
+  app.put("/api/report-cards/comment", async (req, res) => {
+    try {
+      if (!(await requireTeacher(req, res))) return;
+      const teacherId = req.session.teacherId ?? null;
+
+      const { studentId, termLabel, from, to, comment } = req.body ?? {};
+      if (typeof studentId !== "number" || typeof comment !== "string") {
+        return res.status(400).json({ success: false, message: "Choose a pupil and write a comment." });
+      }
+      if (typeof termLabel !== "string" || !termLabel.trim() || !from || !to) {
+        return res.status(400).json({ success: false, message: "Name the term and give its dates." });
+      }
+
+      const student = await storage.getStudent(studentId);
+      if (!student) {
+        return res.status(404).json({ success: false, message: "Student not found" });
+      }
+
+      const saved = await storage.saveReportComment({
+        studentId,
+        termKey: termKeyFor(termLabel, String(from), String(to)),
+        comment: comment.trim(),
+        updatedById: teacherId,
+      });
+      res.json({ success: true, comment: saved.comment });
+    } catch (error) {
+      console.error("Report comment error:", error);
+      res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
+    }
+  });
+
+  /**
+   * Report cards for a whole class, for a term.
+   *
+   * Built as a class even when only one card is wanted: a card carries the
+   * class average beside the child's own, so every child's marks are read
+   * anyway. `studentId` picks one out of the set rather than building it alone.
+   */
+  app.get("/api/report-cards", async (req, res) => {
+    try {
+      if (!(await requireTeacher(req, res))) return;
+
+      const { form, termLabel, from, to, studentId } = req.query as Record<string, string | undefined>;
+      if (!form) return res.status(400).json({ success: false, message: "Choose a class first." });
+      if (!termLabel || !termLabel.trim()) {
+        return res.status(400).json({ success: false, message: "Name the term." });
+      }
+      if (!from || !to) return res.status(400).json({ success: false, message: "Give the term's dates." });
+      if (from > to) {
+        return res.status(400).json({ success: false, message: "The term starts after it ends." });
+      }
+
+      const term = { label: termLabel.trim(), from, to };
+      const cards = await buildClassReportCards(form, term);
+
+      if (studentId) {
+        const one = cards.find((c) => c.student.id === parseInt(studentId));
+        if (!one) {
+          return res.status(404).json({ success: false, message: "That pupil is not in this class." });
+        }
+        return res.json({ success: true, cards: [one] });
+      }
+
+      res.json({ success: true, cards });
+    } catch (error) {
+      console.error("Report cards error:", error);
       res.status(500).json({ success: false, message: "Something went wrong at our end. Try again in a moment." });
     }
   });

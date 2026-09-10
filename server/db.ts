@@ -119,6 +119,25 @@ CREATE TABLE IF NOT EXISTS certificates (
 -- simultaneous reads cannot both insert the same award.
 CREATE UNIQUE INDEX IF NOT EXISTS certificates_one_per_achievement
   ON certificates (student_id, cert_key);
+CREATE TABLE IF NOT EXISTS report_settings (
+  id SERIAL PRIMARY KEY,
+  settings_key TEXT NOT NULL UNIQUE,
+  boundaries JSONB NOT NULL,
+  updated_at TIMESTAMP NOT NULL DEFAULT now(),
+  updated_by_id INTEGER
+);
+CREATE TABLE IF NOT EXISTS report_comments (
+  id SERIAL PRIMARY KEY,
+  student_id INTEGER NOT NULL,
+  term_key TEXT NOT NULL,
+  comment TEXT NOT NULL,
+  updated_at TIMESTAMP NOT NULL DEFAULT now(),
+  updated_by_id INTEGER
+);
+-- One comment per pupil per term, enforced by the database so two teachers
+-- saving at once cannot both insert.
+CREATE UNIQUE INDEX IF NOT EXISTS report_comments_one_per_term
+  ON report_comments (student_id, term_key);
 CREATE TABLE IF NOT EXISTS dream_world (
   id SERIAL PRIMARY KEY,
   student_id INTEGER NOT NULL,
@@ -330,4 +349,6 @@ export const {
   blasterBest,
   questionBank,
   certificates,
+  reportSettings,
+  reportComments,
 } = (usePostgres ? pgSchema : sqliteSchema) as typeof pgSchema;

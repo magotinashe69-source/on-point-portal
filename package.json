@@ -14,6 +14,7 @@
     "check:bank": "tsx script/check-question-bank.ts",
     "check:mastery": "tsx script/check-mastery.ts",
     "check:certs": "tsx script/check-certificates.ts",
+    "check:reports": "tsx script/check-report-cards.ts",
     "db:push": "drizzle-kit push"
   },
   "dependencies": {

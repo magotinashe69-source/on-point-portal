@@ -40,6 +40,7 @@ import TargetBlaster from "@/pages/student/target-blaster";
 import CertificatesPage from "@/pages/student/certificates";
 import CertificatePage from "@/pages/student/certificate";
 import MostImprovedPage from "@/pages/teacher/most-improved";
+import ReportCardsPage from "@/pages/teacher/report-cards";
 // Dream World is retired. Its pages (dream-world, visit, town-view, certificate)
 // are still in the repo but are no longer imported or routed to — see the
 // redirects below.
@@ -69,6 +70,7 @@ function Router() {
       <Route path="/teacher/question-bank" component={QuestionBankPage} />
       <Route path="/teacher/class-mastery" component={ClassMasteryPage} />
       <Route path="/teacher/most-improved" component={MostImprovedPage} />
+      <Route path="/teacher/report-cards" component={ReportCardsPage} />
       {/* Parent portal. A parent account can only ever see its own child —
           the server enforces that on every request, not these routes. */}
       <Route path="/parent/login" component={ParentLogin} />

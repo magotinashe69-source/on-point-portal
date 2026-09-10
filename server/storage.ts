@@ -3,7 +3,7 @@ import { eq, and, inArray, or, isNull, desc, gte, lte } from "drizzle-orm";
 // the right database (SQLite or PostgreSQL) at runtime.
 import {
   db,
-  teachers, students, parents, assignments, submissions, marks, resources, announcements, lessons, exportLogs, studentRewards, studentXp, studentStreaks, dreamWorld, penaltyBest, gamePlays, blasterBest, questionBank, certificates,
+  teachers, students, parents, assignments, submissions, marks, resources, announcements, lessons, exportLogs, studentRewards, studentXp, studentStreaks, dreamWorld, penaltyBest, gamePlays, blasterBest, questionBank, certificates, reportSettings, reportComments,
 } from "./db";
 // The TypeScript types are the same for both databases, so they come from the shared schema.
 import {
@@ -26,6 +26,7 @@ import {
   type BlasterBest, type InsertBlasterBest,
   type QuestionBankRow,
   type CertificateRow, type InsertCertificateRow,
+  type ReportSettingsRow, type ReportCommentRow, type InsertReportCommentRow,
   MASTER_PASSWORD
 } from "@shared/schema";
 // The Question Bank's shapes and rules are pure, so they live in shared/.
@@ -140,6 +141,18 @@ export interface IStorage {
   updateBankQuestion(id: number, changes: Partial<NewBankQuestion>): Promise<BankQuestion>;
   /** Remove one saved question from the library. */
   deleteBankQuestion(id: number): Promise<void>;
+
+  // --- Report cards ---
+  /** The school's grade boundaries. Undefined until they are first saved. */
+  getReportSettings(): Promise<ReportSettingsRow | undefined>;
+  /** Save the school's grade boundaries. */
+  saveReportSettings(boundaries: Array<{ grade: string; min: number }>, updatedById: number | null): Promise<ReportSettingsRow>;
+  /** One pupil's comment for one term. */
+  getReportComment(studentId: number, termKey: string): Promise<ReportCommentRow | undefined>;
+  /** Every comment saved for a term, for a whole class at once. */
+  getReportComments(studentIds: number[], termKey: string): Promise<ReportCommentRow[]>;
+  /** Write or replace a pupil's comment for a term. */
+  saveReportComment(row: InsertReportCommentRow): Promise<ReportCommentRow>;
 
   // --- Certificates & Awards ---
   /** Every certificate a child has earned. */
@@ -721,6 +734,74 @@ export class DatabaseStorage implements IStorage {
   // Only what has been USED is stored. What a child EARNED is counted from the
   // assignments they handed in today (server/game-plays.ts), so nothing here
   // needs clearing overnight: tomorrow is a different `day` and finds no row.
+
+  // ---------------------------------------------------------------------
+  // Report cards
+  // ---------------------------------------------------------------------
+
+  /** The one settings row. Keyed by name rather than by id — see the schema. */
+  async getReportSettings(): Promise<ReportSettingsRow | undefined> {
+    const [row] = await db.select().from(reportSettings)
+      .where(eq(reportSettings.settingsKey, "default"));
+    return row || undefined;
+  }
+
+  async saveReportSettings(
+    boundaries: Array<{ grade: string; min: number }>, updatedById: number | null,
+  ): Promise<ReportSettingsRow> {
+    const existing = await this.getReportSettings();
+    if (!existing) {
+      const [created] = await db.insert(reportSettings).values({
+        settingsKey: "default", boundaries, updatedById,
+      }).returning();
+      return created;
+    }
+    const [updated] = await db.update(reportSettings)
+      .set({ boundaries, updatedById, updatedAt: new Date() })
+      .where(eq(reportSettings.id, existing.id))
+      .returning();
+    return updated;
+  }
+
+  async getReportComment(studentId: number, termKey: string): Promise<ReportCommentRow | undefined> {
+    const [row] = await db.select().from(reportComments).where(
+      and(eq(reportComments.studentId, studentId), eq(reportComments.termKey, termKey)),
+    );
+    return row || undefined;
+  }
+
+  /** A whole class's comments in one read, for building a set of cards. */
+  async getReportComments(studentIds: number[], termKey: string): Promise<ReportCommentRow[]> {
+    if (studentIds.length === 0) return [];
+    return db.select().from(reportComments).where(
+      and(inArray(reportComments.studentId, studentIds), eq(reportComments.termKey, termKey)),
+    );
+  }
+
+  /**
+   * Write or replace a comment.
+   *
+   * Replaces rather than adds: a pupil has ONE comment per term, and a teacher
+   * editing it expects to change what is there rather than leave two versions
+   * for the card to choose between.
+   */
+  async saveReportComment(row: InsertReportCommentRow): Promise<ReportCommentRow> {
+    const existing = await this.getReportComment(row.studentId, row.termKey);
+    if (!existing) {
+      const [created] = await db.insert(reportComments).values({
+        studentId: row.studentId,
+        termKey: row.termKey,
+        comment: row.comment,
+        updatedById: row.updatedById ?? null,
+      }).returning();
+      return created;
+    }
+    const [updated] = await db.update(reportComments)
+      .set({ comment: row.comment, updatedById: row.updatedById ?? null, updatedAt: new Date() })
+      .where(eq(reportComments.id, existing.id))
+      .returning();
+    return updated;
+  }
 
   // ---------------------------------------------------------------------
   // Certificates & Awards

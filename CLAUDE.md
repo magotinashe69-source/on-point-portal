@@ -954,6 +954,70 @@ and the other has none of it — and checks the spread tells them apart, that th
 list is weakest-first, that the struggling pupil is flagged and the strong one
 is not, and that a pupil cannot read the class view. 61 checks.
 
+## Report cards
+
+A term's marks assembled into a printable card, in the school's navy and gold.
+No AI. Nothing here marks anything or changes a score — it reads, averages,
+grades and lays out.
+
+- `shared/report-card.ts` — grade boundaries, grading, shapes, wording. Pure.
+- `server/report-card.ts` — assembles a class's cards for a term.
+- `client/src/components/ReportCardSheet.tsx` — the printable card.
+- `/teacher/report-cards`, teacher-only.
+
+**THE CARD MUST NOT CLAIM AN ATTENDANCE FIGURE.** The portal keeps no
+attendance register — the QR "attendance card" is only used to log in, and
+nothing records a child being present. A report card goes home to a family, so
+printing "Attendance: 92%" derived from homework would be inventing a fact a
+parent then acts on. The card carries **days the pupil handed work in**,
+labelled as exactly that, with the disclaimer printed ON the card rather than
+in a footnote. `attendance.recorded` stays `false` and `schoolDays` stays
+`null` until somebody builds a real register; that is where it would go.
+
+**A whole class is built even for one card.** A card shows the class average
+beside the child's own, so every child's marks are read anyway — building per
+child would read the same marks once per child. `studentId` picks one out of
+the set.
+
+**The term is decided by when work was HANDED IN**, not when it was marked.
+Marking date depends on when a teacher got to it, which is not something a
+child's term should hinge on.
+
+**A pupil with nothing marked in a subject still gets the row**, showing a dash
+and the class figure. A missing row reads as "not taught" rather than "nothing
+marked", and the comparison is the useful part either way.
+
+### Grade boundaries
+
+Cambridge defaults (A* 90, A 80, B 70, C 60, D 50, E 40, U 0), but **stored and
+editable** — a school sets its own once, in `report_settings`. Every card prints
+the boundaries it was graded against, so a family can read the grade without
+asking what a B means here.
+
+`validateBoundaries()` refuses a set that does not hold together — duplicate
+names, two grades starting at the same mark, or nothing starting at 0. A gap
+mis-grades quietly, and nobody checks a grade that looks plausible.
+`gradeFor()` sorts before comparing, so a set stored in the wrong order still
+grades correctly rather than handing everybody a U.
+
+### Teacher comments
+
+One comment per pupil per term, in `report_comments`, keyed by pupil AND term.
+The term key is its name plus its dates: two terms sharing a name in different
+years stay apart, and editing this term's comment can never overwrite what went
+home last term. A unique index enforces the one-per-term rule in the database,
+not only in the code that looks first.
+
+### Proving it — `npm run check:reports`
+
+`script/check-report-cards.ts` builds a class whose marks are chosen so every
+figure can be worked out by hand — if the check and the code disagree, the
+arithmetic in the header says which is wrong. It checks the subject averages
+and grades, that every card in the class quotes the same class average, the
+overall figure, that work outside the term does not count, that a comment
+belongs to its own term and pupil, that changing the boundaries moves the grade
+but not the average, and that a pupil cannot read the class's cards. 57 checks.
+
 ## Certificates & Awards
 
 Printable certificates in the school's navy and gold, generated from data that

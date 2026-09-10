@@ -336,6 +336,24 @@ export const certificates = sqliteTable("certificates", {
   issuedById: integer("issued_by_id"),
 });
 
+// Report cards. See shared/report-card.ts for the rules.
+export const reportSettings = sqliteTable("report_settings", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  settingsKey: text("settings_key").notNull().unique(),
+  boundaries: text("boundaries", { mode: "json" }).$type<Array<{ grade: string; min: number }>>().notNull(),
+  updatedAt: timestamp("updated_at").notNull().$defaultFn(() => new Date()),
+  updatedById: integer("updated_by_id"),
+});
+
+export const reportComments = sqliteTable("report_comments", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  studentId: integer("student_id").notNull().references(() => students.id),
+  termKey: text("term_key").notNull(),
+  comment: text("comment").notNull(),
+  updatedAt: timestamp("updated_at").notNull().$defaultFn(() => new Date()),
+  updatedById: integer("updated_by_id"),
+});
+
 // Plain SQL that creates every table above if it does not exist yet.
 // We run this once on startup so a fresh SQLite database is ready to use
 // with no manual migration step.
@@ -574,4 +592,24 @@ CREATE TABLE IF NOT EXISTS certificates (
 -- together would otherwise both look, both find nothing, and both insert.
 CREATE UNIQUE INDEX IF NOT EXISTS certificates_one_per_achievement
   ON certificates (student_id, cert_key);
+CREATE TABLE IF NOT EXISTS report_settings (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  settings_key TEXT NOT NULL UNIQUE,
+  boundaries TEXT NOT NULL,
+  updated_at INTEGER NOT NULL,
+  updated_by_id INTEGER
+);
+CREATE TABLE IF NOT EXISTS report_comments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  student_id INTEGER NOT NULL,
+  term_key TEXT NOT NULL,
+  comment TEXT NOT NULL,
+  updated_at INTEGER NOT NULL,
+  updated_by_id INTEGER
+);
+-- One comment per pupil per term. Enforced by the database, not only by the
+-- code that looks first: two teachers saving at once would otherwise both find
+-- nothing and both insert, and the card would show whichever won.
+CREATE UNIQUE INDEX IF NOT EXISTS report_comments_one_per_term
+  ON report_comments (student_id, term_key);
 `;

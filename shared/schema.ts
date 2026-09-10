@@ -592,6 +592,48 @@ export const certificates = pgTable("certificates", {
 
 export type CertificateRow = typeof certificates.$inferSelect;
 
+// Report cards — the school's grade boundaries.
+//
+// ONE row for the whole school, identified by a fixed key rather than by an id,
+// so "the settings" can be read without first knowing which row they are in and
+// two rows can never disagree about what a B is.
+export const reportSettings = pgTable("report_settings", {
+  id: serial("id").primaryKey(),
+  // Always "default". A column rather than a hard-coded row id so a second set
+  // (per class, per year group) could be added later without a migration.
+  settingsKey: text("settings_key").notNull().unique(),
+  boundaries: jsonb("boundaries").$type<Array<{ grade: string; min: number }>>().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  updatedById: integer("updated_by_id"),
+});
+
+export type ReportSettingsRow = typeof reportSettings.$inferSelect;
+
+// A teacher's written comment for one pupil, for one term.
+//
+// Keyed by pupil AND term so a comment belongs to the report it was written
+// for. Editing next term's comment must never overwrite what was said last
+// term — that card has already gone home.
+export const reportComments = pgTable("report_comments", {
+  id: serial("id").primaryKey(),
+  studentId: integer("student_id").notNull().references(() => students.id),
+  // The term this comment belongs to, as its name plus its dates, so two terms
+  // that happen to share a name in different years stay apart.
+  termKey: text("term_key").notNull(),
+  comment: text("comment").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  updatedById: integer("updated_by_id"),
+});
+
+export type ReportCommentRow = typeof reportComments.$inferSelect;
+
+export type InsertReportCommentRow = {
+  studentId: number;
+  termKey: string;
+  comment: string;
+  updatedById?: number | null;
+};
+
 export type InsertCertificateRow = {
   studentId: number;
   kind: string;
