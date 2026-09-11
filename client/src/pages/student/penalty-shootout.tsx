@@ -44,6 +44,7 @@ import {
   scoreLine, type Corner, type Shot,
 } from "@shared/penalty";
 import logoPath from "@assets/logo.webp";
+import { useT } from "@/lib/i18n";
 
 interface SubjectChoice {
   subject: string;
@@ -91,6 +92,7 @@ const CORNER_SHIFT: Record<Corner, { x: number; y: number }> = {
 };
 
 function PenaltyShootoutContent() {
+  const t = useT();
   const [, setLocation] = useLocation();
   const { student } = useAuth();
 
@@ -388,14 +390,14 @@ function PenaltyShootoutContent() {
                 {/* Plays left today, in the child's own terms. */}
                 <div className="rounded-xl border p-4">
                   <div className="flex items-center justify-between gap-3">
-                    <p className="text-xs text-muted-foreground">{PLAYS_TEXT.title}</p>
+                    <p className="text-xs text-muted-foreground">{t.gamePlays.title}</p>
                     <p className="text-2xl font-bold" data-testid="text-plays-left">{plays?.left ?? 0}</p>
                   </div>
                   <p className="text-sm mt-1" data-testid="text-plays-message">
                     {plays ? playsMessage(plays) : ""}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-2">{PLAYS_TEXT.resetNote}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{RESUME_TEXT.noCost}</p>
+                  <p className="text-xs text-muted-foreground mt-2">{t.gamePlays.resetNote}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{t.resume.noCost}</p>
                 </div>
 
                 {/* A game they walked out of. Offered on its own, above the
@@ -410,7 +412,7 @@ function PenaltyShootoutContent() {
                   >
                     <div className="font-semibold text-lg">Carry on with {resumeSubject}</div>
                     <div className="text-xs text-muted-foreground mt-1" data-testid="text-resume-banner">
-                      {RESUME_TEXT.banner}
+                      {t.resume.banner}
                     </div>
                   </button>
                 )}
@@ -463,7 +465,7 @@ function PenaltyShootoutContent() {
                 </div>
                 {resumed && (
                   <div className="text-xs text-muted-foreground" data-testid="text-resumed-note">
-                    {RESUME_TEXT.where("shot", shot.slot + 1, TOTAL_SHOTS, score)}
+                    {t.resume.where("shot", shot.slot + 1, TOTAL_SHOTS, score)}
                   </div>
                 )}
               </div>

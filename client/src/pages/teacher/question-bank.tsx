@@ -44,6 +44,7 @@ import {
   ArrowLeft, Loader2, Library, Search, Pencil, Trash2, X, Save,
 } from "lucide-react";
 import logoPath from "@assets/logo.webp";
+import { useT } from "@/lib/i18n";
 
 const SUBJECTS = Object.keys(SUBJECT_LABELS);
 const FORMS = ["Stage 3", "Stage 4", "Stage 5", "Stage 6", "Form 1", "Form 2"];
@@ -52,6 +53,7 @@ const FORMS = ["Stage 3", "Stage 4", "Stage 5", "Stage 6", "Form 1", "Form 2"];
 const ANY = "__any__";
 
 export default function QuestionBankPage() {
+  const t = useT();
   const [, setLocation] = useLocation();
   const { teacher } = useAuth();
   const { toast } = useToast();
@@ -137,9 +139,9 @@ export default function QuestionBankPage() {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <Library className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-bold">{BANK_TEXT.title}</h1>
+            <h1 className="text-2xl font-bold">{t.bank.title}</h1>
           </div>
-          <p className="text-sm text-muted-foreground">{BANK_TEXT.subtitle}</p>
+          <p className="text-sm text-muted-foreground">{t.bank.subtitle}</p>
         </div>
 
         {/* Filters. Stacked on a phone, side by side once there is room. */}
@@ -150,7 +152,7 @@ export default function QuestionBankPage() {
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder={BANK_TEXT.searchPlaceholder}
+                placeholder={t.bank.searchPlaceholder}
                 className="pl-9"
                 data-testid="input-bank-search"
               />
@@ -188,7 +190,7 @@ export default function QuestionBankPage() {
                 <SelectContent>
                   <SelectItem value={ANY}>Any difficulty</SelectItem>
                   {DIFFICULTIES.map((d) => (
-                    <SelectItem key={d} value={d}>{BANK_TEXT.difficulties[d]}</SelectItem>
+                    <SelectItem key={d} value={d}>{t.bank.difficulties[d]}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -231,7 +233,7 @@ export default function QuestionBankPage() {
         {!isLoading && !isError && questions.length === 0 && (
           <Card>
             <CardContent className="py-10 text-center text-sm text-muted-foreground" data-testid="text-bank-empty">
-              {filtering ? BANK_TEXT.empty : BANK_TEXT.emptyLibrary}
+              {filtering ? t.bank.empty : t.bank.emptyLibrary}
             </CardContent>
           </Card>
         )}
@@ -243,7 +245,7 @@ export default function QuestionBankPage() {
 
               {/* The answer, in words a teacher can check at a glance. */}
               <p className="text-sm" data-testid={`text-bank-answer-${q.id}`}>
-                <span className="text-muted-foreground">{BANK_TEXT.answer}: </span>
+                <span className="text-muted-foreground">{t.bank.answer}: </span>
                 {describeAnswer(q)}
               </p>
 
@@ -261,7 +263,7 @@ export default function QuestionBankPage() {
                 <Badge variant="outline">{subjectLabel(q.subject)}</Badge>
                 <Badge variant="outline">{q.topic}</Badge>
                 <Badge variant="outline">{q.form}</Badge>
-                <Badge variant="outline">{BANK_TEXT.difficulties[q.difficulty]}</Badge>
+                <Badge variant="outline">{t.bank.difficulties[q.difficulty]}</Badge>
               </div>
 
               <div className="flex items-center gap-2">
@@ -290,7 +292,7 @@ export default function QuestionBankPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Remove this question from the bank?</AlertDialogTitle>
             <AlertDialogDescription>
-              {BANK_TEXT.deleteWarning}
+              {t.bank.deleteWarning}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -322,6 +324,7 @@ function EditQuestionDialog({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const t = useT();
   const { toast } = useToast();
   const [questionText, setQuestionText] = useState(question.questionText);
   const [maxScore, setMaxScore] = useState(String(question.maxScore));
@@ -392,7 +395,7 @@ function EditQuestionDialog({
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit saved question</DialogTitle>
-          <DialogDescription>{BANK_TEXT.editWarning}</DialogDescription>
+          <DialogDescription>{t.bank.editWarning}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -565,7 +568,7 @@ function EditQuestionDialog({
                 <SelectTrigger data-testid="select-edit-difficulty"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {DIFFICULTIES.map((d) => (
-                    <SelectItem key={d} value={d}>{BANK_TEXT.difficulties[d]}</SelectItem>
+                    <SelectItem key={d} value={d}>{t.bank.difficulties[d]}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

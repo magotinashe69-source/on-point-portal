@@ -20,6 +20,12 @@
  * `pt.ts` must have the same keys, and TypeScript enforces it — see index.tsx.
  */
 
+import { CERTIFICATE_TEXT } from "@shared/certificates";
+import { BLASTER_TEXT } from "@shared/blaster";
+import { PLAYS_TEXT, RESUME_TEXT } from "@shared/game-plays";
+import { CLASS_MASTERY_TEXT, MASTERY_TEXT } from "@shared/mastery";
+import { BANK_TEXT } from "@shared/question-bank";
+import { TEACHER_PLAYS_TEXT } from "@shared/teacher-plays";
 import { OFFLINE_TEXT } from "@shared/offline";
 import { OVERVIEW_TEXT } from "@shared/parent-overview";
 import { PLAYS_PARENT_TEXT } from "@shared/parent-plays";
@@ -29,6 +35,100 @@ import { REPORT_TEXT } from "@shared/weekly-report";
 export const en = {
   /** The name of the language, in that language. Read on the toggle itself. */
   languageName: "English",
+
+  /**
+   * What to say when something fails to load.
+   *
+   * `thing` names what failed, and each phrase carries its own article. That
+   * matters in Portuguese, where the article agrees with the noun — "a pauta"
+   * but "os seus resultados" — so it cannot be glued on by the sentence.
+   */
+  /**
+   * Subjects, by the code they are stored under.
+   *
+   * The codes are the data; these are only how they are READ. A subject the
+   * school adds later that is not on this list falls back to tidying its own
+   * code, so it still reads properly before anyone updates this — see
+   * subjectName() in index.tsx.
+   */
+  /**
+   * A date spelled out, the way it reads on a certificate somebody keeps.
+   *
+   * Not 09/09/2026: that is ambiguous between conventions. The two languages
+   * order it differently too — "9 September 2026" against "9 de setembro de
+   * 2026" — so the joining is part of the translation, not glued on outside.
+   */
+  dates: {
+    months: [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December",
+    ],
+    long: (day: number, month: string, year: number) => `${day} ${month} ${year}`,
+  },
+
+  subjects: {
+    MATHS: "Maths",
+    ENGLISH: "English",
+    SCIENCE: "Science",
+    PHYSICS: "Physics",
+    CHEMISTRY: "Chemistry",
+    BIOLOGY: "Biology",
+    ECONOMICS: "Economics",
+    BUSINESS_STUDIES: "Business Studies",
+    GEOGRAPHY: "Geography",
+    COMPUTER_SCIENCE: "Computer Science",
+    HISTORY: "History",
+    ACCOUNTING: "Accounting",
+  },
+
+  /** The shelves a teacher files things under. */
+  library: {
+    filterBySubject: "Filter by subject",
+    allSubjects: "All Subjects",
+    filterByType: "Filter by type",
+    allTypes: "All Types",
+    textbooks: "Textbooks",
+    videos: "Videos",
+    lessonPlans: "Lesson Plans",
+    other: "Other",
+    video: "Video",
+    audio: "Audio",
+    noResources: "No resources available",
+    noResourcesNote: "Your teacher hasn't added any resources for your form yet.",
+    noLessons: "No lessons available",
+  },
+
+  errors: {
+    couldNotLoad: (what: string) => `Could not load ${what}`,
+    expired: "Your login has expired. Log in again to carry on.",
+    noPermission: "You do not have permission to do that.",
+    notFound: (what: string) => `${what} could not be found. It may have been deleted.`,
+    conflict: "Someone else changed this first. Reload the page and try again.",
+    serverProblem: "Something went wrong at our end. Try again in a moment.",
+    connection: "Check your connection and try again.",
+    logIn: "Log in",
+    tryAgain: "Try again",
+
+    thing: {
+      generic: "this",
+      yourResources: "your resources",
+      yourLessons: "your lessons",
+      yourResults: "your results",
+      yourResult: "your result",
+      yourHomework: "your homework",
+      yourAssignments: "your assignments",
+      thisHomework: "this homework",
+      thisAssignment: "this assignment",
+      pendingSubmissions: "pending submissions",
+      gradeBook: "the Grade Book",
+      theRegister: "the register",
+      theReport: "the report",
+      weeklyReport: "the weekly report",
+      childDetails: "your child's details",
+      childGamePlays: "your child's game plays",
+      restOfChildInfo: "the rest of your child's information",
+    },
+  },
 
   common: {
     backToHome: "Back to Home",
@@ -41,6 +141,30 @@ export const en = {
     checkConnection: "Check your connection and try again.",
     tagline: "Quality Beyond Measure",
     language: "Language",
+    dashboard: "Dashboard",
+  },
+
+  /** A child's own marked work, question by question. */
+  results: {
+    questionResults: "Question Results",
+    question: (n: number) => `Question ${n}`,
+    yourAnswer: "Your Answer:",
+    noAnswerProvided: "No answer provided",
+    modelAnswer: "What a good answer looks like:",
+    modelAnswerNote:
+      "Your teacher's example. Yours does not have to match it word for word — compare the two and see what you could add next time.",
+    feedback: "Feedback:",
+    awaitingReview: "Awaiting Review",
+    beingReviewed: "Your submission is being reviewed by your teacher.",
+    notFound: "Results not found",
+    questionImageAlt: (question: number, image: number) => `Question ${question} image ${image}`,
+    attachmentAlt: (n: number) => `Your attachment ${n}`,
+  },
+
+  /** The parent's own screens, beyond the dashboard. */
+  parentWork: {
+    mark: "Mark",
+    questionsToGoOver: (n: number) => `${n} question${n !== 1 ? "s" : ""} to go over`,
   },
 
   login: {
@@ -324,4 +448,12 @@ export const en = {
   work: WORK_TEXT,
   plays: PLAYS_PARENT_TEXT,
   offline: OFFLINE_TEXT,
+  mastery: MASTERY_TEXT,
+  bank: BANK_TEXT,
+  blaster: BLASTER_TEXT,
+  gamePlays: PLAYS_TEXT,
+  resume: RESUME_TEXT,
+  teacherPlays: TEACHER_PLAYS_TEXT,
+  classMastery: CLASS_MASTERY_TEXT,
+  certificates: CERTIFICATE_TEXT,
 };

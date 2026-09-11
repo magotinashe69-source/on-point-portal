@@ -12,10 +12,11 @@
 // the certificate alone on a clean page.
 
 import {
-  CERTIFICATE_TEXT, certificateDate, certificateReason,
+  certificateDate, certificateReason,
   type Certificate,
 } from "@shared/certificates";
 import logoPath from "@assets/logo.webp";
+import { longDate, useT } from "@/lib/i18n";
 
 const NAVY = "var(--onpoint-blue, #1F3864)";
 const GOLD = "#BF9000";
@@ -27,6 +28,8 @@ export function CertificateSheet({
   studentName: string;
   form: string;
 }) {
+  const t = useT();
+
   return (
     <>
       <style>{`
@@ -67,18 +70,18 @@ export function CertificateSheet({
         />
 
         <div style={{ color: NAVY, fontWeight: 800, letterSpacing: "0.06em", fontSize: "0.8rem", textTransform: "uppercase" }}>
-          {CERTIFICATE_TEXT.school}
+          {t.certificates.school}
         </div>
         <div style={{ color: GOLD, fontStyle: "italic", fontSize: "0.8rem", marginTop: "0.15rem" }}>
-          {CERTIFICATE_TEXT.tagline}
+          {t.certificates.tagline}
         </div>
 
         <h1 style={{ color: NAVY, fontSize: "clamp(1.4rem, 5vw, 1.9rem)", fontWeight: 800, margin: "0.5rem 0 0" }}>
-          {CERTIFICATE_TEXT.heading}
+          {t.certificates.heading}
         </h1>
         <div style={{ height: 3, width: 120, background: GOLD, margin: "0.5rem auto 1.5rem" }} />
 
-        <p style={{ color: "#444", fontSize: "0.95rem", margin: 0 }}>{CERTIFICATE_TEXT.awardedTo}</p>
+        <p style={{ color: "#444", fontSize: "0.95rem", margin: 0 }}>{t.certificates.awardedTo}</p>
         <p
           style={{ color: NAVY, fontSize: "clamp(1.25rem, 5.5vw, 1.6rem)", fontWeight: 800, margin: "0.5rem 0 0" }}
           data-testid="cert-name"
@@ -95,7 +98,7 @@ export function CertificateSheet({
             {certificate.title}
           </p>
           <p style={{ color: "#333", fontSize: "1rem", margin: "0.35rem 0 0" }}>
-            {certificateReason(certificate.kind)}
+            {t.certificates.reasons[certificate.kind]}
           </p>
           <p
             style={{ color: "#555", fontSize: "0.95rem", margin: "0.5rem 0 0" }}
@@ -115,12 +118,12 @@ export function CertificateSheet({
               style={{ borderTop: `2px solid ${NAVY}`, paddingTop: "0.35rem", fontSize: "0.8rem", color: "#555" }}
               data-testid="cert-date"
             >
-              {certificateDate(certificate.earnedAt)}
+              {longDate(t, certificate.earnedAt)}
             </div>
           </div>
           <div style={{ textAlign: "center", flex: 1 }}>
             <div style={{ borderTop: `2px solid ${NAVY}`, paddingTop: "0.35rem", fontSize: "0.8rem", color: "#555" }}>
-              {CERTIFICATE_TEXT.school}
+              {t.certificates.school}
             </div>
           </div>
         </div>

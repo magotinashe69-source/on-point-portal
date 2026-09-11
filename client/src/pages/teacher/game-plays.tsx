@@ -23,6 +23,7 @@ import {
 } from "@shared/teacher-plays";
 import { ArrowLeft, Loader2, Gamepad2, ClipboardList, Users, AlertTriangle } from "lucide-react";
 import logoPath from "@assets/logo.webp";
+import { useT } from "@/lib/i18n";
 
 // The games are Stages 3-6 only, but every class is offered so a teacher who
 // picks Form 1 gets a plain answer rather than wondering why it is missing.
@@ -69,6 +70,7 @@ function Stat({ icon, label, value, testId }: {
 }
 
 export default function TeacherGamePlays() {
+  const t = useT();
   const [, setLocation] = useLocation();
   const { teacher } = useAuth();
 
@@ -118,15 +120,15 @@ export default function TeacherGamePlays() {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <Gamepad2 className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-bold">{TEACHER_PLAYS_TEXT.title}</h1>
+            <h1 className="text-2xl font-bold">{t.teacherPlays.title}</h1>
           </div>
-          <p className="text-sm text-muted-foreground">{TEACHER_PLAYS_TEXT.subtitle}</p>
+          <p className="text-sm text-muted-foreground">{t.teacherPlays.subtitle}</p>
         </div>
 
         {/* The rule this whole page rests on, said once. */}
         <Card>
           <CardContent className="py-4">
-            <p className="text-sm text-muted-foreground">{TEACHER_PLAYS_TEXT.howItWorks}</p>
+            <p className="text-sm text-muted-foreground">{t.teacherPlays.howItWorks}</p>
           </CardContent>
         </Card>
 
@@ -135,7 +137,7 @@ export default function TeacherGamePlays() {
           <CardContent className="py-4 flex flex-wrap items-center gap-3">
             <Select value={form} onValueChange={setForm}>
               <SelectTrigger className="w-[180px]" data-testid="select-form">
-                <SelectValue placeholder={TEACHER_PLAYS_TEXT.pickClass} />
+                <SelectValue placeholder={t.teacherPlays.pickClass} />
               </SelectTrigger>
               <SelectContent>
                 {FORMS.map((f) => (
@@ -151,7 +153,7 @@ export default function TeacherGamePlays() {
                 onClick={() => setRange("today")}
                 data-testid="button-range-today"
               >
-                {TEACHER_PLAYS_TEXT.today}
+                {t.teacherPlays.today}
               </Button>
               <Button
                 variant={range === "thisWeek" ? "default" : "outline"}
@@ -159,7 +161,7 @@ export default function TeacherGamePlays() {
                 onClick={() => setRange("thisWeek")}
                 data-testid="button-range-week"
               >
-                {TEACHER_PLAYS_TEXT.thisWeek}
+                {t.teacherPlays.thisWeek}
               </Button>
             </div>
           </CardContent>
@@ -168,7 +170,7 @@ export default function TeacherGamePlays() {
         {!form && (
           <Card>
             <CardContent className="py-10 text-center text-sm text-muted-foreground" data-testid="text-pick-class">
-              {TEACHER_PLAYS_TEXT.pickClass} to see who is earning their plays.
+              {t.teacherPlays.pickClass} to see who is earning their plays.
             </CardContent>
           </Card>
         )}
@@ -189,7 +191,7 @@ export default function TeacherGamePlays() {
         {plays && !plays.available && (
           <Card>
             <CardContent className="py-10 text-center text-sm text-muted-foreground" data-testid="text-not-available">
-              {TEACHER_PLAYS_TEXT.notAvailable}
+              {t.teacherPlays.notAvailable}
             </CardContent>
           </Card>
         )}
@@ -197,7 +199,7 @@ export default function TeacherGamePlays() {
         {plays?.available && plays.rows.length === 0 && (
           <Card>
             <CardContent className="py-10 text-center text-sm text-muted-foreground" data-testid="text-empty-class">
-              {TEACHER_PLAYS_TEXT.emptyClass}
+              {t.teacherPlays.emptyClass}
             </CardContent>
           </Card>
         )}
@@ -207,25 +209,25 @@ export default function TeacherGamePlays() {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <Stat
                 icon={<Users className="h-4 w-4" />}
-                label={TEACHER_PLAYS_TEXT.children}
+                label={t.teacherPlays.children}
                 value={String(plays.summary.children)}
                 testId="stat-children"
               />
               <Stat
                 icon={<ClipboardList className="h-4 w-4" />}
-                label={TEACHER_PLAYS_TEXT.earning}
+                label={t.teacherPlays.earning}
                 value={String(plays.summary.earning)}
                 testId="stat-earning"
               />
               <Stat
                 icon={<Gamepad2 className="h-4 w-4" />}
-                label={TEACHER_PLAYS_TEXT.playing}
+                label={t.teacherPlays.playing}
                 value={String(plays.summary.playing)}
                 testId="stat-playing"
               />
               <Stat
                 icon={<AlertTriangle className="h-4 w-4" />}
-                label={TEACHER_PLAYS_TEXT.neither}
+                label={t.teacherPlays.neither}
                 value={String(plays.summary.neither)}
                 testId="stat-neither"
               />
@@ -234,13 +236,13 @@ export default function TeacherGamePlays() {
             <div className="grid grid-cols-2 gap-3">
               <Stat
                 icon={<ClipboardList className="h-4 w-4" />}
-                label={TEACHER_PLAYS_TEXT.totalEarned}
+                label={t.teacherPlays.totalEarned}
                 value={String(plays.summary.totalEarned)}
                 testId="stat-total-earned"
               />
               <Stat
                 icon={<Gamepad2 className="h-4 w-4" />}
-                label={TEACHER_PLAYS_TEXT.totalUsed}
+                label={t.teacherPlays.totalUsed}
                 value={String(plays.summary.totalUsed)}
                 testId="stat-total-used"
               />
@@ -261,12 +263,12 @@ export default function TeacherGamePlays() {
                   <Card key={group} className={GROUP_STYLES[group]} data-testid={`group-${group}`}>
                     <CardHeader>
                       <CardTitle className="text-base">
-                        {TEACHER_PLAYS_TEXT.groups[group]}{" "}
+                        {t.teacherPlays.groups[group]}{" "}
                         <span className="text-muted-foreground font-normal">
                           ({countGroup(plays.rows, group)})
                         </span>
                       </CardTitle>
-                      <CardDescription>{TEACHER_PLAYS_TEXT.groupNotes[group]}</CardDescription>
+                      <CardDescription>{t.teacherPlays.groupNotes[group]}</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-2">
                       {rows.map((r) => (
@@ -285,7 +287,7 @@ export default function TeacherGamePlays() {
                           </div>
                           <div className="flex items-center gap-2">
                             <Badge variant="outline">
-                              {TEACHER_PLAYS_TEXT.usedLine(r.playsUsed, r.playsEarned)}
+                              {t.teacherPlays.usedLine(r.playsUsed, r.playsEarned)}
                             </Badge>
                             {/* Only today has leftovers worth naming — plays do
                                 not carry over, so a past day has none. */}
@@ -300,7 +302,7 @@ export default function TeacherGamePlays() {
                 );
               })}
 
-            <p className="text-xs text-muted-foreground">{TEACHER_PLAYS_TEXT.notMinutes}</p>
+            <p className="text-xs text-muted-foreground">{t.teacherPlays.notMinutes}</p>
           </>
         )}
       </main>

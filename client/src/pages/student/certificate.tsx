@@ -14,12 +14,14 @@ import { useLocation, Link, useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { CertificateSheet } from "@/components/CertificateSheet";
-import { CERTIFICATE_TEXT, type Certificate } from "@shared/certificates";
+import { type Certificate } from "@shared/certificates";
+import { useT } from "@/lib/i18n";
 import { ArrowLeft, Loader2, Printer } from "lucide-react";
 
 const NAVY = "var(--onpoint-blue, #1F3864)";
 
 export default function CertificatePage() {
+  const t = useT();
   const [, setLocation] = useLocation();
   const { student } = useAuth();
   const params = useParams<{ id?: string }>();
@@ -46,7 +48,7 @@ export default function CertificatePage() {
     <div className="cert-page min-h-screen bg-muted/40 py-6 px-3">
       <div className="cert-noprint mx-auto max-w-3xl flex items-center justify-between gap-3 mb-4">
         <Link href="/student/certificates" className="inline-flex items-center gap-2 text-sm">
-          <ArrowLeft className="h-4 w-4" /> {CERTIFICATE_TEXT.back}
+          <ArrowLeft className="h-4 w-4" /> {t.certificates.back}
         </Link>
         {certificate && (
           <button
@@ -55,7 +57,7 @@ export default function CertificatePage() {
             style={{ backgroundColor: NAVY }}
             data-testid="button-print"
           >
-            <Printer className="h-4 w-4" /> {CERTIFICATE_TEXT.print}
+            <Printer className="h-4 w-4" /> {t.certificates.print}
           </button>
         )}
       </div>
@@ -80,7 +82,7 @@ export default function CertificatePage() {
             form={data?.student.form ?? student.form}
           />
           <p className="cert-noprint text-center text-xs text-muted-foreground mt-4">
-            {CERTIFICATE_TEXT.printNote}
+            {t.certificates.printNote}
           </p>
         </>
       )}

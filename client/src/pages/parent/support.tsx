@@ -20,12 +20,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { LanguageToggle } from "@/components/language-toggle";
+import { useT } from "@/lib/i18n";
 import { subjectLabel } from "@shared/weekly-report";
 import { WORK_TEXT, practiseLine, type SupportReport } from "@shared/parent-work";
 import { ArrowLeft, Loader2, Sparkles, TrendingUp, Target } from "lucide-react";
 import logoPath from "@assets/logo.webp";
 
 export default function ParentSupportPage() {
+  const t = useT();
   const [, setLocation] = useLocation();
   const { parent } = useAuth();
 
@@ -52,10 +55,11 @@ export default function ParentSupportPage() {
         <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-4">
           <Link href="/parent/dashboard" className="flex items-center gap-2 min-w-0">
             <ArrowLeft className="h-4 w-4 shrink-0" />
-            <span className="text-sm truncate">Dashboard</span>
+            <span className="text-sm truncate">{t.common.dashboard}</span>
           </Link>
           <div className="flex items-center gap-2">
             <img src={logoPath} alt="On Point" className="h-8 w-auto" />
+            <LanguageToggle />
             <ThemeToggle />
           </div>
         </div>
@@ -149,7 +153,7 @@ export default function ParentSupportPage() {
                       >
                         <span className="text-sm font-medium">{topic.topic}</span>
                         <span className="text-xs text-muted-foreground shrink-0">
-                          {topic.missed} {topic.missed === 1 ? "question" : "questions"} to go over
+                          {t.parentWork.questionsToGoOver(topic.missed)}
                         </span>
                       </li>
                     ))}

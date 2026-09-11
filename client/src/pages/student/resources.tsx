@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/lib/auth";
 import { QueryError } from "@/components/QueryError";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { LanguageToggle } from "@/components/language-toggle";
+import { SUBJECT_CODES, subjectName, useT } from "@/lib/i18n";
 import { 
   ArrowLeft, 
   BookOpen, 
@@ -22,6 +24,7 @@ import type { Resource } from "@shared/schema";
 import logoPath from "@assets/logo.webp";
 
 export default function StudentResources() {
+  const t = useT();
   const [, setLocation] = useLocation();
   const { student } = useAuth();
   const [filterSubject, setFilterSubject] = useState<string>("all");
@@ -72,10 +75,11 @@ export default function StudentResources() {
         <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-4">
           <Link href="/student/dashboard" className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
-            <span className="text-sm">Back to Dashboard</span>
+            <span className="text-sm">{t.submit.backToDashboard}</span>
           </Link>
           <div className="flex items-center gap-3">
             <img src={logoPath} alt="On Point" className="h-8 w-auto" />
+            <LanguageToggle />
             <ThemeToggle />
           </div>
         </div>
@@ -83,7 +87,7 @@ export default function StudentResources() {
 
       <main className="container mx-auto px-4 py-8">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold">Learning Resources</h1>
+          <h1 className="text-3xl font-bold">{t.studentDash.resources}</h1>
           <p className="text-muted-foreground">Textbooks, videos, and study materials for {student.form}</p>
         </div>
 
@@ -92,35 +96,26 @@ export default function StudentResources() {
             <div className="flex flex-wrap gap-4">
               <Select value={filterSubject} onValueChange={setFilterSubject}>
                 <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Filter by subject" />
+                  <SelectValue placeholder={t.library.filterBySubject} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Subjects</SelectItem>
-                  <SelectItem value="MATHS">Maths</SelectItem>
-                  <SelectItem value="ENGLISH">English</SelectItem>
-                  <SelectItem value="SCIENCE">Science</SelectItem>
-                  <SelectItem value="PHYSICS">Physics</SelectItem>
-                  <SelectItem value="CHEMISTRY">Chemistry</SelectItem>
-                  <SelectItem value="BIOLOGY">Biology</SelectItem>
-                  <SelectItem value="ECONOMICS">Economics</SelectItem>
-                  <SelectItem value="BUSINESS_STUDIES">Business Studies</SelectItem>
-                  <SelectItem value="GEOGRAPHY">Geography</SelectItem>
-                  <SelectItem value="COMPUTER_SCIENCE">Computer Science</SelectItem>
-                  <SelectItem value="HISTORY">History</SelectItem>
-                  <SelectItem value="ACCOUNTING">Accounting</SelectItem>
+                  <SelectItem value="all">{t.library.allSubjects}</SelectItem>
+                  {SUBJECT_CODES.map((code) => (
+                    <SelectItem key={code} value={code}>{subjectName(t, code)}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
 
               <Select value={filterType} onValueChange={setFilterType}>
                 <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="Filter by type" />
+                  <SelectValue placeholder={t.library.filterByType} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="TEXTBOOK">Textbooks</SelectItem>
-                  <SelectItem value="YOUTUBE">Videos</SelectItem>
-                  <SelectItem value="LESSON_PLAN">Lesson Plans</SelectItem>
-                  <SelectItem value="OTHER">Other</SelectItem>
+                  <SelectItem value="all">{t.library.allTypes}</SelectItem>
+                  <SelectItem value="TEXTBOOK">{t.library.textbooks}</SelectItem>
+                  <SelectItem value="YOUTUBE">{t.library.videos}</SelectItem>
+                  <SelectItem value="LESSON_PLAN">{t.library.lessonPlans}</SelectItem>
+                  <SelectItem value="OTHER">{t.library.other}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -132,7 +127,7 @@ export default function StudentResources() {
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : isError ? (
-          <QueryError error={error} what="your resources" role="student" onRetry={() => refetch()} data-testid="resources-load-error" />
+          <QueryError error={error} what={t.errors.thing.yourResources} role="student" onRetry={() => refetch()} data-testid="resources-load-error" />
         ) : filteredResources.length > 0 ? (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {filteredResources.map((resource) => (
@@ -177,8 +172,8 @@ export default function StudentResources() {
           <Card>
             <CardContent className="py-12 text-center">
               <BookOpen className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="font-semibold mb-2">No resources available</h3>
-              <p className="text-muted-foreground">Your teacher hasn't added any resources for your form yet.</p>
+              <h3 className="font-semibold mb-2">{t.library.noResources}</h3>
+              <p className="text-muted-foreground">{t.library.noResourcesNote}</p>
             </CardContent>
           </Card>
         )}

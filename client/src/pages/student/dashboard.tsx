@@ -8,7 +8,7 @@ import { useAuth } from "@/lib/auth";
 import { QueryError } from "@/components/QueryError";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
-import { useT } from "@/lib/i18n";
+import { longDate, useT } from "@/lib/i18n";
 import { 
   LogOut, 
   FileText, 
@@ -48,8 +48,8 @@ interface EnrichedSubmission {
 }
 
 import { MasteryMap } from "@/components/MasteryMap";
-import { MASTERY_TEXT, type MasteryMap as MasteryMapData } from "@shared/mastery";
-import { CERTIFICATE_TEXT, certificateDate, type Certificate as CertificateRow } from "@shared/certificates";
+import { type MasteryMap as MasteryMapData } from "@shared/mastery";
+import { type Certificate as CertificateRow } from "@shared/certificates";
 
 export default function StudentDashboard() {
   const [, setLocation] = useLocation();
@@ -280,7 +280,7 @@ export default function StudentDashboard() {
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <div className="flex items-center gap-2">
                   <Award className="h-5 w-5 text-primary" />
-                  <CardTitle className="text-lg">{CERTIFICATE_TEXT.areaTitle}</CardTitle>
+                  <CardTitle className="text-lg">{t.certificates.areaTitle}</CardTitle>
                 </div>
                 <Link href="/student/certificates">
                   <Button variant="outline" size="sm" data-testid="button-all-certificates">
@@ -302,7 +302,7 @@ export default function StudentDashboard() {
                         <p className="text-xs text-muted-foreground break-words">{c.detail}</p>
                       </div>
                       <span className="text-xs text-muted-foreground shrink-0">
-                        {certificateDate(c.earnedAt)}
+                        {longDate(t, c.earnedAt)}
                       </span>
                     </div>
                   </Link>
@@ -318,9 +318,9 @@ export default function StudentDashboard() {
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-1">
             <Sparkles className="h-5 w-5 text-primary" />
-            <h2 className="text-lg font-semibold">{MASTERY_TEXT.title}</h2>
+            <h2 className="text-lg font-semibold">{t.mastery.title}</h2>
           </div>
-          <p className="text-sm text-muted-foreground mb-3">{MASTERY_TEXT.subtitle}</p>
+          <p className="text-sm text-muted-foreground mb-3">{t.mastery.subtitle}</p>
 
           {masteryLoading ? (
             <Card>
@@ -336,7 +336,7 @@ export default function StudentDashboard() {
             // like something is wrong with THEM.
             <Card>
               <CardContent className="py-8 text-center text-sm text-muted-foreground" data-testid="text-mastery-unavailable">
-                {MASTERY_TEXT.empty}
+                {t.mastery.empty}
               </CardContent>
             </Card>
           )}
@@ -522,7 +522,7 @@ export default function StudentDashboard() {
                   ))}
                 </div>
               ) : assignmentsFailed ? (
-                <QueryError error={assignmentsError} what="your homework" role="student" onRetry={() => refetchAssignments()} data-testid="assignments-load-error" />
+                <QueryError error={assignmentsError} what={t.errors.thing.yourHomework} role="student" onRetry={() => refetchAssignments()} data-testid="assignments-load-error" />
               ) : (
                 <div className="text-center py-8">
                   <CheckCircle className="h-12 w-12 mx-auto text-primary mb-4" />
@@ -587,7 +587,7 @@ export default function StudentDashboard() {
                   ))}
                 </div>
               ) : submissionsFailed ? (
-                <QueryError error={submissionsError} what="your results" role="student" onRetry={() => refetchSubmissions()} data-testid="results-load-error" />
+                <QueryError error={submissionsError} what={t.errors.thing.yourResults} role="student" onRetry={() => refetchSubmissions()} data-testid="results-load-error" />
               ) : (
                 <div className="text-center py-8">
                   <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />

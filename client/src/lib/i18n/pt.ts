@@ -24,6 +24,77 @@ import type { Translation } from "./index";
 export const pt: Translation = {
   languageName: "Português",
 
+  dates: {
+    months: [
+      "janeiro", "fevereiro", "março", "abril", "maio", "junho",
+      "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
+    ],
+    long: (day: number, month: string, year: number) => `${day} de ${month} de ${year}`,
+  },
+
+  subjects: {
+    MATHS: "Matemática",
+    ENGLISH: "Inglês",
+    SCIENCE: "Ciências",
+    PHYSICS: "Física",
+    CHEMISTRY: "Química",
+    BIOLOGY: "Biologia",
+    ECONOMICS: "Economia",
+    BUSINESS_STUDIES: "Estudos Comerciais",
+    GEOGRAPHY: "Geografia",
+    COMPUTER_SCIENCE: "Informática",
+    HISTORY: "História",
+    ACCOUNTING: "Contabilidade",
+  },
+
+  library: {
+    filterBySubject: "Filtrar por disciplina",
+    allSubjects: "Todas as disciplinas",
+    filterByType: "Filtrar por tipo",
+    allTypes: "Todos os tipos",
+    textbooks: "Manuais",
+    videos: "Vídeos",
+    lessonPlans: "Planos de aula",
+    other: "Outros",
+    video: "Vídeo",
+    audio: "Áudio",
+    noResources: "Não há recursos disponíveis",
+    noResourcesNote: "O seu professor ainda não acrescentou recursos para a sua turma.",
+    noLessons: "Não há aulas disponíveis",
+  },
+
+  errors: {
+    couldNotLoad: (what: string) => `Não foi possível carregar ${what}`,
+    expired: "A sua sessão expirou. Volte a entrar para continuar.",
+    noPermission: "Não tem permissão para fazer isso.",
+    notFound: (what: string) => `Não foi possível encontrar ${what}. Pode já não existir.`,
+    conflict: "Outra pessoa alterou isto primeiro. Recarregue a página e tente novamente.",
+    serverProblem: "Algo correu mal do nosso lado. Tente novamente daqui a pouco.",
+    connection: "Verifique a sua ligação e tente novamente.",
+    logIn: "Entrar",
+    tryAgain: "Tentar novamente",
+
+    thing: {
+      generic: "isto",
+      yourResources: "os seus recursos",
+      yourLessons: "as suas aulas",
+      yourResults: "os seus resultados",
+      yourResult: "o seu resultado",
+      yourHomework: "os seus trabalhos de casa",
+      yourAssignments: "os seus trabalhos",
+      thisHomework: "este trabalho de casa",
+      thisAssignment: "este trabalho",
+      pendingSubmissions: "as entregas por corrigir",
+      gradeBook: "a pauta",
+      theRegister: "a lista de alunos",
+      theReport: "o relatório",
+      weeklyReport: "o relatório semanal",
+      childDetails: "os dados do seu educando",
+      childGamePlays: "as jogadas do seu educando",
+      restOfChildInfo: "o resto da informação do seu educando",
+    },
+  },
+
   common: {
     backToHome: "Voltar ao início",
     logout: "Terminar sessão",
@@ -35,6 +106,28 @@ export const pt: Translation = {
     checkConnection: "Verifique a sua ligação e tente novamente.",
     tagline: "Qualidade Sem Medida",
     language: "Idioma",
+    dashboard: "Painel",
+  },
+
+  results: {
+    questionResults: "Resultados por pergunta",
+    question: (n: number) => `Pergunta ${n}`,
+    yourAnswer: "A sua resposta:",
+    noAnswerProvided: "Não foi dada resposta",
+    modelAnswer: "Como é uma boa resposta:",
+    modelAnswerNote:
+      "Um exemplo do seu professor. A sua não tem de coincidir palavra por palavra — compare as duas e veja o que poderia acrescentar da próxima vez.",
+    feedback: "Comentário:",
+    awaitingReview: "À espera de correção",
+    beingReviewed: "A sua entrega está a ser corrigida pelo seu professor.",
+    notFound: "Resultados não encontrados",
+    questionImageAlt: (question: number, image: number) => `Imagem ${image} da pergunta ${question}`,
+    attachmentAlt: (n: number) => `O seu anexo ${n}`,
+  },
+
+  parentWork: {
+    mark: "Nota",
+    questionsToGoOver: (n: number) => (n === 1 ? "1 pergunta a rever" : `${n} perguntas a rever`),
   },
 
   login: {
@@ -426,6 +519,217 @@ export const pt: Translation = {
     },
     recordLine(score: number, outOf: number): string {
       return outOf > 0 ? `${score} de ${outOf}` : "—";
+    },
+  },
+
+  // --- Acerta no Alvo (shared/blaster.ts) ---
+  blaster: {
+    title: "Acerta no Alvo",
+    tagline: "Toca no alvo certo antes que ele fuja.",
+    start: "Começar a acertar",
+    round(n: number, total: number): string {
+      return `Ronda ${n} de ${total}`;
+    },
+    hit: "Acertaste!",
+    missed: "Falhaste",
+    timedOut: "Demasiado devagar — fugiu!",
+    nothingYet:
+      "Termina primeiro um trabalho — o Acerta no Alvo é feito a partir de perguntas a que já respondeste.",
+    scoreLine(score: number, outOf: number): string {
+      return `Acertaste em ${score} de ${outOf}`;
+    },
+    newRecord: "Novo recorde!",
+    bestSoFar: "O teu melhor",
+    playAgain: "Jogar outra vez",
+    backToDashboard: "Voltar ao painel",
+  },
+
+  // --- O banco de perguntas (shared/question-bank.ts) ---
+  bank: {
+    title: "Banco de Perguntas",
+    subtitle: "As perguntas que guardou, prontas a usar outra vez.",
+    difficulties: {
+      easy: "Fácil",
+      medium: "Médio",
+      hard: "Difícil",
+    },
+    types: {
+      multiple_choice: "Escolha múltipla",
+      true_false: "Verdadeiro / Falso",
+      numeric: "Número",
+      short_text: "Texto curto",
+    },
+    answer: "Resposta",
+    saved: "Guardada no banco de perguntas.",
+    searchPlaceholder: "Procurar no texto de uma pergunta",
+    empty: "Ainda não há perguntas guardadas que correspondam.",
+    emptyLibrary:
+      "Ainda não há nada guardado. Abra um trabalho, escreva uma pergunta e use \u201cGuardar no banco\u201d.",
+    editWarning:
+      "Isto altera apenas a cópia guardada. Os trabalhos que já usam esta pergunta não são afetados, e as notas já dadas mantêm-se.",
+    deleteWarning:
+      "Isto remove-a apenas da biblioteca. Os trabalhos que já usam esta pergunta ficam com ela, e as notas já dadas mantêm-se.",
+    cannotSaveWritten:
+      "Uma pergunta de resposta escrita é corrigida à mão, por isso não tem resposta para guardar. Só podem ir para o banco perguntas de escolha múltipla, verdadeiro/falso, número e texto curto.",
+  },
+
+  // --- As jogadas (shared/game-plays.ts) ---
+  gamePlays: {
+    title: "Jogadas que restam hoje",
+    left(n: number): string {
+      const jogadas = n === 1 ? "1 jogada" : `${n} jogadas`;
+      return `${jogadas} — termina mais trabalhos para ganhares mais!`;
+    },
+    none: "Volta amanhã, ou termina outro trabalho para ganhares mais jogadas.",
+    noneEarnedYet:
+      "Entrega um trabalho hoje para ganhares uma jogada. Cada trabalho que terminas dá-te uma jogada de cada jogo.",
+    spent(n: number): string {
+      if (n <= 0) return "Essa foi a tua última jogada de hoje. Termina outro trabalho para ganhares mais.";
+      return n === 1 ? "Resta-te 1 jogada hoje." : `Restam-te ${n} jogadas hoje.`;
+    },
+    earnedNote: "Ganhas 1 jogada de cada jogo por cada trabalho que entregas.",
+    resetNote: "As jogadas recomeçam todas as manhãs. As jogadas não usadas não transitam.",
+  },
+
+  resume: {
+    banner: "Deixaste este jogo a meio — continua de onde ficaste.",
+    where(unit: string, n: number, total: number, score: number): string {
+      return `De volta a ${unit} ${n} de ${total} — ${score} até agora.`;
+    },
+    noCost: "Sair de um jogo não gasta a tua jogada — podes voltar e terminá-lo.",
+  },
+
+  // --- Jogos e trabalhos de casa, para o professor (shared/teacher-plays.ts) ---
+  teacherPlays: {
+    title: "Jogos e trabalhos de casa",
+    subtitle: "Quem está a ganhar as suas jogadas, e a quem o prémio não está a chegar.",
+    howItWorks:
+      "Cada trabalho que um aluno entrega dá-lhe uma jogada do Acerta no Alvo e uma da Marcação de Penáltis. As jogadas recomeçam todas as manhãs e não transitam.",
+    pickClass: "Escolha uma turma",
+    today: "Hoje",
+    thisWeek: "Esta semana",
+    children: "Alunos",
+    earning: "Entregaram trabalho",
+    playing: "Jogaram",
+    neither: "Nem uma coisa nem outra",
+    totalEarned: "Jogadas ganhas",
+    totalUsed: "Jogadas usadas",
+    groups: {
+      earnedAndPlayed: "Ganharam e jogaram",
+      earnedNotPlayed: "Ganharam, ainda não jogaram",
+      playedNotEarned: "Jogaram, não ganharam nada",
+      neither: "Nenhuma das duas",
+    },
+    groupNotes: {
+      earnedAndPlayed: "Fizeram o trabalho e receberam o prémio.",
+      earnedNotPlayed: "Fizeram o trabalho e ainda não jogaram. Nada a cobrar.",
+      playedNotEarned: "Jogaram, mas não entregaram nada nestes dias.",
+      neither: "Não entregaram trabalho nem jogaram.",
+    },
+    notAvailable:
+      "Os jogos são para os Stages 3 a 6, por isso não há nada a mostrar para esta turma.",
+    emptyClass: "Ainda não há alunos inscritos nesta turma.",
+    notMinutes:
+      "Isto conta jogadas ganhas e usadas, não minutos passados. O portal não regista quanto tempo um aluno joga.",
+    usedLine(used: number, earned: number): string {
+      return `${used} de ${earned} usadas`;
+    },
+  },
+
+  // --- As competências da turma, para o professor (shared/mastery.ts) ---
+  classMastery: {
+    title: "Competências da turma",
+    subtitle: "O que esta turma já mostrou saber fazer, a partir do trabalho já corrigido.",
+    pickClass: "Escolha uma turma",
+    children: "Alunos",
+    withWork: "Com trabalho corrigido",
+    topicsTracked: "Competências acompanhadas",
+    reteach: "Vale a pena voltar a dar",
+    reteachNote: "Do mais fraco para o mais forte. São os temas que a turma está a achar mais difíceis.",
+    strongest: "A turma já tem estes",
+    needSupport: "Alunos a acompanhar",
+    needSupportNote:
+      "Cada um destes tem pelo menos um tema abaixo de 50%. É o que o painel deles lhes está a mostrar.",
+    splitWarning: "Turma dividida — uns já sabem, outros não. A média esconde isso.",
+    spread(mastered: number, developing: number, practise: number): string {
+      return `${mastered} já sabem · ${developing} quase lá · ${practise} a praticar`;
+    },
+    empty: "Ainda não há trabalho corrigido nesta turma, por isso não há competências a mostrar.",
+    emptyClass: "Ainda não há alunos inscritos nesta turma.",
+    noGaps: "Ninguém nesta turma tem um tema abaixo de 50%.",
+    untaggedNote(n: number): string {
+      return n === 1
+        ? "1 pergunta corrigida não tinha tema, por isso não é mostrada como competência. Acrescente um tema a um trabalho para a incluir."
+        : `${n} perguntas corrigidas não tinham tema, por isso não são mostradas como competências. Acrescente um tema a um trabalho para as incluir.`;
+    },
+  },
+
+  // --- O mapa de competências (shared/mastery.ts) ---
+  mastery: {
+    title: "As minhas competências",
+    subtitle: "O que já mostrou saber fazer, a partir do trabalho que entregou.",
+    bands: {
+      mastered: "Já sabe",
+      developing: "Quase lá",
+      practise: "Continue a praticar",
+    },
+    bandNotes: {
+      mastered: "Acerta nestas quase sempre.",
+      developing: "Está a caminho — mais um pouco de prática e chega lá.",
+      practise: "Vale a pena rever. Toda a gente tem algumas destas.",
+    },
+    summary(mastered: number, total: number): string {
+      if (total === 0) return "";
+      if (mastered === 0) {
+        return total === 1 ? "1 competência no seu mapa até agora." : `${total} competências no seu mapa até agora.`;
+      }
+      return total === 1
+        ? `Já domina ${mastered} de 1 competência.`
+        : `Já domina ${mastered} de ${total} competências.`;
+    },
+    empty: "Faça mais trabalhos de casa para construir o seu mapa de competências.",
+    emptyNote:
+      "Cada trabalho que entrega acrescenta alguma coisa. As suas competências aparecem aqui assim que forem corrigidas.",
+    notEnoughYet:
+      "Ainda não há trabalho corrigido que chegue para mostrar uma competência. Continue — enche-se depressa.",
+    practiseHeading: "Aspetos a praticar",
+    strongHeading: "Os seus pontos fortes",
+    detail(scored: number, available: number, questions: number): string {
+      const perguntas = questions === 1 ? "1 pergunta" : `${questions} perguntas`;
+      return `${scored} de ${available} valores, em ${perguntas}`;
+    },
+  },
+
+  // --- Os certificados (shared/certificates.ts) ---
+  certificates: {
+    school: "On Point Education Centre",
+    tagline: "Qualidade Sem Medida",
+    heading: "Certificado de Mérito",
+    awardedTo: "Este certificado é atribuído com orgulho a",
+    titles: {
+      perfect_score: "Nota Máxima",
+      streak_star: "Estrela da Constância",
+      topic_master: "Domínio do Tema",
+      level_up: "Subida de Nível",
+      most_improved: "Maior Progresso",
+    },
+    reasons: {
+      perfect_score: "por nota máxima, com todas as perguntas certas",
+      streak_star: "por entregar trabalho todos os dias, sem falhar nenhum",
+      topic_master: "por demonstrar verdadeiro domínio de um tema",
+      level_up: "por esforço constante, nível após nível",
+      most_improved: "pelo maior progresso de toda a turma",
+    },
+    areaTitle: "Os meus certificados",
+    areaSubtitle: "Prémios que ganhou. Toque num para o abrir e imprimir.",
+    empty: "Ainda não há certificados.",
+    emptyNote:
+      "Entregue os seus trabalhos, mantenha a sua sequência, e começarão a aparecer aqui.",
+    print: "Imprimir certificado",
+    printNote: "Escolha \u201cGuardar como PDF\u201d na caixa de impressão para ficar com uma cópia.",
+    back: "Voltar",
+    count(n: number): string {
+      return n === 1 ? "1 certificado" : `${n} certificados`;
     },
   },
 

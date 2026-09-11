@@ -181,7 +181,7 @@ export default function ParentDashboard() {
             {isError && (
               <QueryError
                 error={error}
-                what="your child's details"
+                what={t.errors.thing.childDetails}
                 onRetry={() => refetch()}
                 role="parent"
                 data-testid="text-parent-child-error"
@@ -260,7 +260,7 @@ export default function ParentDashboard() {
             {reportError && (
               <QueryError
                 error={reportErrorValue}
-                what="the weekly report"
+                what={t.errors.thing.weeklyReport}
                 onRetry={() => refetchReport()}
                 role="parent"
                 data-testid="text-report-error"
@@ -354,7 +354,7 @@ export default function ParentDashboard() {
           <div className="mt-6">
             <QueryError
               error={overviewErrorValue}
-              what="the rest of your child's information"
+              what={t.errors.thing.restOfChildInfo}
               onRetry={() => refetchOverview()}
               role="parent"
               data-testid="text-overview-error"
@@ -569,7 +569,7 @@ export default function ParentDashboard() {
                 {playsError && (
                   <QueryError
                     error={playsErrorValue}
-                    what="your child's game plays"
+                    what={t.errors.thing.childGamePlays}
                     onRetry={() => refetchPlays()}
                     role="parent"
                     variant="panel"

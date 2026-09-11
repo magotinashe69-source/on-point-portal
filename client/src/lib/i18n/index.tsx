@@ -121,6 +121,48 @@ export function useT(): Translation {
   return useLanguageContext().t;
 }
 
+/**
+ * Every subject code the school uses, in the order they are offered.
+ *
+ * Screens with a subject filter map over this rather than listing the twelve
+ * again, so a subject added here reaches every filter at once. Before this the
+ * same list was typed out in full on six different screens.
+ */
+export const SUBJECT_CODES = Object.keys(en.subjects);
+
+/**
+ * A subject as somebody should read it.
+ *
+ * Falls back to tidying the code itself (BUSINESS_STUDIES -> "Business
+ * Studies") so a subject the school adds later still reads properly before
+ * anyone adds it to the dictionary — the same fallback subjectLabel() in
+ * shared/weekly-report.ts has always had.
+ *
+ * The cast is because the dictionary lists its subjects by name, which is what
+ * makes a missing Portuguese one a build error; the code being looked up is
+ * whatever the database holds.
+ */
+export function subjectName(t: Translation, subject: string): string {
+  const known = (t.subjects as Record<string, string>)[subject];
+  if (known) return known;
+  return subject
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
+
+/**
+ * A date spelled out in the reader's own language: "9 September 2026", or
+ * "9 de setembro de 2026". Used where a date is READ rather than scanned — a
+ * certificate, an award — and an empty string for a date that will not parse,
+ * because a certificate with "Invalid Date" on it is worse than one with none.
+ */
+export function longDate(t: Translation, iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return t.dates.long(d.getDate(), t.dates.months[d.getMonth()], d.getFullYear());
+}
+
 /** The chosen language and a way to change it. For the toggle. */
 export function useLanguage(): { language: Language; setLanguage: (l: Language) => void } {
   const { language, setLanguage } = useLanguageContext();

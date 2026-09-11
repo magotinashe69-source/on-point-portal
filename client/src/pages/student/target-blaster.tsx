@@ -25,14 +25,14 @@ import { useAuth } from "@/lib/auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { isPrimaryForm } from "@shared/schema";
-import { subjectLabel } from "@shared/weekly-report";
-import { BLASTER_TEXT, ROUNDS_PER_GAME, type BlastRound } from "@shared/blaster";
+import { ROUNDS_PER_GAME, type BlastRound } from "@shared/blaster";
 import {
   PLAYS_TEXT, RESUME_TEXT, playsMessage, readProgress, scoreProgress,
   type PlayState, type SlotProgress,
 } from "@shared/game-plays";
 import { ArrowLeft, Loader2, Target, Trophy, Zap } from "lucide-react";
 import logoPath from "@assets/logo.webp";
+import { subjectName, useT } from "@/lib/i18n";
 
 /** Where each target sits and how it drifts. Fixed spots so it stays readable. */
 const TARGET_SPOTS = [
@@ -45,6 +45,7 @@ const TARGET_SPOTS = [
 type Phase = "loading" | "ready" | "round" | "feedback" | "over";
 
 export default function TargetBlaster() {
+  const text = useT();
   const [, setLocation] = useLocation();
   const { student } = useAuth();
 
@@ -263,9 +264,9 @@ export default function TargetBlaster() {
       <main className="container mx-auto px-4 py-6 max-w-2xl">
         <div className="flex items-center gap-2 mb-1">
           <Target className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl font-bold">{BLASTER_TEXT.title}</h1>
+          <h1 className="text-2xl font-bold">{text.blaster.title}</h1>
         </div>
-        <p className="text-muted-foreground text-sm mb-6">{BLASTER_TEXT.tagline}</p>
+        <p className="text-muted-foreground text-sm mb-6">{text.blaster.tagline}</p>
 
         {phase === "loading" && (
           <div className="flex items-center gap-2 text-muted-foreground">
@@ -280,21 +281,21 @@ export default function TargetBlaster() {
               <CardContent className="p-4">
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                   <div>
-                    <p className="text-xs text-muted-foreground">{PLAYS_TEXT.title}</p>
+                    <p className="text-xs text-muted-foreground">{text.gamePlays.title}</p>
                     <p className="text-3xl font-bold" data-testid="text-plays-left">{plays?.left ?? 0}</p>
                   </div>
                   {best.outOf > 0 && (
                     <div className="text-right">
                       <p className="text-xs text-muted-foreground flex items-center gap-1 justify-end">
-                        <Trophy className="h-3 w-3" /> {BLASTER_TEXT.bestSoFar}
+                        <Trophy className="h-3 w-3" /> {text.blaster.bestSoFar}
                       </p>
                       <p className="text-xl font-semibold" data-testid="text-best">{best.score}/{best.outOf}</p>
                     </div>
                   )}
                 </div>
                 <p className="text-sm mt-3" data-testid="text-plays-message">{playsLine}</p>
-                <p className="text-xs text-muted-foreground mt-2">{PLAYS_TEXT.resetNote}</p>
-                <p className="text-xs text-muted-foreground mt-1">{RESUME_TEXT.noCost}</p>
+                <p className="text-xs text-muted-foreground mt-2">{text.gamePlays.resetNote}</p>
+                <p className="text-xs text-muted-foreground mt-1">{text.resume.noCost}</p>
               </CardContent>
             </Card>
 
@@ -306,7 +307,7 @@ export default function TargetBlaster() {
             {questionCount === 0 ? (
               <Card>
                 <CardContent className="py-8 text-center text-muted-foreground" data-testid="text-nothing-yet">
-                  {BLASTER_TEXT.nothingYet}
+                  {text.blaster.nothingYet}
                 </CardContent>
               </Card>
             ) : (
@@ -315,7 +316,7 @@ export default function TargetBlaster() {
                   <Card className="border-primary">
                     <CardContent className="p-4">
                       <p className="text-sm font-medium" data-testid="text-resume-banner">
-                        {RESUME_TEXT.banner}
+                        {text.resume.banner}
                       </p>
                     </CardContent>
                   </Card>
@@ -331,7 +332,7 @@ export default function TargetBlaster() {
                   data-testid="button-start-blast"
                 >
                   {starting ? <Loader2 className="h-5 w-5 mr-2 animate-spin" /> : <Zap className="h-5 w-5 mr-2" />}
-                  {canResume ? "Carry on" : BLASTER_TEXT.start}
+                  {canResume ? "Carry on" : text.blaster.start}
                 </Button>
               </>
             )}
@@ -342,8 +343,8 @@ export default function TargetBlaster() {
         {(phase === "round" || phase === "feedback") && round && (
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-3 flex-wrap">
-              <Badge variant="outline">{BLASTER_TEXT.round(round.index + 1, ROUNDS_PER_GAME)}</Badge>
-              <Badge variant="secondary">{subjectLabel(round.subject)}</Badge>
+              <Badge variant="outline">{text.blaster.round(round.index + 1, ROUNDS_PER_GAME)}</Badge>
+              <Badge variant="secondary">{subjectName(text, round.subject)}</Badge>
               <span className="text-sm font-semibold" data-testid="text-score">Hit {score}/{ROUNDS_PER_GAME}</span>
               {phase === "round" && (
                 <span
@@ -357,7 +358,7 @@ export default function TargetBlaster() {
 
             {resumed && (
               <p className="text-xs text-muted-foreground" data-testid="text-resumed-note">
-                {RESUME_TEXT.where("round", round.index + 1, ROUNDS_PER_GAME, score)}
+                {text.resume.where("round", round.index + 1, ROUNDS_PER_GAME, score)}
               </p>
             )}
 
@@ -393,10 +394,10 @@ export default function TargetBlaster() {
                 <CardContent className="p-4 text-center">
                   <p className="text-lg font-bold" data-testid="text-feedback">
                     {lastHit
-                      ? BLASTER_TEXT.hit
+                      ? text.blaster.hit
                       : answersRef.current[answersRef.current.length - 1]?.timedOut
-                        ? BLASTER_TEXT.timedOut
-                        : BLASTER_TEXT.missed}
+                        ? text.blaster.timedOut
+                        : text.blaster.missed}
                   </p>
                   {!lastHit && lastAnswer && (
                     <p className="text-sm text-muted-foreground mt-1">The right answer was {lastAnswer}.</p>
@@ -413,11 +414,11 @@ export default function TargetBlaster() {
             <Card>
               <CardContent className="p-6 text-center space-y-2">
                 <p className="text-3xl font-bold" data-testid="text-final-score">
-                  {BLASTER_TEXT.scoreLine(result?.score ?? score, result?.outOf ?? ROUNDS_PER_GAME)}
+                  {text.blaster.scoreLine(result?.score ?? score, result?.outOf ?? ROUNDS_PER_GAME)}
                 </p>
                 {result?.newRecord && (
                   <p className="text-lg font-semibold text-primary" data-testid="text-new-record">
-                    {BLASTER_TEXT.newRecord}
+                    {text.blaster.newRecord}
                   </p>
                 )}
                 {result?.xp?.awarded > 0 && (
@@ -426,7 +427,7 @@ export default function TargetBlaster() {
                   </p>
                 )}
                 <p className="text-sm" data-testid="text-plays-after">
-                  {PLAYS_TEXT.spent(plays?.left ?? 0)}
+                  {text.gamePlays.spent(plays?.left ?? 0)}
                 </p>
               </CardContent>
             </Card>
@@ -440,11 +441,11 @@ export default function TargetBlaster() {
                 onClick={() => { setResumed(false); setPhase("ready"); loadStatus(); }}
                 data-testid="button-play-again"
               >
-                {BLASTER_TEXT.playAgain}
+                {text.blaster.playAgain}
               </Button>
               <Link href="/student/dashboard">
                 <Button variant="secondary" className="w-full" data-testid="button-back-dashboard">
-                  {BLASTER_TEXT.backToDashboard}
+                  {text.blaster.backToDashboard}
                 </Button>
               </Link>
             </div>

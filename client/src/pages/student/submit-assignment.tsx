@@ -472,7 +472,7 @@ export default function SubmitAssignment() {
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : assignmentFailed && !assignment ? (
-          <QueryError error={assignmentError} what="this homework" role="student" variant="page" onRetry={() => refetchAssignment()} data-testid="assignment-load-error" />
+          <QueryError error={assignmentError} what={t.errors.thing.thisHomework} role="student" variant="page" onRetry={() => refetchAssignment()} data-testid="assignment-load-error" />
         ) : assignment ? (
           <>
             <Card className="mb-6">

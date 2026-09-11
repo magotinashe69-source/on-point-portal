@@ -17,9 +17,9 @@
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { subjectLabel } from "@shared/weekly-report";
+import { subjectName, useT } from "@/lib/i18n";
 import {
-  MASTERY_TEXT, topicsToPractise,
+  topicsToPractise,
   type MasteryBand, type MasteryMap as MasteryMapData, type TopicMastery,
 } from "@shared/mastery";
 import { CheckCircle2, CircleDot, Sparkles, Target, TrendingUp } from "lucide-react";
@@ -51,6 +51,7 @@ const BAND_STYLE: Record<MasteryBand, { dot: string; text: string; bar: string; 
 
 /** One skill: its name, how it is going, and how much it is based on. */
 function TopicRow({ topic }: { topic: TopicMastery }) {
+  const text = useT();
   const style = BAND_STYLE[topic.band];
   return (
     <div className="py-2" data-testid={`row-topic-${topic.subject}-${topic.topic}`}>
@@ -76,13 +77,14 @@ function TopicRow({ topic }: { topic: TopicMastery }) {
       </div>
 
       <p className="text-xs text-muted-foreground mt-1">
-        {MASTERY_TEXT.bands[topic.band]} · {MASTERY_TEXT.detail(topic.scored, topic.available, topic.questions)}
+        {text.mastery.bands[topic.band]} · {text.mastery.detail(topic.scored, topic.available, topic.questions)}
       </p>
     </div>
   );
 }
 
 export function MasteryMap({ map }: { map: MasteryMapData }) {
+  const text = useT();
   // Nothing to show yet. An invitation, never a blank screen and never a zero:
   // a child who has done no homework has not failed anything.
   if (!map.hasEnough) {
@@ -90,11 +92,11 @@ export function MasteryMap({ map }: { map: MasteryMapData }) {
       <Card data-testid="card-mastery-empty">
         <CardContent className="py-8 text-center space-y-2">
           <Sparkles className="h-8 w-8 mx-auto text-primary" />
-          <p className="font-medium" data-testid="text-mastery-empty">{MASTERY_TEXT.empty}</p>
+          <p className="font-medium" data-testid="text-mastery-empty">{text.mastery.empty}</p>
           <p className="text-sm text-muted-foreground">
             {map.untagged > 0 || map.subjects.length > 0
-              ? MASTERY_TEXT.notEnoughYet
-              : MASTERY_TEXT.emptyNote}
+              ? text.mastery.notEnoughYet
+              : text.mastery.emptyNote}
           </p>
         </CardContent>
       </Card>
@@ -109,14 +111,14 @@ export function MasteryMap({ map }: { map: MasteryMapData }) {
       <Card>
         <CardContent className="py-4">
           <p className="font-medium" data-testid="text-mastery-summary">
-            {MASTERY_TEXT.summary(map.totals.mastered, map.totals.topics)}
+            {text.mastery.summary(map.totals.mastered, map.totals.topics)}
           </p>
           <div className="flex items-center gap-3 flex-wrap mt-2 text-xs">
             {(["mastered", "developing", "practise"] as MasteryBand[]).map((band) => (
               <span key={band} className="flex items-center gap-1.5" data-testid={`legend-${band}`}>
                 <span className={`h-2.5 w-2.5 rounded-full ${BAND_STYLE[band].dot}`} aria-hidden />
                 <span className="text-muted-foreground">
-                  {MASTERY_TEXT.bands[band]} ({map.totals[band]})
+                  {text.mastery.bands[band]} ({map.totals[band]})
                 </span>
               </span>
             ))}
@@ -132,10 +134,10 @@ export function MasteryMap({ map }: { map: MasteryMapData }) {
           <CardContent className="py-4">
             <p className="font-semibold flex items-center gap-2 mb-1">
               <Target className="h-4 w-4" />
-              {MASTERY_TEXT.practiseHeading}
+              {text.mastery.practiseHeading}
             </p>
             <p className="text-xs text-muted-foreground mb-3">
-              {MASTERY_TEXT.bandNotes.practise}
+              {text.mastery.bandNotes.practise}
             </p>
             <div className="flex flex-wrap gap-2">
               {practise.map((t) => (
@@ -144,7 +146,7 @@ export function MasteryMap({ map }: { map: MasteryMapData }) {
                   variant="outline"
                   data-testid={`badge-practise-${t.topic}`}
                 >
-                  {t.topic} · {subjectLabel(t.subject)}
+                  {t.topic} · {subjectName(text, t.subject)}
                 </Badge>
               ))}
             </div>
@@ -157,7 +159,7 @@ export function MasteryMap({ map }: { map: MasteryMapData }) {
         <Card key={s.subject} data-testid={`card-subject-${s.subject}`}>
           <CardContent className="py-4">
             <div className="flex items-center justify-between gap-3 mb-2">
-              <p className="font-semibold">{subjectLabel(s.subject)}</p>
+              <p className="font-semibold">{subjectName(text, s.subject)}</p>
               <div className={`flex items-center gap-1.5 ${BAND_STYLE[s.band].text}`}>
                 <CircleDot className="h-4 w-4" />
                 <span className="text-sm font-semibold tabular-nums" data-testid={`text-subject-percent-${s.subject}`}>

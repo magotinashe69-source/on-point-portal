@@ -27,9 +27,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { LanguageToggle } from "@/components/language-toggle";
+import { useT } from "@/lib/i18n";
 import { subjectLabel } from "@shared/weekly-report";
 import {
-  WORK_TEXT,
   type CompletedWorkItem,
   type QuestionOutcome,
   type ReviewedQuestion,
@@ -58,6 +59,7 @@ function ParentHeader({ backTo, backLabel }: { backTo: string; backLabel: string
         </Link>
         <div className="flex items-center gap-2">
           <img src={logoPath} alt="On Point" className="h-8 w-auto" />
+          <LanguageToggle />
           <ThemeToggle />
         </div>
       </div>
@@ -77,30 +79,32 @@ function shortDate(iso: string): string {
 // How each outcome looks. Green for right, amber for partly right, red for not
 // yet — kept in one place so the list and the detail can never disagree, and
 // so a colour-blind parent still has the words and the icon to go on.
+type OutcomeLabel = "outcomeCorrect" | "outcomePartly" | "outcomeIncorrect" | "outcomeNotMarked";
+
 const OUTCOME_STYLE: Record<
   QuestionOutcome,
-  { label: string; badge: string; edge: string; icon: React.ReactNode }
+  { label: OutcomeLabel; badge: string; edge: string; icon: React.ReactNode }
 > = {
   correct: {
-    label: WORK_TEXT.outcomeCorrect,
+    label: "outcomeCorrect",
     badge: "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-300",
     edge: "border-l-4 border-l-green-500",
     icon: <Check className="h-4 w-4" />,
   },
   partly: {
-    label: WORK_TEXT.outcomePartly,
+    label: "outcomePartly",
     badge: "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300",
     edge: "border-l-4 border-l-amber-500",
     icon: <CircleDot className="h-4 w-4" />,
   },
   incorrect: {
-    label: WORK_TEXT.outcomeIncorrect,
+    label: "outcomeIncorrect",
     badge: "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300",
     edge: "border-l-4 border-l-red-500",
     icon: <X className="h-4 w-4" />,
   },
   not_marked: {
-    label: WORK_TEXT.outcomeNotMarked,
+    label: "outcomeNotMarked",
     badge: "bg-muted text-muted-foreground",
     edge: "border-l-4 border-l-muted-foreground/40",
     icon: <Clock className="h-4 w-4" />,
@@ -112,6 +116,7 @@ const OUTCOME_STYLE: Record<
 // ---------------------------------------------------------------------------
 
 export function ParentWorkList() {
+  const t = useT();
   const [, setLocation] = useLocation();
   const { parent } = useAuth();
 
@@ -131,11 +136,11 @@ export function ParentWorkList() {
 
   return (
     <div className="min-h-screen bg-background">
-      <ParentHeader backTo="/parent/dashboard" backLabel="Dashboard" />
+      <ParentHeader backTo="/parent/dashboard" backLabel={t.common.dashboard} />
 
       <main className="container mx-auto px-4 py-6 max-w-2xl">
-        <h1 className="text-2xl font-bold mb-1">{WORK_TEXT.completedTitle}</h1>
-        <p className="text-muted-foreground text-sm mb-6">{WORK_TEXT.completedNote}</p>
+        <h1 className="text-2xl font-bold mb-1">{t.work.completedTitle}</h1>
+        <p className="text-muted-foreground text-sm mb-6">{t.work.completedNote}</p>
 
         {isLoading && (
           <div className="flex items-center gap-2 text-muted-foreground">
@@ -153,7 +158,7 @@ export function ParentWorkList() {
         {data && work.length === 0 && (
           <Card>
             <CardContent className="py-8 text-center text-muted-foreground" data-testid="text-work-empty">
-              {WORK_TEXT.completedEmpty}
+              {t.work.completedEmpty}
             </CardContent>
           </Card>
         )}
@@ -173,7 +178,7 @@ export function ParentWorkList() {
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <Badge variant="outline">{subjectLabel(item.subject)}</Badge>
                         <span className="text-xs text-muted-foreground">
-                          {WORK_TEXT.handedIn} {shortDate(item.submittedAt)}
+                          {t.work.handedIn} {shortDate(item.submittedAt)}
                         </span>
                       </div>
                       <p className="font-medium truncate">{item.title}</p>
@@ -191,7 +196,7 @@ export function ParentWorkList() {
                         // Waiting on the teacher is said out loud. Showing a 0
                         // here would read as a bad mark rather than no mark.
                         <p className="text-xs text-muted-foreground max-w-[6rem]">
-                          {WORK_TEXT.notMarkedYet}
+                          {t.work.notMarkedYet}
                         </p>
                       )}
                     </div>
@@ -204,7 +209,7 @@ export function ParentWorkList() {
           ))}
         </div>
 
-        <p className="text-xs text-muted-foreground mt-6 border-t pt-4">{WORK_TEXT.readOnly}</p>
+        <p className="text-xs text-muted-foreground mt-6 border-t pt-4">{t.work.readOnly}</p>
       </main>
     </div>
   );
@@ -216,6 +221,7 @@ export function ParentWorkList() {
 
 /** One question: what was asked, what the child put, and what was right. */
 function QuestionCard({ question }: { question: ReviewedQuestion }) {
+  const t = useT();
   const style = OUTCOME_STYLE[question.outcome];
 
   return (
@@ -231,19 +237,19 @@ function QuestionCard({ question }: { question: ReviewedQuestion }) {
             data-testid={`badge-outcome-${question.number}`}
           >
             {style.icon}
-            {style.label}
+            {t.work[style.label]}
           </span>
         </div>
 
         {/* What the child wrote. */}
         <div>
-          <p className="text-xs text-muted-foreground mb-1">{WORK_TEXT.yourChildsAnswer}</p>
+          <p className="text-xs text-muted-foreground mb-1">{t.work.yourChildsAnswer}</p>
           <p className="rounded-md bg-muted px-3 py-2 text-sm whitespace-pre-wrap" data-testid={`text-child-answer-${question.number}`}>
             {question.childAnswer
               ? question.childAnswer
               : question.answeredWithPhoto
-                ? WORK_TEXT.answeredWithPhoto
-                : WORK_TEXT.noAnswerGiven}
+                ? t.work.answeredWithPhoto
+                : t.work.noAnswerGiven}
           </p>
         </div>
 
@@ -257,7 +263,7 @@ function QuestionCard({ question }: { question: ReviewedQuestion }) {
         {question.correctAnswer ? (
           <div>
             <p className="text-xs text-muted-foreground mb-1">
-              {question.correctAnswerKind === "model" ? WORK_TEXT.modelAnswer : WORK_TEXT.correctAnswer}
+              {question.correctAnswerKind === "model" ? t.work.modelAnswer : t.work.correctAnswer}
             </p>
             <p
               className="rounded-md bg-green-50 dark:bg-green-950/40 px-3 py-2 text-sm font-medium whitespace-pre-wrap"
@@ -266,13 +272,13 @@ function QuestionCard({ question }: { question: ReviewedQuestion }) {
               {question.correctAnswer}
             </p>
             {question.correctAnswerKind === "model" && (
-              <p className="text-xs text-muted-foreground mt-1">{WORK_TEXT.modelAnswerNote}</p>
+              <p className="text-xs text-muted-foreground mt-1">{t.work.modelAnswerNote}</p>
             )}
           </div>
         ) : (
           <div>
-            <p className="text-xs text-muted-foreground mb-1">{WORK_TEXT.markedByTeacher}</p>
-            <p className="text-sm text-muted-foreground">{WORK_TEXT.markedByTeacherNote}</p>
+            <p className="text-xs text-muted-foreground mb-1">{t.work.markedByTeacher}</p>
+            <p className="text-sm text-muted-foreground">{t.work.markedByTeacherNote}</p>
           </div>
         )}
 
@@ -284,7 +290,7 @@ function QuestionCard({ question }: { question: ReviewedQuestion }) {
           <div className="rounded-md border p-3">
             <div className="flex items-center gap-2 text-muted-foreground mb-1">
               <MessageSquare className="h-4 w-4" />
-              <span className="text-xs">{WORK_TEXT.teacherComment}</span>
+              <span className="text-xs">{t.work.teacherComment}</span>
             </div>
             <p className="text-sm" data-testid={`text-question-feedback-${question.number}`}>
               {question.teacherComment}
@@ -303,6 +309,7 @@ function QuestionCard({ question }: { question: ReviewedQuestion }) {
 }
 
 export function ParentWorkDetail() {
+  const t = useT();
   const [, setLocation] = useLocation();
   const { parent } = useAuth();
   const [, params] = useRoute("/parent/work/:submissionId");
@@ -325,7 +332,7 @@ export function ParentWorkDetail() {
 
   return (
     <div className="min-h-screen bg-background">
-      <ParentHeader backTo="/parent/work" backLabel={WORK_TEXT.completedTitle} />
+      <ParentHeader backTo="/parent/work" backLabel={t.work.completedTitle} />
 
       <main className="container mx-auto px-4 py-6 max-w-2xl">
         {isLoading && (
@@ -345,7 +352,7 @@ export function ParentWorkDetail() {
                 We could not open that piece of work. You can only see your own child's work.
               </p>
               <Button variant="outline" size="sm" onClick={() => setLocation("/parent/work")}>
-                {WORK_TEXT.back}
+                {t.work.back}
               </Button>
             </CardContent>
           </Card>
@@ -360,7 +367,7 @@ export function ParentWorkDetail() {
               </div>
               <h1 className="text-2xl font-bold" data-testid="text-review-title">{review.title}</h1>
               <p className="text-muted-foreground text-sm">
-                {review.child.fullName} · {WORK_TEXT.handedIn.toLowerCase()} {shortDate(review.submittedAt)}
+                {review.child.fullName} · {t.work.handedIn.toLowerCase()} {shortDate(review.submittedAt)}
               </p>
             </div>
 
@@ -368,7 +375,7 @@ export function ParentWorkDetail() {
               <Card className="mb-6">
                 <CardContent className="p-4 flex items-center justify-between gap-4">
                   <div>
-                    <p className="text-xs text-muted-foreground">Mark</p>
+                    <p className="text-xs text-muted-foreground">{t.parentWork.mark}</p>
                     <p className="text-2xl font-semibold" data-testid="text-review-score">
                       {review.score}/{review.outOf}
                     </p>
@@ -379,7 +386,7 @@ export function ParentWorkDetail() {
             ) : (
               <Card className="mb-6">
                 <CardContent className="p-4 text-sm text-muted-foreground" data-testid="text-awaiting-marking">
-                  {WORK_TEXT.awaitingMarking}
+                  {t.work.awaitingMarking}
                 </CardContent>
               </Card>
             )}
@@ -389,7 +396,7 @@ export function ParentWorkDetail() {
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base flex items-center gap-2">
                     <MessageSquare className="h-4 w-4" />
-                    {WORK_TEXT.overallFeedback}
+                    {t.work.overallFeedback}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -398,7 +405,7 @@ export function ParentWorkDetail() {
               </Card>
             )}
 
-            <p className="text-sm text-muted-foreground mb-4">{WORK_TEXT.reviewNote}</p>
+            <p className="text-sm text-muted-foreground mb-4">{t.work.reviewNote}</p>
 
             <div className="space-y-3">
               {review.questions.map(q => (
@@ -406,7 +413,7 @@ export function ParentWorkDetail() {
               ))}
             </div>
 
-            <p className="text-xs text-muted-foreground mt-6 border-t pt-4">{WORK_TEXT.readOnly}</p>
+            <p className="text-xs text-muted-foreground mt-6 border-t pt-4">{t.work.readOnly}</p>
           </>
         )}
       </main>

@@ -23,12 +23,13 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { apiErrorMessage } from "@/lib/api-error";
-import { subjectLabel, SUBJECT_LABELS } from "@shared/weekly-report";
+import { SUBJECT_LABELS } from "@shared/weekly-report";
 import {
   BANK_TEXT, DIFFICULTIES, describeAnswer, isBankType, typeLabel,
   validateBankQuestion, type Difficulty,
 } from "@shared/question-bank";
 import { Library, Loader2, Save } from "lucide-react";
+import { subjectName, useT } from "@/lib/i18n";
 
 const SUBJECTS = Object.keys(SUBJECT_LABELS);
 const FORMS = ["Stage 3", "Stage 4", "Stage 5", "Stage 6", "Form 1", "Form 2"];
@@ -56,6 +57,7 @@ export function SaveToBankDialog({
   defaultTopic: string;
   onClose: () => void;
 }) {
+  const t = useT();
   const { toast } = useToast();
 
   const [subject, setSubject] = useState(defaultSubject || SUBJECTS[0]);
@@ -103,7 +105,7 @@ export function SaveToBankDialog({
   // createdById is added by the server from the session, so it is stubbed here.
   const problems = bankable
     ? validateBankQuestion({ ...payload(), createdById: 0 } as any)
-    : [BANK_TEXT.cannotSaveWritten];
+    : [t.bank.cannotSaveWritten];
 
   const save = async () => {
     setSaving(true);
@@ -111,7 +113,7 @@ export function SaveToBankDialog({
       const res = await apiRequest("POST", "/api/question-bank", payload());
       const body = await res.json();
       if (body.success) {
-        toast({ title: BANK_TEXT.saved });
+        toast({ title: t.bank.saved });
         // So the Question Bank screen shows it straight away if it is open.
         queryClient.invalidateQueries({ queryKey: ["/api/question-bank"] });
         onClose();
@@ -146,7 +148,7 @@ export function SaveToBankDialog({
 
         {!bankable ? (
           <p className="text-sm text-muted-foreground" data-testid="text-cannot-bank">
-            {BANK_TEXT.cannotSaveWritten}
+            {t.bank.cannotSaveWritten}
           </p>
         ) : (
           <div className="space-y-4">
@@ -157,7 +159,7 @@ export function SaveToBankDialog({
               </p>
               <p className="text-xs text-muted-foreground">
                 {typeLabel(question.type)} · {question.maxScore === 1 ? "1 mark" : `${question.maxScore} marks`}
-                {" · "}{BANK_TEXT.answer}: {describeAnswer(question)}
+                {" · "}{t.bank.answer}: {describeAnswer(question)}
               </p>
             </div>
 
@@ -168,7 +170,7 @@ export function SaveToBankDialog({
                   <SelectTrigger data-testid="select-bank-save-subject"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {SUBJECTS.map((sub) => (
-                      <SelectItem key={sub} value={sub}>{subjectLabel(sub)}</SelectItem>
+                      <SelectItem key={sub} value={sub}>{subjectName(t, sub)}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -203,7 +205,7 @@ export function SaveToBankDialog({
                   <SelectTrigger data-testid="select-bank-save-difficulty"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {DIFFICULTIES.map((d) => (
-                      <SelectItem key={d} value={d}>{BANK_TEXT.difficulties[d]}</SelectItem>
+                      <SelectItem key={d} value={d}>{t.bank.difficulties[d]}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

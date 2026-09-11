@@ -8,6 +8,8 @@ import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/lib/auth";
 import { QueryError } from "@/components/QueryError";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { LanguageToggle } from "@/components/language-toggle";
+import { useT } from "@/lib/i18n";
 import { ArrowLeft, Loader2, CheckCircle, XCircle, Trophy, MessageSquare, Image as ImageIcon, RotateCcw } from "lucide-react";
 import { Lightbox } from "@/components/Lightbox";
 import { isFullyAutoMarked } from "@shared/auto-marking";
@@ -19,6 +21,7 @@ import { takePendingResources } from "@/lib/dream-handoff";
 import logoPath from "@assets/logo.webp";
 
 export default function ViewResults() {
+  const t = useT();
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { student } = useAuth();
@@ -89,10 +92,11 @@ export default function ViewResults() {
         <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-4">
           <Link href="/student/dashboard" className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
-            <span className="text-sm">Back to Dashboard</span>
+            <span className="text-sm">{t.submit.backToDashboard}</span>
           </Link>
           <div className="flex items-center gap-3">
             <img src={logoPath} alt="On Point" className="h-8 w-auto" />
+            <LanguageToggle />
             <ThemeToggle />
           </div>
         </div>
@@ -104,7 +108,7 @@ export default function ViewResults() {
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : submissionFailed ? (
-          <QueryError error={submissionError} what="your result" role="student" variant="page" onRetry={() => refetchSubmission()} data-testid="result-load-error" />
+          <QueryError error={submissionError} what={t.errors.thing.yourResult} role="student" variant="page" onRetry={() => refetchSubmission()} data-testid="result-load-error" />
         ) : submission && assignment && assignment.questions && mark ? (
           <>
             <Card className="mb-6">
@@ -172,7 +176,7 @@ export default function ViewResults() {
             )}
 
             <div className="space-y-4">
-              <h2 className="text-xl font-semibold">Question Results</h2>
+              <h2 className="text-xl font-semibold">{t.results.questionResults}</h2>
               {assignment.questions.map((question, index) => {
                 const studentAnswer = submission.answers.find(a => a.questionId === question.id);
                 const questionMark = mark.questionMarks.find(qm => qm.questionId === question.id);
@@ -189,7 +193,7 @@ export default function ViewResults() {
                           ) : (
                             <XCircle className="h-5 w-5 text-destructive" />
                           )}
-                          <CardTitle className="text-lg">Question {index + 1}</CardTitle>
+                          <CardTitle className="text-lg">{t.results.question(index + 1)}</CardTitle>
                         </div>
                         <Badge 
                           variant={questionPct >= 60 ? "default" : "secondary"}
@@ -207,7 +211,7 @@ export default function ViewResults() {
                             <img 
                               key={imgIndex}
                               src={url} 
-                              alt={`Question ${index + 1} image ${imgIndex + 1}`}
+                              alt={t.results.questionImageAlt(index + 1, imgIndex + 1)}
                               className="max-h-48 rounded-md border object-contain hover:opacity-80 transition-opacity cursor-pointer"
                               onClick={() => { setLightboxImages(question.imageUrls!); setLightboxIndex(imgIndex); }}
                               data-testid={`image-question-${index}-${imgIndex}`}
@@ -218,9 +222,9 @@ export default function ViewResults() {
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div className="p-3 bg-muted rounded-md">
-                        <p className="text-sm font-medium mb-1">Your Answer:</p>
+                        <p className="text-sm font-medium mb-1">{t.results.yourAnswer}</p>
                         <p className="whitespace-pre-wrap text-sm">
-                          {studentAnswer?.answerText || <em className="text-muted-foreground">No answer provided</em>}
+                          {studentAnswer?.answerText || <em className="text-muted-foreground">{t.results.noAnswerProvided}</em>}
                         </p>
                         {studentAnswer?.imageUrls && studentAnswer.imageUrls.length > 0 && (
                           <div className="border-t pt-3 mt-3">
@@ -233,7 +237,7 @@ export default function ViewResults() {
                                 <img
                                   key={imgIdx}
                                   src={url}
-                                  alt={`Your attachment ${imgIdx + 1}`}
+                                  alt={t.results.attachmentAlt(imgIdx + 1)}
                                   className="h-24 w-24 object-cover rounded-md border shadow-sm hover:shadow-md transition-shadow cursor-pointer"
                                   onClick={() => { setLightboxImages(studentAnswer.imageUrls!); setLightboxIndex(imgIdx); }}
                                   data-testid={`image-answer-${index}-${imgIdx}`}
@@ -255,20 +259,19 @@ export default function ViewResults() {
                           className="p-3 bg-green-50 dark:bg-green-950/40 rounded-md border-l-4 border-green-500"
                           data-testid={`panel-model-answer-${index}`}
                         >
-                          <p className="text-sm font-medium mb-1">What a good answer looks like:</p>
+                          <p className="text-sm font-medium mb-1">{t.results.modelAnswer}</p>
                           <p className="text-sm whitespace-pre-wrap" data-testid={`text-model-answer-${index}`}>
                             {mark.modelAnswers[question.id]}
                           </p>
                           <p className="text-xs text-muted-foreground mt-2">
-                            Your teacher's example. Yours does not have to match it word for word —
-                            compare the two and see what you could add next time.
+                            {t.results.modelAnswerNote}
                           </p>
                         </div>
                       )}
 
                       {questionMark?.feedback && (
                         <div className="p-3 bg-primary/5 rounded-md border-l-4 border-primary">
-                          <p className="text-sm font-medium mb-1">Feedback:</p>
+                          <p className="text-sm font-medium mb-1">{t.results.feedback}</p>
                           <p className="text-sm">{questionMark.feedback}</p>
                         </div>
                       )}
@@ -283,12 +286,12 @@ export default function ViewResults() {
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-secondary/10">
               <Loader2 className="h-8 w-8 text-secondary animate-spin" />
             </div>
-            <h2 className="text-xl font-semibold mb-2">Awaiting Review</h2>
-            <p className="text-muted-foreground">Your submission is being reviewed by your teacher.</p>
+            <h2 className="text-xl font-semibold mb-2">{t.results.awaitingReview}</h2>
+            <p className="text-muted-foreground">{t.results.beingReviewed}</p>
           </div>
         ) : (
           <div className="text-center py-16">
-            <p className="text-muted-foreground">Results not found</p>
+            <p className="text-muted-foreground">{t.results.notFound}</p>
           </div>
         )}
       </main>

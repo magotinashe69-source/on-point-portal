@@ -78,6 +78,7 @@ const SAME_IN_BOTH = new Set([
   "Normal",                       // the same word, and used as a priority level
   "— On Point Education Centre",  // the school's own name
   "—",                            // a dash, standing in for a score nobody has yet
+  "On Point Education Centre",    // the school's name, printed on a certificate
 ]);
 
 /**

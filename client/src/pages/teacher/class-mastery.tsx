@@ -19,7 +19,6 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { subjectLabel } from "@shared/weekly-report";
 import {
   CLASS_MASTERY_TEXT, MASTERY_TEXT, isSplit,
   type ClassMastery, type ClassTopicMastery, type MasteryBand,
@@ -28,6 +27,7 @@ import {
   ArrowLeft, Loader2, Target, Users, GraduationCap, AlertTriangle, CheckCircle2, TrendingUp,
 } from "lucide-react";
 import logoPath from "@assets/logo.webp";
+import { subjectName, useT } from "@/lib/i18n";
 
 const FORMS = ["Stage 3", "Stage 4", "Stage 5", "Stage 6", "Form 1", "Form 2"];
 
@@ -62,6 +62,7 @@ function Stat({ icon, label, value, testId }: {
 }
 
 function TopicRow({ topic }: { topic: ClassTopicMastery }) {
+  const t = useT();
   const style = BAND_STYLE[topic.band];
   const split = isSplit(topic);
   return (
@@ -72,7 +73,7 @@ function TopicRow({ topic }: { topic: ClassTopicMastery }) {
             <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${style.dot}`} aria-hidden />
             <span className="font-medium truncate">{topic.topic}</span>
           </div>
-          <p className="text-xs text-muted-foreground mt-0.5">{subjectLabel(topic.subject)}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{subjectName(t, topic.subject)}</p>
         </div>
         <div className={`flex items-center gap-1.5 shrink-0 ${style.text}`}>
           {style.icon}
@@ -94,14 +95,14 @@ function TopicRow({ topic }: { topic: ClassTopicMastery }) {
           the middle, which is the one thing this page must not do. */}
       <p className="text-xs text-muted-foreground mt-1" data-testid={`text-spread-${topic.topic}`}>
         {topic.children} {topic.children === 1 ? "pupil" : "pupils"} ·{" "}
-        {CLASS_MASTERY_TEXT.spread(topic.mastered, topic.developing, topic.practise)}
+        {t.classMastery.spread(topic.mastered, topic.developing, topic.practise)}
       </p>
 
       {split && (
         <p className="text-xs mt-1 flex items-center gap-1.5 text-amber-700 dark:text-amber-500"
            data-testid={`text-split-${topic.topic}`}>
           <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-          {CLASS_MASTERY_TEXT.splitWarning}
+          {t.classMastery.splitWarning}
         </p>
       )}
     </div>
@@ -109,6 +110,7 @@ function TopicRow({ topic }: { topic: ClassTopicMastery }) {
 }
 
 export default function ClassMasteryPage() {
+  const t = useT();
   const [, setLocation] = useLocation();
   const { teacher } = useAuth();
   const [form, setForm] = useState("");
@@ -155,16 +157,16 @@ export default function ClassMasteryPage() {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <GraduationCap className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-bold">{CLASS_MASTERY_TEXT.title}</h1>
+            <h1 className="text-2xl font-bold">{t.classMastery.title}</h1>
           </div>
-          <p className="text-sm text-muted-foreground">{CLASS_MASTERY_TEXT.subtitle}</p>
+          <p className="text-sm text-muted-foreground">{t.classMastery.subtitle}</p>
         </div>
 
         <Card>
           <CardContent className="py-4">
             <Select value={form} onValueChange={setForm}>
               <SelectTrigger className="w-full sm:w-[220px]" data-testid="select-mastery-form">
-                <SelectValue placeholder={CLASS_MASTERY_TEXT.pickClass} />
+                <SelectValue placeholder={t.classMastery.pickClass} />
               </SelectTrigger>
               <SelectContent>
                 {FORMS.map((f) => <SelectItem key={f} value={f}>{f}</SelectItem>)}
@@ -176,7 +178,7 @@ export default function ClassMasteryPage() {
         {!form && (
           <Card>
             <CardContent className="py-10 text-center text-sm text-muted-foreground" data-testid="text-pick-class">
-              {CLASS_MASTERY_TEXT.pickClass} to see what it can do.
+              {t.classMastery.pickClass} to see what it can do.
             </CardContent>
           </Card>
         )}
@@ -196,7 +198,7 @@ export default function ClassMasteryPage() {
         {mastery && mastery.children === 0 && (
           <Card>
             <CardContent className="py-10 text-center text-sm text-muted-foreground" data-testid="text-empty-class">
-              {CLASS_MASTERY_TEXT.emptyClass}
+              {t.classMastery.emptyClass}
             </CardContent>
           </Card>
         )}
@@ -206,19 +208,19 @@ export default function ClassMasteryPage() {
             <div className="grid grid-cols-3 gap-3">
               <Stat
                 icon={<Users className="h-4 w-4" />}
-                label={CLASS_MASTERY_TEXT.children}
+                label={t.classMastery.children}
                 value={String(mastery.children)}
                 testId="stat-children"
               />
               <Stat
                 icon={<GraduationCap className="h-4 w-4" />}
-                label={CLASS_MASTERY_TEXT.withWork}
+                label={t.classMastery.withWork}
                 value={String(mastery.withWork)}
                 testId="stat-with-work"
               />
               <Stat
                 icon={<Target className="h-4 w-4" />}
-                label={CLASS_MASTERY_TEXT.topicsTracked}
+                label={t.classMastery.topicsTracked}
                 value={String(mastery.topics.length)}
                 testId="stat-topics"
               />
@@ -227,7 +229,7 @@ export default function ClassMasteryPage() {
             {mastery.topics.length === 0 && (
               <Card>
                 <CardContent className="py-10 text-center text-sm text-muted-foreground" data-testid="text-no-skills">
-                  {CLASS_MASTERY_TEXT.empty}
+                  {t.classMastery.empty}
                 </CardContent>
               </Card>
             )}
@@ -237,10 +239,10 @@ export default function ClassMasteryPage() {
                 <CardContent className="py-4">
                   <p className="font-semibold flex items-center gap-2">
                     <Target className="h-4 w-4" />
-                    {CLASS_MASTERY_TEXT.reteach}
+                    {t.classMastery.reteach}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1 mb-2">
-                    {CLASS_MASTERY_TEXT.reteachNote}
+                    {t.classMastery.reteachNote}
                   </p>
                   <div className="divide-y">
                     {weakest.map((t) => <TopicRow key={`${t.subject}-${t.topic}`} topic={t} />)}
@@ -252,7 +254,7 @@ export default function ClassMasteryPage() {
             {strongest.length > 0 && (
               <Card data-testid="card-strongest">
                 <CardContent className="py-4">
-                  <p className="font-semibold mb-2">{CLASS_MASTERY_TEXT.strongest}</p>
+                  <p className="font-semibold mb-2">{t.classMastery.strongest}</p>
                   <div className="divide-y">
                     {strongest.map((t) => <TopicRow key={`${t.subject}-${t.topic}`} topic={t} />)}
                   </div>
@@ -264,15 +266,15 @@ export default function ClassMasteryPage() {
               <CardContent className="py-4">
                 <p className="font-semibold flex items-center gap-2">
                   <Users className="h-4 w-4" />
-                  {CLASS_MASTERY_TEXT.needSupport}
+                  {t.classMastery.needSupport}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1 mb-3">
-                  {CLASS_MASTERY_TEXT.needSupportNote}
+                  {t.classMastery.needSupportNote}
                 </p>
 
                 {mastery.needSupport.length === 0 ? (
                   <p className="text-sm text-muted-foreground" data-testid="text-no-gaps">
-                    {CLASS_MASTERY_TEXT.noGaps}
+                    {t.classMastery.noGaps}
                   </p>
                 ) : (
                   <div className="space-y-2">
@@ -312,13 +314,13 @@ export default function ClassMasteryPage() {
                 a class that has done nothing. */}
             {mastery.untagged > 0 && (
               <p className="text-xs text-muted-foreground" data-testid="text-untagged-note">
-                {CLASS_MASTERY_TEXT.untaggedNote(mastery.untagged)}
+                {t.classMastery.untaggedNote(mastery.untagged)}
               </p>
             )}
 
             <p className="text-xs text-muted-foreground">
-              {MASTERY_TEXT.bands.mastered} is {80}%+, {MASTERY_TEXT.bands.developing} is 50–79%,{" "}
-              {MASTERY_TEXT.bands.practise} is below 50%.
+              {t.mastery.bands.mastered} is {80}%+, {t.mastery.bands.developing} is 50–79%,{" "}
+              {t.mastery.bands.practise} is below 50%.
             </p>
           </>
         )}

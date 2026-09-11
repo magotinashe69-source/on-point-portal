@@ -23,11 +23,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { subjectLabel, SUBJECT_LABELS } from "@shared/weekly-report";
+import { SUBJECT_LABELS } from "@shared/weekly-report";
 import {
   BANK_TEXT, DIFFICULTIES, describeAnswer, typeLabel, type BankQuestion,
 } from "@shared/question-bank";
 import { Library, Loader2, Search } from "lucide-react";
+import { subjectName, useT } from "@/lib/i18n";
 
 const SUBJECTS = Object.keys(SUBJECT_LABELS);
 const FORMS = ["Stage 3", "Stage 4", "Stage 5", "Stage 6", "Form 1", "Form 2"];
@@ -45,6 +46,7 @@ export function AddFromBankDialog({
   onAdd: (questions: BankQuestion[]) => void;
   onClose: () => void;
 }) {
+  const t = useT();
   const [subject, setSubject] = useState(defaultSubject || ANY);
   const [form, setForm] = useState(defaultForm || ANY);
   const [difficulty, setDifficulty] = useState(ANY);
@@ -103,7 +105,7 @@ export function AddFromBankDialog({
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder={BANK_TEXT.searchPlaceholder}
+              placeholder={t.bank.searchPlaceholder}
               className="pl-9"
               data-testid="input-pick-search"
             />
@@ -115,7 +117,7 @@ export function AddFromBankDialog({
               <SelectContent>
                 <SelectItem value={ANY}>Any subject</SelectItem>
                 {SUBJECTS.map((sub) => (
-                  <SelectItem key={sub} value={sub}>{subjectLabel(sub)}</SelectItem>
+                  <SelectItem key={sub} value={sub}>{subjectName(t, sub)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -135,7 +137,7 @@ export function AddFromBankDialog({
               <SelectContent>
                 <SelectItem value={ANY}>Any difficulty</SelectItem>
                 {DIFFICULTIES.map((d) => (
-                  <SelectItem key={d} value={d}>{BANK_TEXT.difficulties[d]}</SelectItem>
+                  <SelectItem key={d} value={d}>{t.bank.difficulties[d]}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -149,7 +151,7 @@ export function AddFromBankDialog({
 
           {!isLoading && questions.length === 0 && (
             <p className="text-sm text-muted-foreground py-6 text-center" data-testid="text-pick-empty">
-              {BANK_TEXT.empty}
+              {t.bank.empty}
             </p>
           )}
 
@@ -171,13 +173,13 @@ export function AddFromBankDialog({
                     <p className="text-sm font-medium">{q.questionText}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {typeLabel(q.type)} · {q.maxScore === 1 ? "1 mark" : `${q.maxScore} marks`}
-                      {" · "}{BANK_TEXT.answer}: {describeAnswer(q)}
+                      {" · "}{t.bank.answer}: {describeAnswer(q)}
                     </p>
                     <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
-                      <Badge variant="outline" className="text-xs">{subjectLabel(q.subject)}</Badge>
+                      <Badge variant="outline" className="text-xs">{subjectName(t, q.subject)}</Badge>
                       <Badge variant="outline" className="text-xs">{q.topic}</Badge>
                       <Badge variant="outline" className="text-xs">{q.form}</Badge>
-                      <Badge variant="outline" className="text-xs">{BANK_TEXT.difficulties[q.difficulty]}</Badge>
+                      <Badge variant="outline" className="text-xs">{t.bank.difficulties[q.difficulty]}</Badge>
                       {/* Pointed out, not blocked: a teacher may well want the
                           same question twice, and only they can say. */}
                       {repeat && (

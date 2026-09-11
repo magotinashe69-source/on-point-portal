@@ -15,10 +15,11 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
-  CERTIFICATE_TEXT, certificateDate, type Certificate, type CertificateKind,
+  type Certificate, type CertificateKind,
 } from "@shared/certificates";
 import { ArrowLeft, Award, Flame, Loader2, Sparkles, Star, Target, TrendingUp } from "lucide-react";
 import logoPath from "@assets/logo.webp";
+import { longDate, useT } from "@/lib/i18n";
 
 /** An icon per kind, so the list is scannable without reading every line. */
 const KIND_ICON: Record<CertificateKind, React.ReactNode> = {
@@ -30,6 +31,7 @@ const KIND_ICON: Record<CertificateKind, React.ReactNode> = {
 };
 
 export default function CertificatesPage() {
+  const t = useT();
   const [, setLocation] = useLocation();
   const { student } = useAuth();
 
@@ -51,7 +53,7 @@ export default function CertificatesPage() {
         <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-4">
           <Link href="/student/dashboard" className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
-            <span className="text-sm">Dashboard</span>
+            <span className="text-sm">{t.common.dashboard}</span>
           </Link>
           <div className="flex items-center gap-2">
             <img src={logoPath} alt="On Point" className="h-8 w-auto" />
@@ -64,9 +66,9 @@ export default function CertificatesPage() {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <Award className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-bold">{CERTIFICATE_TEXT.areaTitle}</h1>
+            <h1 className="text-2xl font-bold">{t.certificates.areaTitle}</h1>
           </div>
-          <p className="text-sm text-muted-foreground">{CERTIFICATE_TEXT.areaSubtitle}</p>
+          <p className="text-sm text-muted-foreground">{t.certificates.areaSubtitle}</p>
         </div>
 
         {isLoading && (
@@ -81,8 +83,8 @@ export default function CertificatesPage() {
           <Card data-testid="card-no-certificates">
             <CardContent className="py-10 text-center space-y-2">
               <Sparkles className="h-8 w-8 mx-auto text-primary" />
-              <p className="font-medium" data-testid="text-no-certificates">{CERTIFICATE_TEXT.empty}</p>
-              <p className="text-sm text-muted-foreground">{CERTIFICATE_TEXT.emptyNote}</p>
+              <p className="font-medium" data-testid="text-no-certificates">{t.certificates.empty}</p>
+              <p className="text-sm text-muted-foreground">{t.certificates.emptyNote}</p>
             </CardContent>
           </Card>
         )}
@@ -90,7 +92,7 @@ export default function CertificatesPage() {
         {!isLoading && list.length > 0 && (
           <>
             <p className="text-sm text-muted-foreground" data-testid="text-certificate-count">
-              {CERTIFICATE_TEXT.count(list.length)}
+              {t.certificates.count(list.length)}
             </p>
 
             {list.map((c) => (
@@ -105,7 +107,7 @@ export default function CertificatesPage() {
                       <p className="text-sm text-muted-foreground break-words">{c.detail}</p>
                     </div>
                     <Badge variant="outline" className="shrink-0 text-xs">
-                      {certificateDate(c.earnedAt)}
+                      {longDate(t, c.earnedAt)}
                     </Badge>
                   </CardContent>
                 </Card>

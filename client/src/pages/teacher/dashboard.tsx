@@ -881,7 +881,7 @@ export default function TeacherDashboard() {
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
               ) : assignmentsFailed ? (
-                <QueryError error={assignmentsError} what="your assignments" onRetry={() => refetchAssignments()} data-testid="assignments-load-error" />
+                <QueryError error={assignmentsError} what={t.errors.thing.yourAssignments} onRetry={() => refetchAssignments()} data-testid="assignments-load-error" />
               ) : filteredAssignments.length > 0 ? (
                 <div className="space-y-5 max-h-[600px] overflow-y-auto pr-1">
                   {/* Drafts first — these are the ones waiting for a tap. */}
@@ -942,7 +942,7 @@ export default function TeacherDashboard() {
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
               ) : submissionsFailed ? (
-                <QueryError error={submissionsError} what="pending submissions" onRetry={() => refetchSubmissions()} data-testid="submissions-load-error" />
+                <QueryError error={submissionsError} what={t.errors.thing.pendingSubmissions} onRetry={() => refetchSubmissions()} data-testid="submissions-load-error" />
               ) : filteredPendingSubmissions.length > 0 ? (
                 <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
                   {filteredPendingSubmissions.map((submission) => (
