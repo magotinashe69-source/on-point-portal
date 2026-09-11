@@ -14,6 +14,7 @@ import { PageErrorBoundary } from "@/components/ErrorBoundary";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ArrowLeft, CheckCircle, XCircle, Download, Printer, BookOpen, Filter } from "lucide-react";
 import logoPath from "@assets/logo.webp";
+import { useT } from "@/lib/i18n";
 
 interface GradebookRow {
   studentId: number;
@@ -33,15 +34,16 @@ interface GradebookRow {
 // cannot drift apart - a skeleton whose columns do not line up with the real
 // table is worse than no skeleton, because the page jumps when it loads.
 const COLUMNS = [
-  { key: "learner", label: "Learner", head: "", bar: "w-24" },
-  { key: "class", label: "Class", head: "w-24", bar: "w-12" },
-  { key: "assignment", label: "Assignment", head: "", bar: "w-40" },
-  { key: "handedIn", label: "Handed in", head: "w-40", bar: "w-20" },
-  { key: "mark", label: "Mark", head: "w-24 text-right", bar: "w-10 ml-auto" },
-  { key: "date", label: "Date", head: "w-40", bar: "w-24" },
+  { key: "learner", head: "", bar: "w-24" },
+  { key: "class", head: "w-24", bar: "w-12" },
+  { key: "assignment", head: "", bar: "w-40" },
+  { key: "handedIn", head: "w-40", bar: "w-20" },
+  { key: "mark", head: "w-24 text-right", bar: "w-10 ml-auto" },
+  { key: "date", head: "w-40", bar: "w-24" },
 ] as const;
 
 function GradeBookContent() {
+  const t = useT();
   const [, setLocation] = useLocation();
   const { teacher } = useAuth();
 
@@ -166,7 +168,7 @@ function GradeBookContent() {
           aria-hidden="true"
           className={`h-2 w-2 shrink-0 rounded-full ${not ? "bg-destructive" : "bg-green-600"}`}
         />
-        {not ? "Not handed in" : "Handed in"}
+        {not ? t.gradeBook.notHandedIn : t.gradeBook.handedIn}
       </span>
     );
   };
@@ -188,7 +190,7 @@ function GradeBookContent() {
         <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-4">
           <Link href="/teacher/dashboard" className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
-            <span className="text-sm">Back to dashboard</span>
+            <span className="text-sm">{t.gradeBook.backToDashboard}</span>
           </Link>
           <div className="flex items-center gap-3">
             <img src={logoPath} alt="On Point" className="h-8 w-auto" />
@@ -204,8 +206,8 @@ function GradeBookContent() {
               <BookOpen className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold">Grade Book</h1>
-              <p className="text-sm text-muted-foreground">Every mark across every assignment.</p>
+              <h1 className="text-2xl font-bold">{t.gradeBook.title}</h1>
+              <p className="text-sm text-muted-foreground">{t.gradeBook.subtitle}</p>
             </div>
           </div>
           <div className="flex gap-2">
@@ -221,8 +223,8 @@ function GradeBookContent() {
         </div>
 
         <div className="print-title hidden print:block mb-4">
-          <h1 className="text-2xl font-bold">On Point Education Centre — Grade Book</h1>
-          <p className="text-sm text-muted-foreground">Generated {new Date().toLocaleDateString("en-GB")}</p>
+          <h1 className="text-2xl font-bold">{t.gradeBook.printTitle}</h1>
+          <p className="text-sm text-muted-foreground">{t.gradeBook.generated(new Date().toLocaleDateString("en-GB"))}</p>
         </div>
 
         {/* Summary cards */}
@@ -254,7 +256,7 @@ function GradeBookContent() {
         {/* Filters */}
         <Card className="mb-6 no-print">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Filters</CardTitle>
+            <CardTitle className="text-base">{t.gradeBook.filters}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -262,10 +264,10 @@ function GradeBookContent() {
                 <Label htmlFor="filter-assignment">Assignment</Label>
                 <Select value={filterAssignmentId} onValueChange={setFilterAssignmentId}>
                   <SelectTrigger id="filter-assignment" data-testid="select-filter-assignment">
-                    <SelectValue placeholder="All assignments" />
+                    <SelectValue placeholder={t.gradeBook.allAssignments} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="ALL">All assignments</SelectItem>
+                    <SelectItem value="ALL">{t.gradeBook.allAssignments}</SelectItem>
                     {uniqueAssignments.map(a => (
                       <SelectItem key={a.id} value={String(a.id)}>{a.title}</SelectItem>
                     ))}
@@ -274,22 +276,22 @@ function GradeBookContent() {
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="filter-status">Status</Label>
+                <Label htmlFor="filter-status">{t.gradeBook.status}</Label>
                 <Select value={filterStatus} onValueChange={setFilterStatus}>
                   <SelectTrigger id="filter-status" data-testid="select-filter-status">
-                    <SelectValue placeholder="All statuses" />
+                    <SelectValue placeholder={t.gradeBook.allStatuses} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="ALL">All statuses</SelectItem>
-                    <SelectItem value="SUBMITTED">Handed in, not yet marked</SelectItem>
-                    <SelectItem value="MARKED">Marked</SelectItem>
+                    <SelectItem value="ALL">{t.gradeBook.allStatuses}</SelectItem>
+                    <SelectItem value="SUBMITTED">{t.gradeBook.handedNotMarked}</SelectItem>
+                    <SelectItem value="MARKED">{t.gradeBook.marked}</SelectItem>
                     <SelectItem value="NOT_SUBMITTED">Not handed in</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="filter-from">Handed in from</Label>
+                <Label htmlFor="filter-from">{t.gradeBook.handedInFrom}</Label>
                 <Input
                   id="filter-from"
                   type="date"
@@ -300,7 +302,7 @@ function GradeBookContent() {
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="filter-to">Handed in to</Label>
+                <Label htmlFor="filter-to">{t.gradeBook.handedInTo}</Label>
                 <Input
                   id="filter-to"
                   type="date"
@@ -330,7 +332,7 @@ function GradeBookContent() {
         {filterAssignmentId !== "ALL" && statsData?.success && questionStats.length > 0 && (
           <Card className="mb-4" data-testid="class-breakdown">
             <CardHeader>
-              <CardTitle className="text-base">Per-question breakdown</CardTitle>
+              <CardTitle className="text-base">{t.gradeBook.perQuestion}</CardTitle>
               <p className="text-sm text-muted-foreground">
                 Across {statsData.totalMarked} marked submission{statsData.totalMarked === 1 ? "" : "s"} — spot which questions the class struggled with.
               </p>
@@ -357,7 +359,7 @@ function GradeBookContent() {
                 );
               })}
               {statsData.totalMarked === 0 && (
-                <p className="text-sm text-muted-foreground">No marked submissions yet.</p>
+                <p className="text-sm text-muted-foreground">{t.gradeBook.noMarkedYet}</p>
               )}
             </CardContent>
           </Card>
@@ -378,12 +380,12 @@ function GradeBookContent() {
                  before the data is, so hold the layout instead of collapsing it
                  and jolting the page when rows arrive. */
               <div className="overflow-x-auto" data-testid="gradebook-skeleton" aria-busy="true" aria-live="polite">
-                <span className="sr-only">Loading the Grade Book</span>
+                <span className="sr-only">{t.gradeBook.loading}</span>
                 <Table>
                   <TableHeader>
                     <TableRow className="h-8 bg-muted/50 hover:bg-muted/50">
                       {COLUMNS.map(c => (
-                        <TableHead key={c.key} className={`h-8 px-3 text-label-01 ${c.head}`}>{c.label}</TableHead>
+                        <TableHead key={c.key} className={`h-8 px-3 text-label-01 ${c.head}`}>{t.gradeBook.columns[c.key]}</TableHead>
                       ))}
                     </TableRow>
                   </TableHeader>
@@ -406,7 +408,7 @@ function GradeBookContent() {
                  reloading the whole page. */
               <QueryError
                 error={error}
-                what="the Grade Book"
+                what={t.errors.thing.gradeBook}
                 onRetry={() => refetch()}
                 data-testid="gradebook-load-error"
               />
@@ -415,7 +417,7 @@ function GradeBookContent() {
                  concludes the Grade Book is empty. */
               <div className="flex flex-col items-center justify-center py-16 px-4 text-center" data-testid="gradebook-no-results">
                 <Filter className="h-10 w-10 mb-3 text-muted-foreground opacity-40" />
-                <p className="font-medium">Nothing matches those filters</p>
+                <p className="font-medium">{t.gradeBook.nothingMatches}</p>
                 <p className="text-body-01 text-muted-foreground mt-1 max-w-sm">
                   There {allRows.length === 1 ? "is" : "are"} {allRows.length} record{allRows.length === 1 ? "" : "s"} in
                   the Grade Book. Try a wider set of dates, or a different class or assignment.
@@ -429,7 +431,7 @@ function GradeBookContent() {
                  when there is not a single mark to filter. */
               <div className="flex flex-col items-center justify-center py-16 px-4 text-center" data-testid="gradebook-empty">
                 <BookOpen className="h-10 w-10 mb-3 text-muted-foreground opacity-40" />
-                <p className="font-medium">No marks yet</p>
+                <p className="font-medium">{t.gradeBook.noMarks}</p>
                 <p className="text-body-01 text-muted-foreground mt-1 max-w-sm">
                   Marks appear here once you have set an assignment and your class has started handing it in.
                 </p>
@@ -454,7 +456,7 @@ function GradeBookContent() {
                   <TableHeader>
                     <TableRow className="h-8 bg-muted/50 hover:bg-muted/50">
                       {COLUMNS.map(c => (
-                        <TableHead key={c.key} className={`h-8 px-3 text-label-01 ${c.head}`}>{c.label}</TableHead>
+                        <TableHead key={c.key} className={`h-8 px-3 text-label-01 ${c.head}`}>{t.gradeBook.columns[c.key]}</TableHead>
                       ))}
                     </TableRow>
                   </TableHeader>
@@ -489,7 +491,7 @@ function GradeBookContent() {
                               <span
                                 className="font-medium text-primary underline underline-offset-2 cursor-pointer hover:opacity-80"
                                 data-testid={`link-review-${row.submissionId}`}
-                                title="Open this submission"
+                                title={t.gradeBook.openSubmission}
                               >
                                 {row.score}/{row.totalMarks ?? 0}
                               </span>
@@ -499,7 +501,7 @@ function GradeBookContent() {
                               <span
                                 className="text-primary underline underline-offset-2 cursor-pointer"
                                 data-testid={`link-review-${row.submissionId}`}
-                                title="Open this submission"
+                                title={t.gradeBook.openSubmission}
                               >
                                 Awaiting
                               </span>
@@ -529,8 +531,9 @@ function GradeBookContent() {
 // unexpected answer from the server — the teacher sees a message with a way
 // back instead of a blank white screen.
 export default function GradeBook() {
+  const t = useT();
   return (
-    <PageErrorBoundary backHref="/teacher/dashboard" backLabel="Back to dashboard" label="gradebook">
+    <PageErrorBoundary backHref="/teacher/dashboard" backLabel={t.gradeBook.backToDashboard} label="gradebook">
       <GradeBookContent />
     </PageErrorBoundary>
   );

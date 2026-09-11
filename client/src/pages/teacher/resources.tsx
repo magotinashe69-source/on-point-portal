@@ -38,21 +38,11 @@ import {
 } from "lucide-react";
 import type { Resource } from "@shared/schema";
 import logoPath from "@assets/logo.webp";
+import { SUBJECT_CODES, subjectName, useT } from "@/lib/i18n";
 
 // Option lists shared by the single-resource form and the bulk paste dialog.
-const RESOURCE_SUBJECTS: { value: string; label: string }[] = [
-  { value: "MATHS", label: "Maths" }, { value: "ENGLISH", label: "English" },
-  { value: "SCIENCE", label: "Science" }, { value: "PHYSICS", label: "Physics" },
-  { value: "CHEMISTRY", label: "Chemistry" }, { value: "BIOLOGY", label: "Biology" },
-  { value: "ECONOMICS", label: "Economics" }, { value: "BUSINESS_STUDIES", label: "Business Studies" },
-  { value: "GEOGRAPHY", label: "Geography" }, { value: "COMPUTER_SCIENCE", label: "Computer Science" },
-  { value: "HISTORY", label: "History" }, { value: "ACCOUNTING", label: "Accounting" },
-];
 const RESOURCE_FORMS = ["Stage 3", "Stage 4", "Stage 5", "Stage 6", "Form 1", "Form 2"] as const;
-const RESOURCE_TYPES: { value: "TEXTBOOK" | "YOUTUBE" | "LESSON_PLAN" | "OTHER"; label: string }[] = [
-  { value: "TEXTBOOK", label: "Textbook" }, { value: "YOUTUBE", label: "YouTube Video" },
-  { value: "LESSON_PLAN", label: "Lesson Plan" }, { value: "OTHER", label: "Other" },
-];
+const RESOURCE_TYPE_CODES = ["TEXTBOOK", "YOUTUBE", "LESSON_PLAN", "OTHER"] as const;
 
 // --- Bulk paste ---------------------------------------------------------
 // Adding a term's worth of links one dialog at a time is slow. Each line is one
@@ -76,7 +66,10 @@ export interface ParsedResources {
   skipped: SkippedLine[];
 }
 
-export function parsePastedResources(raw: string): ParsedResources {
+export function parsePastedResources(
+  raw: string,
+  reasons = { noTitle: "No title", noLink: 'No link — put it after a "|"' },
+): ParsedResources {
   const rows: ParsedResourceLine[] = [];
   const skipped: SkippedLine[] = [];
 
@@ -86,11 +79,11 @@ export function parsePastedResources(raw: string): ParsedResources {
     const description = line.parts.slice(2).join(" | ").trim();
 
     if (title === "") {
-      skipped.push({ lineNumber: line.lineNumber, text: line.text, reason: "No title" });
+      skipped.push({ lineNumber: line.lineNumber, text: line.text, reason: reasons.noTitle });
       continue;
     }
     if (url === "") {
-      skipped.push({ lineNumber: line.lineNumber, text: line.text, reason: 'No link — put it after a "|"' });
+      skipped.push({ lineNumber: line.lineNumber, text: line.text, reason: reasons.noLink });
       continue;
     }
     rows.push({ lineNumber: line.lineNumber, title, url, description });
@@ -113,6 +106,7 @@ const createResourceSchema = z.object({
 type CreateResourceForm = z.infer<typeof createResourceSchema>;
 
 export default function TeacherResources() {
+  const t = useT();
   const [, setLocation] = useLocation();
   const { teacher } = useAuth();
   const { toast } = useToast();
@@ -168,11 +162,11 @@ export default function TeacherResources() {
     onSuccess: (data) => {
       if (data.success) {
         queryClient.invalidateQueries({ queryKey: ["/api/resources"] });
-        toast({ title: "Resource added" });
+        toast({ title: t.teacherLibrary.resourceAdded });
         setIsDialogOpen(false);
         form.reset();
       } else {
-        toast({ title: "Resource not added", description: data.message, variant: "destructive" });
+        toast({ title: t.teacherLibrary.resourceNotAdded, description: data.message, variant: "destructive" });
       }
     },
   });
@@ -181,7 +175,7 @@ export default function TeacherResources() {
   // Work out what a paste would actually do, so the preview and the button
   // agree with what happens. A link already on the shelf is skipped, and so is
   // the same link repeated twice in the pasted list itself.
-  const pasteParsed = parsePastedResources(pasteText);
+  const pasteParsed = parsePastedResources(pasteText, { noTitle: t.teacherLibrary.noTitle, noLink: t.teacherLibrary.noLink });
   const pasteReview = separateDuplicates(pasteParsed.rows, {
     keyOf: r => r.url,
     labelOf: r => r.title,
@@ -189,7 +183,7 @@ export default function TeacherResources() {
     existingKeys: new Set(
       (resources || []).map(r => (r.url || "").trim().toLowerCase()).filter(u => u !== "")
     ),
-    existingReason: "This link is already saved",
+    existingReason: t.teacherLibrary.alreadySaved,
   });
 
   // Add everything in the preview. Resources go in one at a time so that one
@@ -245,9 +239,9 @@ export default function TeacherResources() {
     onSuccess: (data) => {
       if (data.success) {
         queryClient.invalidateQueries({ queryKey: ["/api/resources"] });
-        toast({ title: "Resource deleted" });
+        toast({ title: t.teacherLibrary.resourceDeleted });
       } else {
-        toast({ title: "Resource not deleted", description: data.message, variant: "destructive" });
+        toast({ title: t.teacherLibrary.resourceNotDeleted, description: data.message, variant: "destructive" });
       }
     },
   });
@@ -285,7 +279,7 @@ export default function TeacherResources() {
         <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-4">
           <Link href="/teacher/dashboard" className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
-            <span className="text-sm">Back to Dashboard</span>
+            <span className="text-sm">{t.submit.backToDashboard}</span>
           </Link>
           <div className="flex items-center gap-3">
             <img src={logoPath} alt="On Point" className="h-8 w-auto" />
@@ -297,49 +291,49 @@ export default function TeacherResources() {
       <main className="container mx-auto px-4 py-8">
         <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
           <div>
-            <h1 className="text-3xl font-bold">Learning Resources</h1>
-            <p className="text-muted-foreground">Manage textbooks, videos, and lesson plans</p>
+            <h1 className="text-3xl font-bold">{t.teacherLibrary.resources}</h1>
+            <p className="text-muted-foreground">{t.teacherLibrary.resourcesNote}</p>
           </div>
           <div className="flex items-center gap-2">
           {/* Bulk paste — add a whole list of links at once. */}
           <Button variant="outline" onClick={() => setIsPasteOpen(true)} data-testid="button-paste-resources">
             <ClipboardPaste className="h-4 w-4 mr-2" />
-            Paste resources
+            {t.teacherLibrary.pasteResources}
           </Button>
           <BulkPasteDialog
             open={isPasteOpen}
             onOpenChange={setIsPasteOpen}
-            title="Paste resources"
-            description="One resource per line, with the link after a bar. They all share the type, subject and class you pick here. Links already saved are skipped."
+            title={t.teacherLibrary.pasteResources}
+            description={t.teacherLibrary.pasteNote}
             noun={{ one: "resource", many: "resources" }}
             settings={
               <div className="space-y-3">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="space-y-1.5">
-                    <Label>Type</Label>
+                    <Label>{t.teacherLibrary.type}</Label>
                     <Select value={pasteType} onValueChange={(v) => setPasteType(v as typeof pasteType)}>
                       <SelectTrigger data-testid="select-paste-type"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {RESOURCE_TYPES.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                        {RESOURCE_TYPE_CODES.map(code => <SelectItem key={code} value={code}>{t.teacherLibrary.types[code]}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Subject</Label>
+                    <Label>{t.teacherLibrary.subject}</Label>
                     <Select value={pasteSubject || "__none__"} onValueChange={(v) => setPasteSubject(v === "__none__" ? "" : v)}>
                       <SelectTrigger data-testid="select-paste-subject"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="__none__">No subject</SelectItem>
-                        {RESOURCE_SUBJECTS.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                        <SelectItem value="__none__">{t.teacherLibrary.noSubject}</SelectItem>
+                        {SUBJECT_CODES.map(code => <SelectItem key={code} value={code}>{subjectName(t, code)}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Class</Label>
+                    <Label>{t.teacherLibrary.classLabel}</Label>
                     <Select value={pasteForm || "__all__"} onValueChange={(v) => setPasteForm(v === "__all__" ? "" : v)}>
                       <SelectTrigger data-testid="select-paste-class"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="__all__">All classes</SelectItem>
+                        <SelectItem value="__all__">{t.teacherLibrary.allClasses}</SelectItem>
                         {RESOURCE_FORMS.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
                       </SelectContent>
                     </Select>
@@ -395,8 +389,8 @@ export default function TeacherResources() {
             </DialogTrigger>
             <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Add New Resource</DialogTitle>
-                <DialogDescription>Add a textbook, video, or lesson plan for your students</DialogDescription>
+                <DialogTitle>{t.teacherLibrary.addResource}</DialogTitle>
+                <DialogDescription>{t.teacherLibrary.addResourceNote}</DialogDescription>
               </DialogHeader>
               <Form {...form}>
                 <form onSubmit={form.handleSubmit((data) => createMutation.mutate(data))} className="space-y-4">
@@ -405,9 +399,9 @@ export default function TeacherResources() {
                     name="title"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Title</FormLabel>
+                        <FormLabel>{t.teacherLibrary.title}</FormLabel>
                         <FormControl>
-                          <Input placeholder="e.g., Grade 7 Mathematics Textbook" data-testid="input-resource-title" {...field} />
+                          <Input placeholder={t.teacherLibrary.titlePlaceholder} data-testid="input-resource-title" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -419,11 +413,11 @@ export default function TeacherResources() {
                     name="type"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Type</FormLabel>
+                        <FormLabel>{t.teacherLibrary.type}</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
                             <SelectTrigger data-testid="select-resource-type">
-                              <SelectValue placeholder="Select type" />
+                              <SelectValue placeholder={t.teacherLibrary.selectType} />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
@@ -443,9 +437,9 @@ export default function TeacherResources() {
                     name="description"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Description (optional)</FormLabel>
+                        <FormLabel>{t.teacherLibrary.description}</FormLabel>
                         <FormControl>
-                          <Textarea placeholder="Brief description..." data-testid="textarea-resource-desc" {...field} />
+                          <Textarea placeholder={t.teacherLibrary.descriptionPlaceholder} data-testid="textarea-resource-desc" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -458,11 +452,11 @@ export default function TeacherResources() {
                       name="subject"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Subject</FormLabel>
+                          <FormLabel>{t.teacherLibrary.subject}</FormLabel>
                           <Select onValueChange={field.onChange} value={field.value || ""}>
                             <FormControl>
                               <SelectTrigger>
-                                <SelectValue placeholder="Select subject" />
+                                <SelectValue placeholder={t.teacherLibrary.selectSubject} />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
@@ -490,15 +484,15 @@ export default function TeacherResources() {
                       name="form"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Form</FormLabel>
+                          <FormLabel>{t.teacherLibrary.form}</FormLabel>
                           <Select onValueChange={(val) => field.onChange(val === "__all__" ? "" : val)} value={field.value || "__all__"}>
                             <FormControl>
                               <SelectTrigger data-testid="select-resource-form">
-                                <SelectValue placeholder="All forms" />
+                                <SelectValue placeholder={t.teacherLibrary.allFormsOption} />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="__all__">All Forms</SelectItem>
+                              <SelectItem value="__all__">{t.teacherLibrary.allForms}</SelectItem>
                               <SelectItem value="Stage 3">Stage 3</SelectItem>
                               <SelectItem value="Stage 4">Stage 4</SelectItem>
                               <SelectItem value="Stage 5">Stage 5</SelectItem>
@@ -519,7 +513,7 @@ export default function TeacherResources() {
                       name="url"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>YouTube URL</FormLabel>
+                          <FormLabel>{t.teacherLibrary.youtubeUrl}</FormLabel>
                           <FormControl>
                             <Input placeholder="https://youtube.com/watch?v=..." data-testid="input-resource-url" {...field} />
                           </FormControl>
@@ -533,12 +527,12 @@ export default function TeacherResources() {
                       name="fileUrl"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Upload File</FormLabel>
+                          <FormLabel>{t.teacherLibrary.uploadFile}</FormLabel>
                           <div className="space-y-2">
                             <SimpleUploader
                               onUpload={(url) => field.onChange(url)}
                               accept=".pdf,.doc,.docx,image/*"
-                              label="Upload Document"
+                              label={t.teacherLibrary.uploadDocument}
                             />
                             {field.value && (
                               <p className="text-sm text-muted-foreground">File uploaded: {field.value.split('/').pop()}</p>
@@ -556,8 +550,8 @@ export default function TeacherResources() {
                     render={({ field }) => (
                       <FormItem className="flex items-center justify-between rounded-md border p-3">
                         <div>
-                          <FormLabel>Teacher Only</FormLabel>
-                          <p className="text-xs text-muted-foreground">Hide this resource from students</p>
+                          <FormLabel>{t.teacherLibrary.teacherOnly}</FormLabel>
+                          <p className="text-xs text-muted-foreground">{t.teacherLibrary.teacherOnlyNote}</p>
                         </div>
                         <FormControl>
                           <Switch checked={field.value} onCheckedChange={field.onChange} />
@@ -582,10 +576,10 @@ export default function TeacherResources() {
             <div className="flex flex-wrap gap-4">
               <Select value={filterForm} onValueChange={setFilterForm}>
                 <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="Filter by form" />
+                  <SelectValue placeholder={t.register.filterByForm} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Forms</SelectItem>
+                  <SelectItem value="all">{t.teacherLibrary.allForms}</SelectItem>
                   <SelectItem value="Stage 3">Stage 3</SelectItem>
                   <SelectItem value="Stage 4">Stage 4</SelectItem>
                   <SelectItem value="Stage 5">Stage 5</SelectItem>
@@ -597,10 +591,10 @@ export default function TeacherResources() {
 
               <Select value={filterSubject} onValueChange={setFilterSubject}>
                 <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Filter by subject" />
+                  <SelectValue placeholder={t.library.filterBySubject} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Subjects</SelectItem>
+                  <SelectItem value="all">{t.library.allSubjects}</SelectItem>
                   <SelectItem value="MATHS">Maths</SelectItem>
                   <SelectItem value="ENGLISH">English</SelectItem>
                   <SelectItem value="SCIENCE">Science</SelectItem>
@@ -618,13 +612,13 @@ export default function TeacherResources() {
 
               <Select value={filterType} onValueChange={setFilterType}>
                 <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="Filter by type" />
+                  <SelectValue placeholder={t.library.filterByType} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="TEXTBOOK">Textbooks</SelectItem>
-                  <SelectItem value="YOUTUBE">Videos</SelectItem>
-                  <SelectItem value="LESSON_PLAN">Lesson Plans</SelectItem>
+                  <SelectItem value="all">{t.library.allTypes}</SelectItem>
+                  <SelectItem value="TEXTBOOK">{t.library.textbooks}</SelectItem>
+                  <SelectItem value="YOUTUBE">{t.library.videos}</SelectItem>
+                  <SelectItem value="LESSON_PLAN">{t.library.lessonPlans}</SelectItem>
                   <SelectItem value="OTHER">Other</SelectItem>
                 </SelectContent>
               </Select>
@@ -637,7 +631,7 @@ export default function TeacherResources() {
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : isError ? (
-          <QueryError error={error} what="your resources" onRetry={() => refetch()} data-testid="resources-load-error" />
+          <QueryError error={error} what={t.errors.thing.yourResources} onRetry={() => refetch()} data-testid="resources-load-error" />
         ) : filteredResources.length > 0 ? (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {filteredResources.map((resource) => (
@@ -703,8 +697,8 @@ export default function TeacherResources() {
           <Card>
             <CardContent className="py-12 text-center">
               <BookOpen className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="font-semibold mb-2">No resources found</h3>
-              <p className="text-muted-foreground mb-4">Add your first learning resource to get started</p>
+              <h3 className="font-semibold mb-2">{t.teacherLibrary.noResources}</h3>
+              <p className="text-muted-foreground mb-4">{t.teacherLibrary.noResourcesNote}</p>
               <Button onClick={() => setIsDialogOpen(true)}>
                 <PlusCircle className="h-4 w-4 mr-2" />
                 Add resource

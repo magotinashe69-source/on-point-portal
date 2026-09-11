@@ -41,16 +41,9 @@ import {
 } from "lucide-react";
 import type { Lesson } from "@shared/schema";
 import logoPath from "@assets/logo.webp";
+import { SUBJECT_CODES, subjectName, useT } from "@/lib/i18n";
 
 // Option lists shared by the single-lesson form and the bulk paste dialog.
-const LESSON_SUBJECTS: { value: string; label: string }[] = [
-  { value: "MATHS", label: "Maths" }, { value: "ENGLISH", label: "English" },
-  { value: "SCIENCE", label: "Science" }, { value: "PHYSICS", label: "Physics" },
-  { value: "CHEMISTRY", label: "Chemistry" }, { value: "BIOLOGY", label: "Biology" },
-  { value: "ECONOMICS", label: "Economics" }, { value: "BUSINESS_STUDIES", label: "Business Studies" },
-  { value: "GEOGRAPHY", label: "Geography" }, { value: "COMPUTER_SCIENCE", label: "Computer Science" },
-  { value: "HISTORY", label: "History" }, { value: "ACCOUNTING", label: "Accounting" },
-];
 const LESSON_FORMS = ["Stage 3", "Stage 4", "Stage 5", "Stage 6", "Form 1", "Form 2"] as const;
 
 // --- Bulk paste ---------------------------------------------------------
@@ -145,6 +138,7 @@ const createLessonSchema = z.object({
 type CreateLessonForm = z.infer<typeof createLessonSchema>;
 
 function MediaRecorder_({ onRecordingComplete, type }: { onRecordingComplete: (blob: Blob, duration: string) => void; type: "VIDEO" | "AUDIO" }) {
+  const t = useT();
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
@@ -244,7 +238,7 @@ function MediaRecorder_({ onRecordingComplete, type }: { onRecordingComplete: (b
           />
           {!isRecording && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-              <p className="text-white text-sm">Camera preview will appear here</p>
+              <p className="text-white text-sm">{t.teacherLessons.cameraPreview}</p>
             </div>
           )}
         </div>
@@ -261,7 +255,7 @@ function MediaRecorder_({ onRecordingComplete, type }: { onRecordingComplete: (b
 
       {hasPermission === false && (
         <p className="text-sm text-destructive">
-          Permission denied. Please allow {type === "VIDEO" ? "camera and microphone" : "microphone"} access in your browser settings.
+          {t.teacherLessons.permissionDenied(type === "VIDEO" ? t.teacherLessons.cameraAndMic : t.teacherLessons.microphone)}
         </p>
       )}
 
@@ -269,12 +263,12 @@ function MediaRecorder_({ onRecordingComplete, type }: { onRecordingComplete: (b
         {!isRecording ? (
           <Button type="button" onClick={startRecording} variant="default" size="lg" data-testid="button-start-recording">
             <Circle className="h-5 w-5 fill-red-500 text-red-500 mr-2" />
-            Start recording
+            {t.teacherLessons.startRecording}
           </Button>
         ) : (
           <Button type="button" onClick={stopRecording} variant="destructive" size="lg" data-testid="button-stop-recording">
             <Square className="h-5 w-5 mr-2" />
-            Stop recording ({formatTime(recordingTime)})
+            {t.teacherLessons.stopRecording(formatTime(recordingTime))}
           </Button>
         )}
       </div>
@@ -283,6 +277,7 @@ function MediaRecorder_({ onRecordingComplete, type }: { onRecordingComplete: (b
 }
 
 export default function TeacherLessons() {
+  const t = useT();
   const [, setLocation] = useLocation();
   const { teacher } = useAuth();
   const { toast } = useToast();
@@ -339,13 +334,13 @@ export default function TeacherLessons() {
     onSuccess: (data) => {
       if (data.success) {
         queryClient.invalidateQueries({ queryKey: ["/api/lessons"] });
-        toast({ title: "Lesson added" });
+        toast({ title: t.teacherLessons.lessonAdded });
         setIsDialogOpen(false);
         form.reset();
         setRecordedBlob(null);
         setRecordedDuration("");
       } else {
-        toast({ title: "Lesson not added", description: data.message, variant: "destructive" });
+        toast({ title: t.teacherLessons.lessonNotAdded, description: data.message, variant: "destructive" });
       }
     },
   });
@@ -362,7 +357,7 @@ export default function TeacherLessons() {
     existingKeys: new Set(
       (lessons || []).map(l => (l.fileUrl || "").trim().toLowerCase()).filter(u => u !== "")
     ),
-    existingReason: "This file is already a lesson",
+    existingReason: t.teacherLessons.alreadyALesson,
   });
 
   // Add everything in the preview. Lessons go in one at a time so that one bad
@@ -417,7 +412,7 @@ export default function TeacherLessons() {
     onSuccess: (data) => {
       if (data.success) {
         queryClient.invalidateQueries({ queryKey: ["/api/lessons"] });
-        toast({ title: "Lesson deleted" });
+        toast({ title: t.teacherLessons.lessonDeleted });
       }
     },
   });
@@ -456,9 +451,9 @@ export default function TeacherLessons() {
       if (!uploadRes.ok) throw new Error("Failed to upload recording");
       
       form.setValue("fileUrl", objectPath);
-      toast({ title: "Recording uploaded" });
+      toast({ title: t.teacherLessons.recordingUploaded });
     } catch (err) {
-      toast({ title: "Recording not uploaded", description: "Check your connection and try again.", variant: "destructive" });
+      toast({ title: t.teacherLessons.recordingNotUploaded, description: t.common.checkConnection, variant: "destructive" });
     } finally {
       setIsUploadingRecording(false);
     }
@@ -479,7 +474,7 @@ export default function TeacherLessons() {
         <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-4">
           <Link href="/teacher/dashboard" className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
-            <span className="text-sm">Back to Dashboard</span>
+            <span className="text-sm">{t.submit.backToDashboard}</span>
           </Link>
           <div className="flex items-center gap-3">
             <img src={logoPath} alt="On Point" className="h-8 w-auto" />
@@ -491,35 +486,35 @@ export default function TeacherLessons() {
       <main className="container mx-auto px-4 py-8">
         <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
           <div>
-            <h1 className="text-3xl font-bold">Video & Audio Lessons</h1>
-            <p className="text-muted-foreground">Upload or record lessons for your students</p>
+            <h1 className="text-3xl font-bold">{t.teacherLessons.title}</h1>
+            <p className="text-muted-foreground">{t.teacherLessons.subtitle}</p>
           </div>
           <div className="flex items-center gap-2">
           {/* Bulk paste — add a whole list of already-hosted recordings. */}
           <Button variant="outline" onClick={() => setIsPasteOpen(true)} data-testid="button-paste-lessons">
             <ClipboardPaste className="h-4 w-4 mr-2" />
-            Paste lessons
+            {t.teacherLessons.pasteLessons}
           </Button>
           <BulkPasteDialog
             open={isPasteOpen}
             onOpenChange={setIsPasteOpen}
-            title="Paste lessons"
-            description="One lesson per line, with a YouTube link or a link to the video or audio file after a bar. They all share the subject and class you pick here."
+            title={t.teacherLessons.pasteLessons}
+            description={t.teacherLessons.pasteNote}
             noun={{ one: "lesson", many: "lessons" }}
             countSuffix={`to ${pasteForm}`}
             settings={
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Subject</Label>
+                  <Label>{t.teacherLibrary.subject}</Label>
                   <Select value={pasteSubject} onValueChange={setPasteSubject}>
                     <SelectTrigger data-testid="select-paste-subject"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {LESSON_SUBJECTS.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                      {SUBJECT_CODES.map(code => <SelectItem key={code} value={code}>{subjectName(t, code)}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Class</Label>
+                  <Label>{t.teacherLibrary.classLabel}</Label>
                   <Select value={pasteForm} onValueChange={setPasteForm}>
                     <SelectTrigger data-testid="select-paste-class"><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -528,12 +523,12 @@ export default function TeacherLessons() {
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Type if unclear</Label>
+                  <Label>{t.teacherLessons.typeIfUnclear}</Label>
                   <Select value={pasteType} onValueChange={(v) => setPasteType(v as "VIDEO" | "AUDIO")}>
                     <SelectTrigger data-testid="select-paste-type"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="VIDEO">Video Lesson</SelectItem>
-                      <SelectItem value="AUDIO">Audio Lesson</SelectItem>
+                      <SelectItem value="VIDEO">{t.teacherLessons.videoLesson}</SelectItem>
+                      <SelectItem value="AUDIO">{t.teacherLessons.audioLesson}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -549,7 +544,7 @@ export default function TeacherLessons() {
               <>
                 {r.title}
                 <span className="ml-2 text-xs text-muted-foreground">
-                  {(r.type ?? pasteType) === "VIDEO" ? "Video" : "Audio"}
+                  {(r.type ?? pasteType) === "VIDEO" ? t.library.video : t.library.audio}
                 </span>
                 <div className="text-xs text-muted-foreground truncate">
                   {r.fileUrl}{r.description ? " — " + r.description : ""}
@@ -588,8 +583,8 @@ export default function TeacherLessons() {
             </DialogTrigger>
             <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Add New Lesson</DialogTitle>
-                <DialogDescription>Upload a video/audio file or record one directly</DialogDescription>
+                <DialogTitle>{t.teacherLessons.addLesson}</DialogTitle>
+                <DialogDescription>{t.teacherLessons.addLessonNote}</DialogDescription>
               </DialogHeader>
               <Form {...form}>
                 <form onSubmit={form.handleSubmit((data) => createMutation.mutate(data))} className="space-y-4">
@@ -598,9 +593,9 @@ export default function TeacherLessons() {
                     name="title"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Title</FormLabel>
+                        <FormLabel>{t.teacherLibrary.title}</FormLabel>
                         <FormControl>
-                          <Input placeholder="e.g., Introduction to Algebra" data-testid="input-lesson-title" {...field} />
+                          <Input placeholder={t.teacherLessons.titlePlaceholder} data-testid="input-lesson-title" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -612,9 +607,9 @@ export default function TeacherLessons() {
                     name="description"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Description (optional)</FormLabel>
+                        <FormLabel>{t.teacherLessons.description}</FormLabel>
                         <FormControl>
-                          <Textarea placeholder="Brief description of the lesson..." data-testid="textarea-lesson-desc" {...field} />
+                          <Textarea placeholder={t.teacherLessons.descriptionPlaceholder} data-testid="textarea-lesson-desc" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -627,16 +622,16 @@ export default function TeacherLessons() {
                       name="type"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Type</FormLabel>
+                          <FormLabel>{t.teacherLibrary.type}</FormLabel>
                           <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
                               <SelectTrigger data-testid="select-lesson-type">
-                                <SelectValue placeholder="Select type" />
+                                <SelectValue placeholder={t.teacherLessons.selectType} />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="VIDEO">Video Lesson</SelectItem>
-                              <SelectItem value="AUDIO">Audio Lesson</SelectItem>
+                              <SelectItem value="VIDEO">{t.teacherLessons.videoLesson}</SelectItem>
+                              <SelectItem value="AUDIO">{t.teacherLessons.audioLesson}</SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -649,11 +644,11 @@ export default function TeacherLessons() {
                       name="subject"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Subject</FormLabel>
+                          <FormLabel>{t.teacherLibrary.subject}</FormLabel>
                           <Select onValueChange={field.onChange} value={field.value || ""}>
                             <FormControl>
                               <SelectTrigger>
-                                <SelectValue placeholder="Select subject" />
+                                <SelectValue placeholder={t.teacherLessons.selectSubject} />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
@@ -682,11 +677,11 @@ export default function TeacherLessons() {
                     name="form"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Form</FormLabel>
+                        <FormLabel>{t.teacherLibrary.form}</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value || ""}>
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Select form" />
+                              <SelectValue placeholder={t.teacherLessons.selectForm} />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
@@ -704,7 +699,7 @@ export default function TeacherLessons() {
                   />
 
                   <div className="space-y-3">
-                    <FormLabel>Lesson File</FormLabel>
+                    <FormLabel>{t.teacherLessons.lessonFile}</FormLabel>
                     <Tabs value={uploadMode} onValueChange={(v) => setUploadMode(v as "upload" | "record")}>
                       <TabsList className="w-full">
                         <TabsTrigger value="upload" className="flex-1" data-testid="tab-upload">
@@ -726,10 +721,10 @@ export default function TeacherLessons() {
                                 <SimpleUploader
                                   onUpload={(url) => field.onChange(url)}
                                   accept="video/*,audio/*,.mp4,.mp3,.wav,.webm,.ogg,.m4a"
-                                  label={`Upload ${form.getValues("type") === "VIDEO" ? "Video" : "Audio"}`}
+                                  label={`Upload ${form.getValues("type") === "VIDEO" ? t.library.video : t.library.audio}`}
                                 />
                                 {field.value && (
-                                  <p className="text-sm text-green-600 dark:text-green-400">File uploaded successfully</p>
+                                  <p className="text-sm text-green-600 dark:text-green-400">{t.teacherLessons.fileUploaded}</p>
                                 )}
                               </div>
                               <FormMessage />
@@ -760,7 +755,7 @@ export default function TeacherLessons() {
                     name="duration"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Duration (optional)</FormLabel>
+                        <FormLabel>{t.teacherLessons.duration}</FormLabel>
                         <FormControl>
                           <Input placeholder="e.g., 15:30" data-testid="input-lesson-duration" {...field} />
                         </FormControl>
@@ -785,10 +780,10 @@ export default function TeacherLessons() {
             <div className="flex flex-wrap gap-4">
               <Select value={filterForm} onValueChange={setFilterForm}>
                 <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="Filter by form" />
+                  <SelectValue placeholder={t.register.filterByForm} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Forms</SelectItem>
+                  <SelectItem value="all">{t.teacherLibrary.allForms}</SelectItem>
                   <SelectItem value="Stage 3">Stage 3</SelectItem>
                   <SelectItem value="Stage 4">Stage 4</SelectItem>
                   <SelectItem value="Stage 5">Stage 5</SelectItem>
@@ -800,10 +795,10 @@ export default function TeacherLessons() {
 
               <Select value={filterSubject} onValueChange={setFilterSubject}>
                 <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Filter by subject" />
+                  <SelectValue placeholder={t.library.filterBySubject} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Subjects</SelectItem>
+                  <SelectItem value="all">{t.library.allSubjects}</SelectItem>
                   <SelectItem value="MATHS">Maths</SelectItem>
                   <SelectItem value="ENGLISH">English</SelectItem>
                   <SelectItem value="SCIENCE">Science</SelectItem>
@@ -821,12 +816,12 @@ export default function TeacherLessons() {
 
               <Select value={filterType} onValueChange={setFilterType}>
                 <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="Filter by type" />
+                  <SelectValue placeholder={t.library.filterByType} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="VIDEO">Video</SelectItem>
-                  <SelectItem value="AUDIO">Audio</SelectItem>
+                  <SelectItem value="all">{t.library.allTypes}</SelectItem>
+                  <SelectItem value="VIDEO">{t.library.video}</SelectItem>
+                  <SelectItem value="AUDIO">{t.library.audio}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -838,7 +833,7 @@ export default function TeacherLessons() {
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : isError ? (
-          <QueryError error={error} what="your lessons" onRetry={() => refetch()} data-testid="lessons-load-error" />
+          <QueryError error={error} what={t.errors.thing.yourLessons} onRetry={() => refetch()} data-testid="lessons-load-error" />
         ) : filteredLessons.length > 0 ? (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {filteredLessons.map((lesson) => (
@@ -852,7 +847,7 @@ export default function TeacherLessons() {
                       <CardTitle className="text-base">{lesson.title}</CardTitle>
                       <div className="flex items-center gap-2 mt-1 flex-wrap">
                         <Badge variant={lesson.type === "VIDEO" ? "default" : "secondary"}>
-                          {lesson.type === "VIDEO" ? "Video" : "Audio"}
+                          {lesson.type === "VIDEO" ? t.library.video : t.library.audio}
                         </Badge>
                         <Badge variant="outline">{lesson.subject?.replace("_", " ")}</Badge>
                         <Badge variant="outline">{lesson.form}</Badge>
@@ -896,8 +891,8 @@ export default function TeacherLessons() {
           <Card>
             <CardContent className="py-12 text-center">
               <Video className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="font-semibold mb-2">No lessons yet</h3>
-              <p className="text-muted-foreground mb-4">Upload or record your first video or audio lesson</p>
+              <h3 className="font-semibold mb-2">{t.teacherLessons.noLessons}</h3>
+              <p className="text-muted-foreground mb-4">{t.teacherLessons.noLessonsNote}</p>
               <Button onClick={() => setIsDialogOpen(true)}>
                 <PlusCircle className="h-4 w-4 mr-2" />
                 Add lesson

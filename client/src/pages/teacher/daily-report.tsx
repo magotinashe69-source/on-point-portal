@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Loader2, Copy, CheckCheck, ClipboardList, LogOut, Check, X, AlertTriangle } from "lucide-react";
 import logoPath from "@assets/logo.webp";
+import { subjectName, useT, type Translation } from "@/lib/i18n";
 
 interface DailyReportData {
   submitted: Array<{ fullName: string }>;
@@ -27,21 +28,6 @@ const SUBJECTS = [
   "BIOLOGY", "ECONOMICS", "BUSINESS_STUDIES", "GEOGRAPHY",
   "COMPUTER_SCIENCE", "HISTORY", "ACCOUNTING",
 ] as const;
-
-const SUBJECT_LABELS: Record<string, string> = {
-  MATHS: "Maths",
-  ENGLISH: "English",
-  SCIENCE: "Science",
-  PHYSICS: "Physics",
-  CHEMISTRY: "Chemistry",
-  BIOLOGY: "Biology",
-  ECONOMICS: "Economics",
-  BUSINESS_STUDIES: "Business Studies",
-  GEOGRAPHY: "Geography",
-  COMPUTER_SCIENCE: "Computer Science",
-  HISTORY: "History",
-  ACCOUNTING: "Accounting",
-};
 
 function getDateRange(preset: DatePreset, customDate: string): { dateFrom: string; dateTo: string; label: string } {
   const today = new Date();
@@ -72,67 +58,69 @@ function getDateRange(preset: DatePreset, customDate: string): { dateFrom: strin
 }
 
 function buildWhatsAppText(
+  t: Translation,
   data: DailyReportData,
   dateLabel: string,
   form: string,
   subject: string
 ): string {
-  const subjectLabel = subject === "all" ? "All Subjects" : (SUBJECT_LABELS[subject] || subject);
+  const subjectLabel = subject === "all" ? t.dailyReport.allSubjects : subjectName(t, subject);
   const lines: string[] = [];
 
-  lines.push("*Homework submission report*");
-  lines.push(`Date: ${dateLabel}`);
-  lines.push(`Class: ${form}`);
-  lines.push(`Subject: ${subjectLabel}`);
+  lines.push(t.dailyReport.whatsHeading);
+  lines.push(t.dailyReport.whatsDate(dateLabel));
+  lines.push(t.dailyReport.whatsClass(form));
+  lines.push(t.dailyReport.whatsSubject(subjectLabel));
   lines.push("");
 
   if (data.submitted.length > 0) {
-    lines.push("*Handed in:*");
+    lines.push(t.dailyReport.whatsHandedIn);
     data.submitted.forEach((s, i) => lines.push(`${i + 1}. ${s.fullName}`));
   } else {
-    lines.push("*Handed in:*");
-    lines.push("No one handed in during this period.");
+    lines.push(t.dailyReport.whatsHandedIn);
+    lines.push(t.dailyReport.whatsNobody);
   }
   lines.push("");
 
   if (data.notSubmitted.length > 0) {
-    lines.push("*Did not hand in:*");
+    lines.push(t.dailyReport.whatsDidNot);
     data.notSubmitted.forEach((s, i) => lines.push(`${i + 1}. ${s.fullName}`));
   } else {
-    lines.push("*Did not hand in:*");
-    lines.push("Everyone handed in.");
+    lines.push(t.dailyReport.whatsDidNot);
+    lines.push(t.dailyReport.whatsEveryone);
   }
   lines.push("");
 
   if (data.lowAttendance.length > 0) {
-    lines.push("*Needs to improve homework attendance:*");
+    lines.push(t.dailyReport.whatsNeedsToImprove);
     data.lowAttendance.forEach((s, i) =>
       lines.push(`${i + 1}. ${s.fullName} — ${s.completionRate}% completion`)
     );
     lines.push("");
   }
 
-  lines.push("*Message for parents:*");
+  lines.push(t.dailyReport.whatsMessageForParents);
   lines.push(
-    "Dear Parents, thank you to all learners who completed today's homework. Your effort is noticed and appreciated."
+    t.dailyReport.parentThanks
   );
   lines.push("");
   lines.push(
-    "Learners who did not submit must please complete the work as soon as possible. Homework is part of academic discipline and helps us track progress. We strongly encourage parents to support their children daily so they do not fall behind."
+    t.dailyReport.parentChase
   );
   if (data.lowAttendance.length > 0) {
     lines.push("");
     lines.push(
-      "Those with low homework attendance are kindly reminded to improve and catch up. Consistent homework completion will help learners perform better and avoid being left behind."
+      t.dailyReport.parentLowAttendance
     );
   }
   lines.push("");
-  lines.push("— On Point Education Centre");
+  lines.push(t.dailyReport.whatsSignOff);
 
   return lines.join("\n");
 }
 
 export default function DailyReport() {
+  const t = useT();
   const [, setLocation] = useLocation();
   const { teacher, logout } = useAuth();
   const { toast } = useToast();
@@ -184,7 +172,7 @@ export default function DailyReport() {
 
   const handleGenerate = () => {
     if (!form) {
-      toast({ title: "Select a class", variant: "destructive" });
+      toast({ title: t.dailyReport.selectClass, variant: "destructive" });
       return;
     }
     const { dateFrom, dateTo, label } = getDateRange(datePreset, customDate);
@@ -194,20 +182,20 @@ export default function DailyReport() {
 
   const handleCopy = async () => {
     if (!reportData || !queryParams) return;
-    const text = buildWhatsAppText(reportData, queryParams.dateLabel, queryParams.form, queryParams.subject);
+    const text = buildWhatsAppText(t, reportData, queryParams.dateLabel, queryParams.form, queryParams.subject);
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
-      toast({ title: "Copied", description: "Report copied to clipboard. Paste it into WhatsApp." });
+      toast({ title: t.register.copied, description: t.register.copiedNote });
       setTimeout(() => setCopied(false), 3000);
     } catch {
-      toast({ title: "Copy failed", description: "Please select and copy the text manually.", variant: "destructive" });
+      toast({ title: t.register.copyFailed, description: t.register.copyFailedNote, variant: "destructive" });
     }
   };
 
   if (!teacher) return null;
 
-  const subjectLabel = queryParams?.subject === "all" ? "All Subjects" : (SUBJECT_LABELS[queryParams?.subject || ""] || queryParams?.subject);
+  const subjectLabel = queryParams?.subject === "all" ? t.dailyReport.allSubjects : subjectName(t, queryParams?.subject || "");
 
   return (
     <div className="min-h-screen bg-background">
@@ -215,7 +203,7 @@ export default function DailyReport() {
         <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-4">
           <div className="flex items-center gap-3">
             <img src={logoPath} alt="On Point" className="h-10 w-auto" />
-            <span className="font-semibold text-primary hidden sm:block">Teacher Portal</span>
+            <span className="font-semibold text-primary hidden sm:block">{t.teacherDash.portal}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground hidden md:block">Welcome, {teacher.fullName}</span>
@@ -243,18 +231,18 @@ export default function DailyReport() {
             <ClipboardList className="h-8 w-8 text-primary" />
             Daily Homework Report
           </h1>
-          <p className="text-muted-foreground">Generate a WhatsApp-ready submission snapshot for any class and date.</p>
+          <p className="text-muted-foreground">{t.dailyReport.subtitle}</p>
         </div>
 
         {/* Filters */}
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle className="text-base">Report Filters</CardTitle>
+            <CardTitle className="text-base">{t.dailyReport.filters}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Date preset */}
             <div>
-              <label className="text-sm font-medium block mb-2">Date</label>
+              <label className="text-sm font-medium block mb-2">{t.dailyReport.date}</label>
               <div className="flex flex-wrap gap-2 mb-2">
                 {(["today", "yesterday", "thisWeek", "custom"] as DatePreset[]).map(p => (
                   <Button
@@ -264,7 +252,7 @@ export default function DailyReport() {
                     onClick={() => setDatePreset(p)}
                     data-testid={`button-preset-${p}`}
                   >
-                    {p === "today" ? "Today" : p === "yesterday" ? "Yesterday" : p === "thisWeek" ? "This Week" : "Custom Date"}
+                    {p === "today" ? t.dailyReport.today : p === "yesterday" ? t.dailyReport.yesterday : p === "thisWeek" ? t.dailyReport.thisWeek : t.dailyReport.customDate}
                   </Button>
                 ))}
               </div>
@@ -281,10 +269,10 @@ export default function DailyReport() {
 
             {/* Class */}
             <div>
-              <label className="text-sm font-medium block mb-2">Class</label>
+              <label className="text-sm font-medium block mb-2">{t.dailyReport.classLabel}</label>
               <Select value={form} onValueChange={setForm}>
                 <SelectTrigger className="max-w-xs" data-testid="select-form">
-                  <SelectValue placeholder="Select a class…" />
+                  <SelectValue placeholder={t.dailyReport.selectClassPlaceholder} />
                 </SelectTrigger>
                 <SelectContent>
                   {FORMS.map(f => (
@@ -296,15 +284,15 @@ export default function DailyReport() {
 
             {/* Subject */}
             <div>
-              <label className="text-sm font-medium block mb-2">Subject</label>
+              <label className="text-sm font-medium block mb-2">{t.dailyReport.subject}</label>
               <Select value={subject} onValueChange={setSubject}>
                 <SelectTrigger className="max-w-xs" data-testid="select-subject">
-                  <SelectValue placeholder="All Subjects" />
+                  <SelectValue placeholder={t.dailyReport.allSubjects} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Subjects</SelectItem>
+                  <SelectItem value="all">{t.dailyReport.allSubjects}</SelectItem>
                   {SUBJECTS.map(s => (
-                    <SelectItem key={s} value={s}>{SUBJECT_LABELS[s]}</SelectItem>
+                    <SelectItem key={s} value={s}>{subjectName(t, s)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -356,9 +344,9 @@ export default function DailyReport() {
                   data-testid="button-copy-whatsapp"
                 >
                   {copied ? (
-                    <><CheckCheck className="h-4 w-4 mr-2" />Copied</>
+                    <><CheckCheck className="h-4 w-4 mr-2" />{t.register.copied}</>
                   ) : (
-                    <><Copy className="h-4 w-4 mr-2" />Copy WhatsApp Message</>
+                    <><Copy className="h-4 w-4 mr-2" />{t.dailyReport.copyWhatsApp}</>
                   )}
                 </Button>
               </div>
@@ -375,7 +363,7 @@ export default function DailyReport() {
                   </Badge>
                 </h3>
                 {reportData.submitted.length === 0 ? (
-                  <p className="text-muted-foreground text-sm pl-8">None submitted for this period.</p>
+                  <p className="text-muted-foreground text-sm pl-8">{t.dailyReport.noneSubmitted}</p>
                 ) : (
                   <ol className="space-y-1 pl-8" data-testid="list-submitted">
                     {reportData.submitted.map((s, i) => (
@@ -439,11 +427,11 @@ export default function DailyReport() {
 
               {/* Parent message */}
               <div className="rounded-lg bg-muted/50 border p-4 text-sm space-y-2" data-testid="div-parent-message">
-                <p className="font-semibold text-muted-foreground text-xs uppercase tracking-wide mb-2">Message for Parents</p>
-                <p>Dear Parents, thank you to all learners who completed today's homework. Your effort is noticed and appreciated.</p>
-                <p>Learners who did not submit must please complete the work as soon as possible. Homework is part of academic discipline and helps us track progress. We strongly encourage parents to support their children daily so they do not fall behind.</p>
+                <p className="font-semibold text-muted-foreground text-xs uppercase tracking-wide mb-2">{t.dailyReport.messageForParents}</p>
+                <p>{t.dailyReport.parentThanks}</p>
+                <p>{t.dailyReport.parentChase}</p>
                 {reportData.lowAttendance.length > 0 && (
-                  <p>Those with low homework attendance are kindly reminded to improve and catch up. Consistent homework completion will help learners perform better and avoid being left behind.</p>
+                  <p>{t.dailyReport.parentLowAttendance}</p>
                 )}
               </div>
 
@@ -454,9 +442,9 @@ export default function DailyReport() {
                 data-testid="button-copy-whatsapp-bottom"
               >
                 {copied ? (
-                  <><CheckCheck className="h-4 w-4 mr-2" />Copied to clipboard</>
+                  <><CheckCheck className="h-4 w-4 mr-2" />{t.dailyReport.copiedToClipboard}</>
                 ) : (
-                  <><Copy className="h-4 w-4 mr-2" />Copy WhatsApp Message</>
+                  <><Copy className="h-4 w-4 mr-2" />{t.dailyReport.copyWhatsApp}</>
                 )}
               </Button>
             </CardContent>

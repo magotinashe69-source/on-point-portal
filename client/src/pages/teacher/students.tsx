@@ -21,6 +21,7 @@ import { ArrowLeft, PlusCircle, Pencil, Trash2, KeyRound, Loader2, Users, Clipbo
 import logoPath from "@assets/logo.webp";
 import type { Student, Parent } from "@shared/schema";
 import type { WeeklyReport } from "@shared/weekly-report";
+import { useT } from "@/lib/i18n";
 
 // --- Bulk paste ---------------------------------------------------------
 // Enrolling a class means typing the same thing thirty times. Each line is one
@@ -43,7 +44,10 @@ export interface ParsedStudents {
   skipped: SkippedLine[];
 }
 
-export function parsePastedStudents(raw: string): ParsedStudents {
+export function parsePastedStudents(
+  raw: string,
+  reasons = { noName: "No name", badGender: 'Gender should be "Male" or "Female"' },
+): ParsedStudents {
   const rows: ParsedStudentLine[] = [];
   const skipped: SkippedLine[] = [];
 
@@ -52,7 +56,7 @@ export function parsePastedStudents(raw: string): ParsedStudents {
     const genderRaw = (line.parts[1] ?? "").toLowerCase();
 
     if (fullName === "") {
-      skipped.push({ lineNumber: line.lineNumber, text: line.text, reason: "No name" });
+      skipped.push({ lineNumber: line.lineNumber, text: line.text, reason: reasons.noName });
       continue;
     }
 
@@ -61,7 +65,7 @@ export function parsePastedStudents(raw: string): ParsedStudents {
       if (genderRaw === "m" || genderRaw === "male") gender = "Male";
       else if (genderRaw === "f" || genderRaw === "female") gender = "Female";
       else {
-        skipped.push({ lineNumber: line.lineNumber, text: line.text, reason: 'Gender should be "Male" or "Female"' });
+        skipped.push({ lineNumber: line.lineNumber, text: line.text, reason: reasons.badGender });
         continue;
       }
     }
@@ -78,6 +82,7 @@ const FORM_ID_PREFIX: Record<string, string> = {
 };
 
 export default function StudentManagement() {
+  const t = useT();
   const [, setLocation] = useLocation();
   const { teacher } = useAuth();
   const { toast } = useToast();
@@ -150,13 +155,13 @@ export default function StudentManagement() {
       if (data.success) {
         queryClient.invalidateQueries({ queryKey: ["/api/parents"] });
         toast({
-          title: "Parent account created",
-          description: `Give the parent their username and password. They log in at /parent/login.`,
+          title: t.register.parentCreated,
+          description: t.register.parentCreatedNote,
         });
         setParentForStudent(null);
         setNewParent({ fullName: "", username: "", password: "" });
       } else {
-        toast({ title: "Parent account not created", description: data.message, variant: "destructive" });
+        toast({ title: t.register.parentNotCreated, description: data.message, variant: "destructive" });
       }
     },
   });
@@ -168,7 +173,7 @@ export default function StudentManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/parents"] });
-      toast({ title: "Parent account removed", description: "The pupil and their work are untouched." });
+      toast({ title: t.register.parentRemoved, description: t.register.parentRemovedNote });
       setParentForStudent(null);
       setEditingParent(false);
     },
@@ -186,13 +191,13 @@ export default function StudentManagement() {
       if (data.success) {
         queryClient.invalidateQueries({ queryKey: ["/api/parents"] });
         toast({
-          title: "Parent account updated",
-          description: "The new details take effect the next time they log in.",
+          title: t.register.parentUpdated,
+          description: t.register.parentUpdatedNote,
         });
         setEditingParent(false);
         setParentEdits({ fullName: "", username: "", password: "" });
       } else {
-        toast({ title: "Parent account not updated", description: data.message, variant: "destructive" });
+        toast({ title: t.register.parentNotUpdated, description: data.message, variant: "destructive" });
       }
     },
   });
@@ -205,11 +210,11 @@ export default function StudentManagement() {
     onSuccess: (data) => {
       if (data.success) {
         queryClient.invalidateQueries({ queryKey: ["/api/students"] });
-        toast({ title: "Student added" });
+        toast({ title: t.register.studentAdded });
         setIsAddDialogOpen(false);
         setNewStudent({ studentId: "", qrCode: "", fullName: "", gender: "Male", form: "Form 1" });
       } else {
-        toast({ title: "Student not added", description: data.message, variant: "destructive" });
+        toast({ title: t.register.studentNotAdded, description: data.message, variant: "destructive" });
       }
     },
   });
@@ -222,11 +227,11 @@ export default function StudentManagement() {
     onSuccess: (data) => {
       if (data.success) {
         queryClient.invalidateQueries({ queryKey: ["/api/students"] });
-        toast({ title: "Student updated" });
+        toast({ title: t.register.studentUpdated });
         setIsEditDialogOpen(false);
         setEditingStudent(null);
       } else {
-        toast({ title: "Student not updated", description: data.message, variant: "destructive" });
+        toast({ title: t.register.studentNotUpdated, description: data.message, variant: "destructive" });
       }
     },
   });
@@ -238,7 +243,7 @@ export default function StudentManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/students"] });
-      toast({ title: "Student removed" });
+      toast({ title: t.register.studentRemoved });
     },
   });
 
@@ -250,9 +255,9 @@ export default function StudentManagement() {
     onSuccess: (data) => {
       if (data.success) {
         queryClient.invalidateQueries({ queryKey: ["/api/students"] });
-        toast({ title: "Password reset", description: "The student sets a new password next time they log in." });
+        toast({ title: t.register.passwordReset, description: t.register.passwordResetNote });
       } else {
-        toast({ title: "Password not reset", description: data.message, variant: "destructive" });
+        toast({ title: t.register.passwordNotReset, description: data.message, variant: "destructive" });
       }
     },
   });
@@ -275,10 +280,10 @@ export default function StudentManagement() {
     try {
       await navigator.clipboard.writeText(text);
       setReportCopied(true);
-      toast({ title: "Copied", description: "Report copied to clipboard. Paste it into WhatsApp." });
+      toast({ title: t.register.copied, description: t.register.copiedNote });
       setTimeout(() => setReportCopied(false), 3000);
     } catch {
-      toast({ title: "Copy failed", description: "Please select and copy the text manually.", variant: "destructive" });
+      toast({ title: t.register.copyFailed, description: t.register.copyFailedNote, variant: "destructive" });
     }
   };
 
@@ -296,13 +301,13 @@ export default function StudentManagement() {
   // Work out what a paste would actually do, so the preview and the button
   // agree with what happens. A pupil already on the register is skipped, and so
   // is a name repeated twice in the pasted list itself.
-  const pasteParsed = parsePastedStudents(pasteText);
+  const pasteParsed = parsePastedStudents(pasteText, { noName: t.register.noName, badGender: t.register.badGender });
   const pasteReview = separateDuplicates(pasteParsed.rows, {
     keyOf: r => r.fullName,
     labelOf: r => r.fullName,
     lineNumberOf: r => r.lineNumber,
     existingKeys: new Set(students.map(s => s.fullName.trim().toLowerCase())),
-    existingReason: "Already on the register",
+    existingReason: t.register.alreadyOnRegister,
   });
 
   // Student IDs for the batch. Carries on from the highest number already used
@@ -372,7 +377,7 @@ export default function StudentManagement() {
         <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-4">
           <Link href="/teacher/dashboard" className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
-            <span className="text-sm">Back to Dashboard</span>
+            <span className="text-sm">{t.submit.backToDashboard}</span>
           </Link>
           <div className="flex items-center gap-3">
             <img src={logoPath} alt="On Point" className="h-8 w-auto" />
@@ -398,19 +403,19 @@ export default function StudentManagement() {
               {/* Bulk paste — enrol a whole class from a pasted list. */}
               <Button variant="outline" onClick={() => setIsPasteDialogOpen(true)} data-testid="button-paste-students">
                 <ClipboardPaste className="h-4 w-4 mr-2" />
-                Paste students
+                {t.register.pasteStudents}
               </Button>
               <BulkPasteDialog
                 open={isPasteDialogOpen}
                 onOpenChange={setIsPasteDialogOpen}
-                title="Paste students"
-                description="One pupil per line. They all join the class you pick here. Anyone already on the register is skipped."
-                noun={{ one: "student", many: "students" }}
+                title={t.register.pasteStudents}
+                description={t.register.pasteNote}
+                noun={{ one: t.register.pasteNounOne, many: t.register.pasteNounMany }}
                 countSuffix={`to ${pasteForm}`}
                 settings={
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
-                      <Label>Class</Label>
+                      <Label>{t.register.pasteClass}</Label>
                       <Select value={pasteForm} onValueChange={(v) => setPasteForm(v as typeof pasteForm)}>
                         <SelectTrigger data-testid="select-paste-form"><SelectValue /></SelectTrigger>
                         <SelectContent>
@@ -421,12 +426,12 @@ export default function StudentManagement() {
                       </Select>
                     </div>
                     <div className="space-y-1.5">
-                      <Label>Gender if not given</Label>
+                      <Label>{t.register.pasteGender}</Label>
                       <Select value={pasteGender} onValueChange={(v) => setPasteGender(v as "Male" | "Female")}>
                         <SelectTrigger data-testid="select-paste-gender"><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="Male">Male</SelectItem>
-                          <SelectItem value="Female">Female</SelectItem>
+                          <SelectItem value="Male">{t.register.male}</SelectItem>
+                          <SelectItem value="Female">{t.register.female}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -435,7 +440,7 @@ export default function StudentManagement() {
                 value={pasteText}
                 onValueChange={setPasteText}
                 placeholder={"Tafara Moyo\nRudo Chikwanha | Female\nTendai Ncube | M"}
-                hint="Add “| Female” or “| Male” after a name to set that pupil's gender. Student IDs are given out automatically."
+                hint={t.register.pasteHint}
                 toAdd={pasteReview.toAdd}
                 keyOfRow={(r) => r.lineNumber}
                 renderRow={(r) => (
@@ -444,7 +449,7 @@ export default function StudentManagement() {
                     <span className="text-xs text-muted-foreground">{r.gender ?? pasteGender}</span>
                   </span>
                 )}
-                emptyMessage="Nobody new to add — every name here is already on the register."
+                emptyMessage={t.register.pasteEmpty}
                 duplicates={pasteReview.duplicates}
                 skipped={pasteParsed.skipped}
                 busy={pasteBusy}
@@ -496,14 +501,14 @@ export default function StudentManagement() {
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Add New Student</DialogTitle>
+                    <DialogTitle>{t.register.addStudent}</DialogTitle>
                     <DialogDescription>
                       Enter the student's details. They will create their password on first login.
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4 py-4">
                     <div className="space-y-2">
-                      <Label>Form</Label>
+                      <Label>{t.register.form}</Label>
                       <Select 
                         value={newStudent.form} 
                         onValueChange={(v) => setNewStudent({ ...newStudent, form: v as any })}
@@ -522,12 +527,12 @@ export default function StudentManagement() {
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label>Student ID</Label>
+                      <Label>{t.register.studentId}</Label>
                       <div className="flex gap-2">
                         <Input
                           value={newStudent.studentId}
                           onChange={(e) => setNewStudent({ ...newStudent, studentId: e.target.value })}
-                          placeholder="e.g., F1-005"
+                          placeholder={t.register.studentIdPlaceholder}
                           data-testid="input-student-id"
                         />
                         <Button 
@@ -540,29 +545,29 @@ export default function StudentManagement() {
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="input-student-qr">QR card code</Label>
+                      <Label htmlFor="input-student-qr">{t.register.qrCode}</Label>
                       <Input
                         id="input-student-qr"
                         value={newStudent.qrCode}
                         onChange={(e) => setNewStudent({ ...newStudent, qrCode: e.target.value.toUpperCase() })}
-                        placeholder="e.g., G3-001"
+                        placeholder={t.register.qrCodePlaceholder}
                         data-testid="input-student-qr"
                       />
                       <p className="text-xs text-muted-foreground">
-                        The ID on the attendance card, from the Master Student Database. Leave blank if the pupil has no card yet.
+                        {t.register.qrCodeNote}
                       </p>
                     </div>
                     <div className="space-y-2">
-                      <Label>Full Name</Label>
+                      <Label>{t.register.fullName}</Label>
                       <Input
                         value={newStudent.fullName}
                         onChange={(e) => setNewStudent({ ...newStudent, fullName: e.target.value })}
-                        placeholder="Enter full name"
+                        placeholder={t.register.fullNamePlaceholder}
                         data-testid="input-student-name"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Gender</Label>
+                      <Label>{t.register.gender}</Label>
                       <Select 
                         value={newStudent.gender} 
                         onValueChange={(v) => setNewStudent({ ...newStudent, gender: v as any })}
@@ -571,8 +576,8 @@ export default function StudentManagement() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="Male">Male</SelectItem>
-                          <SelectItem value="Female">Female</SelectItem>
+                          <SelectItem value="Male">{t.register.male}</SelectItem>
+                          <SelectItem value="Female">{t.register.female}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -596,10 +601,10 @@ export default function StudentManagement() {
             <div className="mb-4">
               <Select value={filterForm} onValueChange={setFilterForm}>
                 <SelectTrigger className="w-48" data-testid="select-filter-form">
-                  <SelectValue placeholder="Filter by form" />
+                  <SelectValue placeholder={t.register.filterByForm} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Students</SelectItem>
+                  <SelectItem value="all">{t.register.allStudents}</SelectItem>
                   <SelectItem value="Stage 3">Stage 3</SelectItem>
                   <SelectItem value="Stage 4">Stage 4</SelectItem>
                   <SelectItem value="Stage 5">Stage 5</SelectItem>
@@ -615,9 +620,9 @@ export default function StudentManagement() {
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
               </div>
             ) : isError ? (
-              <QueryError error={error} what="the register" onRetry={() => refetch()} data-testid="students-load-error" />
+              <QueryError error={error} what={t.errors.thing.theRegister} onRetry={() => refetch()} data-testid="students-load-error" />
             ) : filteredStudents.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">No students found</p>
+              <p className="text-center text-muted-foreground py-8">{t.register.noStudents}</p>
             ) : (
               <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
                 {filteredStudents.map((student) => (
@@ -634,9 +639,9 @@ export default function StudentManagement() {
                       <Badge variant="outline">{student.form}</Badge>
                       <Badge variant="secondary">{student.gender}</Badge>
                       {student.password ? (
-                        <Badge className="bg-green-500">Password Set</Badge>
+                        <Badge className="bg-green-500">{t.register.passwordSet}</Badge>
                       ) : (
-                        <Badge variant="outline">No Password</Badge>
+                        <Badge variant="outline">{t.register.noPassword}</Badge>
                       )}
                       {parentFor(student.id) && (
                         <Badge variant="secondary" data-testid={`badge-parent-${student.id}`}>
@@ -649,8 +654,8 @@ export default function StudentManagement() {
                       <Button
                         size="icon"
                         variant="ghost"
-                        title="Weekly report"
-                        aria-label="Weekly report"
+                        title={t.register.weeklyReport}
+                        aria-label={t.register.weeklyReport}
                         onClick={() => {
                           setReportForStudent(student);
                           setReportWeek("last");
@@ -663,8 +668,8 @@ export default function StudentManagement() {
                       <Button
                         size="icon"
                         variant="ghost"
-                        title={parentFor(student.id) ? "Parent account" : "Add parent account"}
-                        aria-label={parentFor(student.id) ? "Parent account" : "Add parent account"}
+                        title={parentFor(student.id) ? t.register.parentAccount : t.register.addParentAccount}
+                        aria-label={parentFor(student.id) ? t.register.parentAccount : t.register.addParentAccount}
                         onClick={() => {
                           setParentForStudent(student);
                           setEditingParent(false);
@@ -723,12 +728,12 @@ export default function StudentManagement() {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <MessageSquare className="h-5 w-5" />
-                Weekly report{reportForStudent ? ` — ${reportForStudent.fullName}` : ""}
+                {t.register.weeklyReport}{reportForStudent ? ` — ${reportForStudent.fullName}` : ""}
               </DialogTitle>
               <DialogDescription>
                 {reportData?.report
-                  ? `Week of ${reportData.report.week.label}. Copy this and send it to the parent.`
-                  : "Copy this and send it to the parent."}
+                  ? t.register.weekOf(reportData.report.week.label)
+                  : t.register.copyAndSend}
               </DialogDescription>
             </DialogHeader>
 
@@ -778,7 +783,7 @@ export default function StudentManagement() {
                     {reportCopied ? (
                       <><Check className="h-4 w-4 mr-2" />Copied</>
                     ) : (
-                      <><Copy className="h-4 w-4 mr-2" />Copy WhatsApp Message</>
+                      <><Copy className="h-4 w-4 mr-2" />{t.register.copyWhatsApp}</>
                     )}
                   </Button>
                 </DialogFooter>
@@ -794,7 +799,7 @@ export default function StudentManagement() {
         <Dialog open={!!parentForStudent} onOpenChange={(open) => { if (!open) { setParentForStudent(null); setEditingParent(false); } }}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Parent account</DialogTitle>
+              <DialogTitle>{t.register.parentAccount}</DialogTitle>
               <DialogDescription>
                 {parentForStudent
                   ? `For ${parentForStudent.fullName} (${parentForStudent.form})`
@@ -808,11 +813,11 @@ export default function StudentManagement() {
                  the two things a teacher can do to it: edit, or remove. */
               <div className="space-y-4 py-4">
                 <div className="rounded-md border p-4 space-y-1">
-                  <p className="text-sm text-muted-foreground">Parent</p>
+                  <p className="text-sm text-muted-foreground">{t.register.parent}</p>
                   <p className="font-medium" data-testid="text-existing-parent-name">{existingParent.fullName}</p>
-                  <p className="text-sm text-muted-foreground pt-2">Username</p>
+                  <p className="text-sm text-muted-foreground pt-2">{t.register.username}</p>
                   <p className="font-mono text-sm" data-testid="text-existing-parent-username">{existingParent.username}</p>
-                  <p className="text-sm text-muted-foreground pt-2">Linked to</p>
+                  <p className="text-sm text-muted-foreground pt-2">{t.register.linkedTo}</p>
                   <p className="text-sm" data-testid="text-existing-parent-child">
                     {parentForStudent.fullName} ({parentForStudent.form})
                   </p>
@@ -863,7 +868,7 @@ export default function StudentManagement() {
               <>
                 <div className="space-y-4 py-4">
                   <div className="space-y-2">
-                    <Label htmlFor="input-edit-parent-name">Parent's name</Label>
+                    <Label htmlFor="input-edit-parent-name">{t.register.parentName}</Label>
                     <Input
                       id="input-edit-parent-name"
                       value={parentEdits.fullName}
@@ -872,7 +877,7 @@ export default function StudentManagement() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="input-edit-parent-username">Username</Label>
+                    <Label htmlFor="input-edit-parent-username">{t.register.username}</Label>
                     <Input
                       id="input-edit-parent-username"
                       value={parentEdits.username}
@@ -886,12 +891,12 @@ export default function StudentManagement() {
                     </p>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="input-edit-parent-password">New password</Label>
+                    <Label htmlFor="input-edit-parent-password">{t.register.newPassword}</Label>
                     <Input
                       id="input-edit-parent-password"
                       value={parentEdits.password}
                       onChange={(e) => setParentEdits({ ...parentEdits, password: e.target.value })}
-                      placeholder="Leave blank to keep the current password"
+                      placeholder={t.register.newPasswordPlaceholder}
                       data-testid="input-edit-parent-password"
                     />
                     <p className="text-xs text-muted-foreground">
@@ -931,22 +936,22 @@ export default function StudentManagement() {
               <>
                 <div className="space-y-4 py-4">
                   <div className="space-y-2">
-                    <Label htmlFor="input-parent-name">Parent's name</Label>
+                    <Label htmlFor="input-parent-name">{t.register.parentName}</Label>
                     <Input
                       id="input-parent-name"
                       value={newParent.fullName}
                       onChange={(e) => setNewParent({ ...newParent, fullName: e.target.value })}
-                      placeholder="e.g., Mrs Rudo Moyo"
+                      placeholder={t.register.parentNamePlaceholder}
                       data-testid="input-parent-name"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="input-parent-username">Username</Label>
+                    <Label htmlFor="input-parent-username">{t.register.username}</Label>
                     <Input
                       id="input-parent-username"
                       value={newParent.username}
                       onChange={(e) => setNewParent({ ...newParent, username: e.target.value.toLowerCase() })}
-                      placeholder="e.g., rmoyo"
+                      placeholder={t.register.usernamePlaceholder}
                       autoCapitalize="none"
                       autoCorrect="off"
                       data-testid="input-parent-username"
@@ -956,12 +961,12 @@ export default function StudentManagement() {
                     </p>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="input-parent-password">Password</Label>
+                    <Label htmlFor="input-parent-password">{t.register.password}</Label>
                     <Input
                       id="input-parent-password"
                       value={newParent.password}
                       onChange={(e) => setNewParent({ ...newParent, password: e.target.value })}
-                      placeholder="At least 6 characters"
+                      placeholder={t.register.passwordPlaceholder}
                       data-testid="input-parent-password"
                     />
                     <p className="text-xs text-muted-foreground">
@@ -997,7 +1002,7 @@ export default function StudentManagement() {
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Edit Student</DialogTitle>
+              <DialogTitle>{t.register.editStudent}</DialogTitle>
               <DialogDescription>
                 Update the student's details
               </DialogDescription>
@@ -1005,7 +1010,7 @@ export default function StudentManagement() {
             {editingStudent && (
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
-                  <Label>Student ID</Label>
+                  <Label>{t.register.studentId}</Label>
                   <Input
                     value={editingStudent.studentId}
                     onChange={(e) => setEditingStudent({ ...editingStudent, studentId: e.target.value })}
@@ -1021,7 +1026,7 @@ export default function StudentManagement() {
                     data-testid="checkbox-edit-student-active"
                   />
                   <span className="min-w-0">
-                    <span className="block text-sm font-medium">Active</span>
+                    <span className="block text-sm font-medium">{t.register.active}</span>
                     <span className="block text-xs text-muted-foreground">
                       An inactive pupil keeps their work and marks, but cannot log in and their
                       card stops working. Use this when a pupil leaves.
@@ -1034,7 +1039,7 @@ export default function StudentManagement() {
                     id="input-edit-student-qr"
                     value={editingStudent.qrCode ?? ""}
                     onChange={(e) => setEditingStudent({ ...editingStudent, qrCode: e.target.value.toUpperCase() })}
-                    placeholder="e.g., G3-001"
+                    placeholder={t.register.qrCodePlaceholder}
                     data-testid="input-edit-student-qr"
                   />
                   <p className="text-xs text-muted-foreground">
@@ -1042,7 +1047,7 @@ export default function StudentManagement() {
                   </p>
                 </div>
                 <div className="space-y-2">
-                  <Label>Full Name</Label>
+                  <Label>{t.register.fullName}</Label>
                   <Input
                     value={editingStudent.fullName}
                     onChange={(e) => setEditingStudent({ ...editingStudent, fullName: e.target.value })}
@@ -1050,7 +1055,7 @@ export default function StudentManagement() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Form</Label>
+                  <Label>{t.register.form}</Label>
                   <Select 
                     value={editingStudent.form} 
                     onValueChange={(v) => setEditingStudent({ ...editingStudent, form: v })}
@@ -1069,7 +1074,7 @@ export default function StudentManagement() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Gender</Label>
+                  <Label>{t.register.gender}</Label>
                   <Select 
                     value={editingStudent.gender} 
                     onValueChange={(v) => setEditingStudent({ ...editingStudent, gender: v })}
@@ -1078,8 +1083,8 @@ export default function StudentManagement() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Male">Male</SelectItem>
-                      <SelectItem value="Female">Female</SelectItem>
+                      <SelectItem value="Male">{t.register.male}</SelectItem>
+                      <SelectItem value="Female">{t.register.female}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

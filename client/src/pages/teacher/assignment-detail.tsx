@@ -22,6 +22,7 @@ import type { Assignment, Student } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import logoPath from "@assets/logo.webp";
+import { useT } from "@/lib/i18n";
 
 interface EnrichedSubmission {
   id: number;
@@ -36,6 +37,7 @@ interface EnrichedSubmission {
 }
 
 export default function AssignmentDetail() {
+  const t = useT();
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { teacher } = useAuth();
@@ -85,10 +87,10 @@ export default function AssignmentDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/assignments", id] });
       queryClient.invalidateQueries({ queryKey: ["/api/assignments"] });
       setIsEditDialogOpen(false);
-      toast({ title: "Assignment updated successfully" });
+      toast({ title: t.assignmentDetail.updated });
     },
     onError: () => {
-      toast({ title: "Failed to update assignment", variant: "destructive" });
+      toast({ title: t.assignmentDetail.notUpdated, variant: "destructive" });
     },
   });
 
@@ -98,11 +100,11 @@ export default function AssignmentDetail() {
     },
     onSuccess: (_, archived) => {
       queryClient.invalidateQueries({ queryKey: ["/api/assignments"] });
-      toast({ title: archived ? "Assignment archived" : "Assignment restored" });
+      toast({ title: archived ? t.assignmentDetail.archived : t.assignmentDetail.restored });
       setLocation("/teacher/dashboard");
     },
     onError: () => {
-      toast({ title: "Failed to update assignment", variant: "destructive" });
+      toast({ title: t.assignmentDetail.notUpdated, variant: "destructive" });
     },
   });
 
@@ -119,10 +121,10 @@ export default function AssignmentDetail() {
       setExtensionStudentId("");
       setExtensionNewDate("");
       setExtensionReason("");
-      toast({ title: "Deadline extended successfully" });
+      toast({ title: t.assignmentDetail.deadlineExtended });
     },
     onError: () => {
-      toast({ title: "Failed to extend deadline", variant: "destructive" });
+      toast({ title: t.assignmentDetail.deadlineNotExtended, variant: "destructive" });
     },
   });
 
@@ -190,13 +192,19 @@ export default function AssignmentDetail() {
   const buildNotifyMessage = (student: Student) => {
     const dueDate = assignment
       ? new Date(assignment.dueDate).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })
-      : "the due date";
-    return `Dear Parent of ${student.fullName},\n\nYour child has not yet submitted the assignment "${assignment?.title}" (Subject: ${assignment?.subject}, Form: ${assignment?.form}) which was due on ${dueDate}.\n\nPlease follow up with your child and ensure the work is submitted as soon as possible.\n\nThank you,\nOn Point Education Centre`;
+      : t.assignmentDetail.theDueDate;
+    return t.assignmentDetail.notifyParent(
+      student.fullName,
+      assignment?.title ?? "",
+      assignment?.subject ?? "",
+      assignment?.form ?? "",
+      dueDate,
+    );
   };
 
   const handleCopyMessage = (message: string) => {
     navigator.clipboard.writeText(message).then(() => {
-      toast({ title: "Message copied to clipboard" });
+      toast({ title: t.assignmentDetail.messageCopied });
     });
   };
 
@@ -206,7 +214,7 @@ export default function AssignmentDetail() {
         <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-4">
           <Link href="/teacher/dashboard" className="flex items-center gap-2" data-testid="link-back-dashboard">
             <ArrowLeft className="h-4 w-4" />
-            <span className="text-sm">Back to Dashboard</span>
+            <span className="text-sm">{t.submit.backToDashboard}</span>
           </Link>
           <div className="flex items-center gap-3">
             <img src={logoPath} alt="On Point" className="h-8 w-auto" />
@@ -221,7 +229,7 @@ export default function AssignmentDetail() {
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : assignmentFailed ? (
-          <QueryError error={assignmentError} what="this assignment" variant="page" onRetry={() => refetchAssignment()} data-testid="assignment-load-error" />
+          <QueryError error={assignmentError} what={t.errors.thing.thisAssignment} variant="page" onRetry={() => refetchAssignment()} data-testid="assignment-load-error" />
         ) : assignment ? (
           <>
             {/* Header */}
@@ -257,7 +265,7 @@ export default function AssignmentDetail() {
                   {/* Archive */}
                   <Button variant="outline" size="sm" onClick={() => archiveAssignmentMutation.mutate(!assignment.archived)} disabled={archiveAssignmentMutation.isPending} data-testid="button-archive-detail">
                     {archiveAssignmentMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : assignment.archived ? <ArchiveRestore className="h-4 w-4 mr-1" /> : <Archive className="h-4 w-4 mr-1" />}
-                    {assignment.archived ? "Unarchive" : "Archive"}
+                    {assignment.archived ? t.assignmentDetail.unarchive : t.assignmentDetail.archive}
                   </Button>
 
                   {/* Extend Deadline */}
@@ -270,15 +278,15 @@ export default function AssignmentDetail() {
                     </DialogTrigger>
                     <DialogContent>
                       <DialogHeader>
-                        <DialogTitle>Extend deadline for a student</DialogTitle>
-                        <DialogDescription>Give a specific student more time</DialogDescription>
+                        <DialogTitle>{t.assignmentDetail.extendDeadline}</DialogTitle>
+                        <DialogDescription>{t.assignmentDetail.extendDeadlineNote}</DialogDescription>
                       </DialogHeader>
                       <div className="space-y-4">
                         <div>
-                          <Label htmlFor="extension-student">Student</Label>
+                          <Label htmlFor="extension-student">{t.assignmentDetail.student}</Label>
                           <Select value={extensionStudentId} onValueChange={setExtensionStudentId}>
                             <SelectTrigger data-testid="select-extension-student">
-                              <SelectValue placeholder="Select a student" />
+                              <SelectValue placeholder={t.assignmentDetail.selectStudent} />
                             </SelectTrigger>
                             <SelectContent>
                               {students?.filter(s => s.form === assignment.form).map((student) => (
@@ -290,12 +298,12 @@ export default function AssignmentDetail() {
                           </Select>
                         </div>
                         <div>
-                          <Label htmlFor="extension-date">New Due Date</Label>
+                          <Label htmlFor="extension-date">{t.assignmentDetail.newDueDate}</Label>
                           <Input id="extension-date" type="date" value={extensionNewDate} onChange={(e) => setExtensionNewDate(e.target.value)} data-testid="input-extension-date" />
                         </div>
                         <div>
-                          <Label htmlFor="extension-reason">Reason (optional)</Label>
-                          <Textarea id="extension-reason" value={extensionReason} onChange={(e) => setExtensionReason(e.target.value)} placeholder="e.g., Medical leave, family emergency" rows={2} data-testid="input-extension-reason" />
+                          <Label htmlFor="extension-reason">{t.assignmentDetail.reason}</Label>
+                          <Textarea id="extension-reason" value={extensionReason} onChange={(e) => setExtensionReason(e.target.value)} placeholder={t.assignmentDetail.reasonPlaceholder} rows={2} data-testid="input-extension-reason" />
                         </div>
                         <Button onClick={handleExtendDeadline} disabled={extendDeadlineMutation.isPending || !extensionStudentId || !extensionNewDate} className="w-full" data-testid="button-save-extension">
                           {extendDeadlineMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
@@ -304,7 +312,7 @@ export default function AssignmentDetail() {
                       </div>
                       {assignment.extendedDeadlines && assignment.extendedDeadlines.length > 0 && (
                         <div className="mt-4 pt-4 border-t">
-                          <h4 className="font-medium mb-2">Current Extensions</h4>
+                          <h4 className="font-medium mb-2">{t.assignmentDetail.currentExtensions}</h4>
                           <div className="space-y-2 text-sm">
                             {assignment.extendedDeadlines.map((ext, idx) => {
                               const student = students?.find(s => s.id === ext.studentId);
@@ -388,7 +396,7 @@ export default function AssignmentDetail() {
             {/* Instructions */}
             <Card className="mb-8">
               <CardHeader>
-                <CardTitle>Instructions</CardTitle>
+                <CardTitle>{t.assignmentDetail.instructions}</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="whitespace-pre-wrap">{assignment.instructions}</p>
@@ -413,7 +421,7 @@ export default function AssignmentDetail() {
             {/* Questions */}
             <Card className="mb-8">
               <CardHeader>
-                <CardTitle>Questions</CardTitle>
+                <CardTitle>{t.assignmentDetail.questions}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
@@ -439,10 +447,10 @@ export default function AssignmentDetail() {
               {showFormFilter && (
                 <Select value={formFilter} onValueChange={setFormFilter}>
                   <SelectTrigger className="w-40" data-testid="select-form-filter">
-                    <SelectValue placeholder="All forms" />
+                    <SelectValue placeholder={t.assignmentDetail.allFormsLower} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Forms</SelectItem>
+                    <SelectItem value="all">{t.assignmentDetail.allForms}</SelectItem>
                     {eligibleForms.map(f => (
                       <SelectItem key={f} value={f}>{f}</SelectItem>
                     ))}
@@ -460,7 +468,7 @@ export default function AssignmentDetail() {
                     Submitted
                     <Badge className="ml-auto bg-green-600">{submittedList.length}</Badge>
                   </CardTitle>
-                  <CardDescription>Students who have submitted their work</CardDescription>
+                  <CardDescription>{t.assignmentDetail.submitted}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   {submissionsLoading ? (
@@ -470,7 +478,7 @@ export default function AssignmentDetail() {
                   ) : submittedList.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
                       <Clock className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                      <p className="text-sm">No submissions yet</p>
+                      <p className="text-sm">{t.assignmentDetail.noSubmissions}</p>
                     </div>
                   ) : (
                     <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
@@ -505,7 +513,7 @@ export default function AssignmentDetail() {
                                     {sub.score}/{assignment.totalMarks}
                                   </Badge>
                                 ) : (
-                                  <Badge variant="secondary" className="text-xs">Needs Review</Badge>
+                                  <Badge variant="secondary" className="text-xs">{t.assignmentDetail.needsReview}</Badge>
                                 )}
                               </div>
                             </div>
@@ -525,7 +533,7 @@ export default function AssignmentDetail() {
                     Not Submitted
                     <Badge className="ml-auto bg-destructive">{notSubmittedList.length}</Badge>
                   </CardTitle>
-                  <CardDescription>Students who haven't submitted yet</CardDescription>
+                  <CardDescription>{t.assignmentDetail.notSubmitted}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   {submissionsLoading ? (
@@ -535,7 +543,7 @@ export default function AssignmentDetail() {
                   ) : notSubmittedList.length === 0 ? (
                     <div className="text-center py-8 text-green-600 dark:text-green-400">
                       <CheckCircle className="h-8 w-8 mx-auto mb-2" />
-                      <p className="text-sm font-medium">Everyone has handed in.</p>
+                      <p className="text-sm font-medium">{t.assignmentDetail.everyoneHandedIn}</p>
                     </div>
                   ) : (
                     <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
@@ -573,7 +581,7 @@ export default function AssignmentDetail() {
         ) : (
           <div className="text-center py-16">
             <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <p className="text-muted-foreground">Assignment not found</p>
+            <p className="text-muted-foreground">{t.assignmentDetail.notFound}</p>
           </div>
         )}
       </main>
