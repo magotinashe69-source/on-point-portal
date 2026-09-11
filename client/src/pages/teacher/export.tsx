@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import logoPath from "@assets/logo.webp";
 import type { Assignment } from "@shared/schema";
+import { useT } from "@/lib/i18n";
 
 interface PreviewData {
   totalStudents: number;
@@ -46,6 +47,7 @@ const FORMS = ["Stage 3", "Stage 4", "Stage 5", "Stage 6", "Form 1", "Form 2"];
 const TERMS = ["1", "2", "3", "4"];
 
 export default function TeacherExport() {
+  const t = useT();
   const [, setLocation] = useLocation();
   const { teacher, student, logout } = useAuth();
   const { toast } = useToast();
@@ -150,10 +152,10 @@ export default function TeacherExport() {
       URL.revokeObjectURL(objectUrl);
 
       setLastDownload({ filename, count: preview?.totalRows ?? 0 });
-      toast({ title: "Export complete", description: `Downloaded ${filename}` });
+      toast({ title: t.exportData.complete, description: `Downloaded ${filename}` });
       refetchLogs();
     } catch {
-      toast({ title: "Export did not finish", description: "Check your connection and try again.", variant: "destructive" });
+      toast({ title: t.exportData.didNotFinish, description: t.common.checkConnection, variant: "destructive" });
     } finally {
       setIsDownloading(false);
     }
@@ -164,25 +166,25 @@ export default function TeacherExport() {
   const exportTypeCards: { type: ExportType; label: string; description: string; icon: JSX.Element }[] = [
     {
       type: "full",
-      label: "Full Master Export",
-      description: "Every student, every assignment, every subject.",
+      label: t.exportData.fullMaster,
+      description: t.exportData.fullMasterNote,
       icon: <Database className="h-5 w-5" />,
     },
     {
       type: "term",
-      label: "By Term",
+      label: t.exportData.byTerm,
       description: "Filter by school term (Jan–Mar = Term 1, Apr–Jun = 2, Jul–Sep = 3, Oct–Dec = 4)",
       icon: <Calendar className="h-5 w-5" />,
     },
     {
       type: "class",
-      label: "By Class & Subject",
-      description: "Filter by a specific class level and/or subject",
+      label: t.exportData.byClassSubject,
+      description: t.exportData.byClassSubjectNote,
       icon: <Filter className="h-5 w-5" />,
     },
     {
       type: "assignment",
-      label: "By Assignment",
+      label: t.exportData.byAssignment,
       description: "Every student's result for one specific assignment — ideal for parent reporting",
       icon: <FileText className="h-5 w-5" />,
     },
@@ -194,7 +196,7 @@ export default function TeacherExport() {
         <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-4">
           <div className="flex items-center gap-3">
             <img src={logoPath} alt="On Point" className="h-10 w-auto" />
-            <span className="font-semibold text-primary hidden sm:block">Teacher Portal</span>
+            <span className="font-semibold text-primary hidden sm:block">{t.teacherDash.portal}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground hidden md:block">
@@ -214,7 +216,7 @@ export default function TeacherExport() {
           <Alert className="mb-6 border-destructive/50 bg-destructive/10" data-testid="alert-session-expired">
             <AlertTriangle className="h-4 w-4 text-destructive" />
             <AlertDescription className="text-destructive">
-              <strong>Your session has expired.</strong>{" "}
+              <strong>{t.exportData.sessionExpired}</strong>{" "}
               <Link href="/teacher/login" className="underline font-medium">
                 Please log in again
               </Link>{" "}
@@ -232,7 +234,7 @@ export default function TeacherExport() {
         </div>
 
         <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Export Data</h1>
+          <h1 className="text-3xl font-bold mb-2">{t.exportData.title}</h1>
           <p className="text-muted-foreground">
             Download a complete CSV of homework data — every student cross-joined with every assignment.
             Non-submissions are included as rows so nothing is missed.
@@ -280,10 +282,10 @@ export default function TeacherExport() {
               {exportType === "term" && (
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="text-sm font-medium block mb-1.5">Term</label>
+                    <label className="text-sm font-medium block mb-1.5">{t.exportData.term}</label>
                     <Select value={selectedTerm} onValueChange={setSelectedTerm}>
                       <SelectTrigger data-testid="select-term">
-                        <SelectValue placeholder="Select term..." />
+                        <SelectValue placeholder={t.exportData.selectTerm} />
                       </SelectTrigger>
                       <SelectContent>
                         {TERMS.map(t => (
@@ -293,13 +295,13 @@ export default function TeacherExport() {
                     </Select>
                   </div>
                   <div>
-                    <label className="text-sm font-medium block mb-1.5">Class (optional)</label>
+                    <label className="text-sm font-medium block mb-1.5">{t.exportData.classOptional}</label>
                     <Select value={selectedForm || "__all__"} onValueChange={v => setSelectedForm(v === "__all__" ? "" : v)}>
                       <SelectTrigger data-testid="select-form-term">
-                        <SelectValue placeholder="All classes" />
+                        <SelectValue placeholder={t.exportData.allClasses} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="__all__">All classes</SelectItem>
+                        <SelectItem value="__all__">{t.exportData.allClasses}</SelectItem>
                         {FORMS.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
                       </SelectContent>
                     </Select>
@@ -310,25 +312,25 @@ export default function TeacherExport() {
               {exportType === "class" && (
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="text-sm font-medium block mb-1.5">Class level</label>
+                    <label className="text-sm font-medium block mb-1.5">{t.exportData.classLevel}</label>
                     <Select value={selectedForm || "__all__"} onValueChange={v => setSelectedForm(v === "__all__" ? "" : v)}>
                       <SelectTrigger data-testid="select-form-class">
-                        <SelectValue placeholder="All classes" />
+                        <SelectValue placeholder={t.exportData.allClasses} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="__all__">All classes</SelectItem>
+                        <SelectItem value="__all__">{t.exportData.allClasses}</SelectItem>
                         {FORMS.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
                   <div>
-                    <label className="text-sm font-medium block mb-1.5">Subject</label>
+                    <label className="text-sm font-medium block mb-1.5">{t.exportData.subject}</label>
                     <Select value={selectedSubject || "__all__"} onValueChange={v => setSelectedSubject(v === "__all__" ? "" : v)}>
                       <SelectTrigger data-testid="select-subject">
-                        <SelectValue placeholder="All subjects" />
+                        <SelectValue placeholder={t.exportData.allSubjects} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="__all__">All subjects</SelectItem>
+                        <SelectItem value="__all__">{t.exportData.allSubjects}</SelectItem>
                         {SUBJECTS.map(s => <SelectItem key={s} value={s}>{s.replace(/_/g, " ")}</SelectItem>)}
                       </SelectContent>
                     </Select>
@@ -338,13 +340,13 @@ export default function TeacherExport() {
 
               {exportType === "assignment" && (
                 <div>
-                  <label className="text-sm font-medium block mb-1.5">Assignment</label>
+                  <label className="text-sm font-medium block mb-1.5">{t.exportData.assignment}</label>
                   <Select value={selectedAssignmentId || "__none__"} onValueChange={v => setSelectedAssignmentId(v === "__none__" ? "" : v)}>
                     <SelectTrigger data-testid="select-assignment">
-                      <SelectValue placeholder="Select an assignment..." />
+                      <SelectValue placeholder={t.exportData.selectAssignment} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="__none__">Select an assignment...</SelectItem>
+                      <SelectItem value="__none__">{t.exportData.selectAssignment}</SelectItem>
                       {allAssignments.map(a => (
                         <SelectItem key={a.id} value={String(a.id)}>
                           {a.title} — {a.form} · {a.subject}{a.archived ? " (archived)" : ""}
@@ -370,7 +372,7 @@ export default function TeacherExport() {
             {previewLoading ? (
               <div className="flex items-center gap-2 text-muted-foreground py-4">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                <span className="text-sm">Calculating...</span>
+                <span className="text-sm">{t.exportData.calculating}</span>
               </div>
             ) : preview ? (
               <div className="space-y-4">
@@ -379,21 +381,21 @@ export default function TeacherExport() {
                     <Users className="h-5 w-5 text-primary shrink-0" />
                     <div>
                       <p className="text-2xl font-bold">{preview.totalStudents}</p>
-                      <p className="text-xs text-muted-foreground">Students</p>
+                      <p className="text-xs text-muted-foreground">{t.exportData.students}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
                     <BookOpen className="h-5 w-5 text-primary shrink-0" />
                     <div>
                       <p className="text-2xl font-bold">{preview.totalAssignments}</p>
-                      <p className="text-xs text-muted-foreground">Assignments</p>
+                      <p className="text-xs text-muted-foreground">{t.exportData.assignments}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 p-3 rounded-lg bg-primary/5 border border-primary/20">
                     <FileText className="h-5 w-5 text-primary shrink-0" />
                     <div>
                       <p className="text-2xl font-bold text-primary">{preview.totalRows}</p>
-                      <p className="text-xs text-muted-foreground">Total CSV rows</p>
+                      <p className="text-xs text-muted-foreground">{t.exportData.totalRows}</p>
                     </div>
                   </div>
                 </div>
@@ -401,17 +403,17 @@ export default function TeacherExport() {
                 <div className="grid gap-2 sm:grid-cols-3">
                   <div className="flex items-center gap-2 text-sm">
                     <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400 shrink-0" />
-                    <span className="text-muted-foreground">On time:</span>
+                    <span className="text-muted-foreground">{t.exportData.onTime}</span>
                     <span className="font-medium">{preview.submitted}</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm">
                     <Clock className="h-4 w-4 text-orange-500 shrink-0" />
-                    <span className="text-muted-foreground">Late:</span>
+                    <span className="text-muted-foreground">{t.exportData.late}</span>
                     <span className="font-medium">{preview.late}</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm">
                     <XCircle className="h-4 w-4 text-destructive shrink-0" />
-                    <span className="text-muted-foreground">Not submitted:</span>
+                    <span className="text-muted-foreground">{t.exportData.notSubmitted}</span>
                     <span className="font-medium">{preview.notSubmitted}</span>
                   </div>
                 </div>
@@ -425,8 +427,8 @@ export default function TeacherExport() {
             ) : (
               <p className="text-sm text-muted-foreground py-4">
                 {!previewReady
-                  ? "Select filters above to see a preview."
-                  : "No data matches the current filters."}
+                  ? t.exportData.selectFilters
+                  : t.exportData.noMatch}
               </p>
             )}
           </CardContent>
@@ -443,9 +445,9 @@ export default function TeacherExport() {
               data-testid="button-download-csv"
             >
               {isDownloading ? (
-                <><Loader2 className="h-5 w-5 mr-2 animate-spin" />Generating CSV...</>
+                <><Loader2 className="h-5 w-5 mr-2 animate-spin" />{t.exportData.generating}</>
               ) : (
-                <><Download className="h-5 w-5 mr-2" />Download Master CSV</>
+                <><Download className="h-5 w-5 mr-2" />{t.exportData.download}</>
               )}
             </Button>
 
@@ -468,22 +470,22 @@ export default function TeacherExport() {
           <CardHeader>
             <div className="flex items-center gap-2">
               <History className="h-5 w-5 text-primary" />
-              <CardTitle className="text-base">Export History</CardTitle>
+              <CardTitle className="text-base">{t.exportData.history}</CardTitle>
             </div>
-            <CardDescription>Last 20 exports from this account</CardDescription>
+            <CardDescription>{t.exportData.historyNote}</CardDescription>
           </CardHeader>
           <CardContent>
             {!exportLogs || exportLogs.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">No exports yet. Download your first CSV above.</p>
+              <p className="text-sm text-muted-foreground py-4 text-center">{t.exportData.noExports}</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm" data-testid="table-export-logs">
                   <thead>
                     <tr className="border-b text-left">
-                      <th className="pb-2 font-medium text-muted-foreground">Date exported</th>
-                      <th className="pb-2 font-medium text-muted-foreground">Filter</th>
-                      <th className="pb-2 font-medium text-muted-foreground">Filter value</th>
-                      <th className="pb-2 font-medium text-muted-foreground text-right">Records</th>
+                      <th className="pb-2 font-medium text-muted-foreground">{t.exportData.dateExported}</th>
+                      <th className="pb-2 font-medium text-muted-foreground">{t.exportData.filter}</th>
+                      <th className="pb-2 font-medium text-muted-foreground">{t.exportData.filterValue}</th>
+                      <th className="pb-2 font-medium text-muted-foreground text-right">{t.exportData.records}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">

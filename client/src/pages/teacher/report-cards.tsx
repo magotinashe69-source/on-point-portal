@@ -27,11 +27,12 @@ import { apiRequest } from "@/lib/queryClient";
 import { apiErrorMessage } from "@/lib/api-error";
 import { ReportCardSheet, ReportCardPrintStyles } from "@/components/ReportCardSheet";
 import {
-  DEFAULT_BOUNDARIES, REPORT_TEXT, sortBoundaries, validateBoundaries,
+  DEFAULT_BOUNDARIES, sortBoundaries, validateBoundaries,
   type GradeBoundary, type ReportCard,
 } from "@shared/report-card";
 import { ArrowLeft, FileText, Loader2, Printer, Save, SlidersHorizontal } from "lucide-react";
 import logoPath from "@assets/logo.webp";
+import { useT } from "@/lib/i18n";
 
 const FORMS = ["Stage 3", "Stage 4", "Stage 5", "Stage 6", "Form 1", "Form 2"];
 
@@ -48,6 +49,7 @@ function defaultTerm() {
 }
 
 export default function ReportCardsPage() {
+  const t = useT();
   const [, setLocation] = useLocation();
   const { teacher } = useAuth();
   const { toast } = useToast();
@@ -121,19 +123,19 @@ export default function ReportCardsPage() {
         <div className="rc-noprint">
           <div className="flex items-center gap-2 mb-1">
             <FileText className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-bold">{REPORT_TEXT.title}</h1>
+            <h1 className="text-2xl font-bold">{t.reportCard.title}</h1>
           </div>
-          <p className="text-sm text-muted-foreground">{REPORT_TEXT.subtitle}</p>
+          <p className="text-sm text-muted-foreground">{t.reportCard.subtitle}</p>
         </div>
 
         <Card className="rc-noprint">
           <CardContent className="py-4 space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs">{REPORT_TEXT.pickClass}</Label>
+                <Label className="text-xs">{t.reportCard.pickClass}</Label>
                 <Select value={form} onValueChange={setForm}>
                   <SelectTrigger className="mt-1" data-testid="select-rc-form">
-                    <SelectValue placeholder={REPORT_TEXT.pickClass} />
+                    <SelectValue placeholder={t.reportCard.pickClass} />
                   </SelectTrigger>
                   <SelectContent>
                     {FORMS.map((f) => <SelectItem key={f} value={f}>{f}</SelectItem>)}
@@ -141,7 +143,7 @@ export default function ReportCardsPage() {
                 </Select>
               </div>
               <div>
-                <Label className="text-xs" htmlFor="rc-term">{REPORT_TEXT.termLabel}</Label>
+                <Label className="text-xs" htmlFor="rc-term">{t.reportCard.termLabel}</Label>
                 <Input
                   id="rc-term"
                   className="mt-1"
@@ -151,13 +153,13 @@ export default function ReportCardsPage() {
                 />
               </div>
               <div>
-                <Label className="text-xs" htmlFor="rc-from">{REPORT_TEXT.termFrom}</Label>
+                <Label className="text-xs" htmlFor="rc-from">{t.reportCard.termFrom}</Label>
                 <Input id="rc-from" type="date" className="mt-1" value={term.from}
                   onChange={(e) => setTerm({ ...term, from: e.target.value })}
                   data-testid="input-term-from" />
               </div>
               <div>
-                <Label className="text-xs" htmlFor="rc-to">{REPORT_TEXT.termTo}</Label>
+                <Label className="text-xs" htmlFor="rc-to">{t.reportCard.termTo}</Label>
                 <Input id="rc-to" type="date" className="mt-1" value={term.to}
                   onChange={(e) => setTerm({ ...term, to: e.target.value })}
                   data-testid="input-term-to" />
@@ -167,16 +169,16 @@ export default function ReportCardsPage() {
             <div className="flex flex-wrap gap-2">
               <Button onClick={build} disabled={loading} data-testid="button-build">
                 {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
-                {REPORT_TEXT.build}
+                {t.reportCard.build}
               </Button>
               <Button variant="outline" onClick={() => setBoundariesOpen(true)} data-testid="button-boundaries">
                 <SlidersHorizontal className="h-4 w-4 mr-2" />
-                {REPORT_TEXT.editBoundaries}
+                {t.reportCard.editBoundaries}
               </Button>
               {cards && cards.length > 0 && (
                 <Button variant="outline" onClick={printAll} data-testid="button-print-all">
                   <Printer className="h-4 w-4 mr-2" />
-                  {REPORT_TEXT.printAll} ({cards.length})
+                  {t.reportCard.printAll} ({cards.length})
                 </Button>
               )}
             </div>
@@ -206,7 +208,7 @@ export default function ReportCardsPage() {
                   : <Badge variant="outline" className="text-xs text-muted-foreground">No comment</Badge>}
                 <Button size="sm" variant="outline" onClick={() => setCommenting(card)}
                   data-testid={`button-comment-${card.student.id}`}>
-                  {REPORT_TEXT.editComment}
+                  {t.reportCard.editComment}
                 </Button>
                 <Button size="sm" variant="outline" onClick={() => printOne(card.student.id)}
                   data-testid={`button-print-${card.student.id}`}>
@@ -220,7 +222,7 @@ export default function ReportCardsPage() {
 
         {cards && cards.length > 0 && (
           <p className="rc-noprint text-center text-xs text-muted-foreground">
-            {REPORT_TEXT.printNote}
+            {t.reportCard.printNote}
           </p>
         )}
       </main>
@@ -257,6 +259,7 @@ function CommentDialog({
   onClose: () => void;
   onSaved: (text: string) => void;
 }) {
+  const t = useT();
   const { toast } = useToast();
   const [text, setText] = useState(card.comment ?? "");
   const [saving, setSaving] = useState(false);
@@ -271,7 +274,7 @@ function CommentDialog({
       });
       const body = await res.json();
       if (body.success) {
-        toast({ title: REPORT_TEXT.commentSaved });
+        toast({ title: t.reportCard.commentSaved });
         onSaved(body.comment);
       } else {
         toast({ title: body.message || "Could not save the comment", variant: "destructive" });
@@ -292,7 +295,7 @@ function CommentDialog({
         <DialogHeader>
           <DialogTitle>{card.student.fullName}</DialogTitle>
           <DialogDescription>
-            {REPORT_TEXT.comment} for {term.label}. It is saved against this term, so next
+            {t.reportCard.comment} for {term.label}. It is saved against this term, so next
             term's comment will not overwrite it.
           </DialogDescription>
         </DialogHeader>
@@ -300,14 +303,14 @@ function CommentDialog({
           value={text}
           onChange={(e) => setText(e.target.value)}
           rows={5}
-          placeholder={REPORT_TEXT.commentPlaceholder}
+          placeholder={t.reportCard.commentPlaceholder}
           data-testid="input-comment"
         />
         <DialogFooter>
           <Button variant="outline" onClick={onClose} data-testid="button-cancel-comment">Cancel</Button>
           <Button onClick={save} disabled={saving} data-testid="button-save-comment">
             {saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
-            {REPORT_TEXT.saveComment}
+            {t.reportCard.saveComment}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -317,6 +320,7 @@ function CommentDialog({
 
 /** Set the school's own grade boundaries. */
 function BoundariesDialog({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+  const t = useT();
   const { toast } = useToast();
   const [rows, setRows] = useState<GradeBoundary[]>(DEFAULT_BOUNDARIES);
   const [loading, setLoading] = useState(true);
@@ -343,7 +347,7 @@ function BoundariesDialog({ onClose, onSaved }: { onClose: () => void; onSaved: 
       const res = await apiRequest("PUT", "/api/report-cards/boundaries", { boundaries: rows });
       const body = await res.json();
       if (body.success) {
-        toast({ title: REPORT_TEXT.boundariesSaved });
+        toast({ title: t.reportCard.boundariesSaved });
         onSaved();
       } else {
         toast({ title: body.message || "Could not save the boundaries", variant: "destructive" });
@@ -362,7 +366,7 @@ function BoundariesDialog({ onClose, onSaved }: { onClose: () => void; onSaved: 
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{REPORT_TEXT.editBoundaries}</DialogTitle>
+          <DialogTitle>{t.reportCard.editBoundaries}</DialogTitle>
           <DialogDescription>
             The lowest mark that earns each grade. These are printed on every report card,
             so a family can read the grade without having to ask what it means here.
@@ -406,7 +410,7 @@ function BoundariesDialog({ onClose, onSaved }: { onClose: () => void; onSaved: 
 
             <Button variant="ghost" size="sm" onClick={() => setRows(DEFAULT_BOUNDARIES)}
               data-testid="button-reset-boundaries">
-              {REPORT_TEXT.resetBoundaries}
+              {t.reportCard.resetBoundaries}
             </Button>
           </div>
         )}

@@ -26,15 +26,12 @@ import { SimpleUploader } from "@/components/SimpleUploader";
 import { FileAttachmentZone } from "@/components/FileAttachmentZone";
 import type { AttachmentFile } from "@/components/FileAttachmentZone";
 import type { Student, Assignment, Submission } from "@shared/schema";
+import { useT } from "@/lib/i18n";
 
 // The question types a teacher can choose. "written" is marked by hand (the
 // original behaviour); the other four are marked automatically in code.
-const QUESTION_TYPES = [
-  { value: "multiple_choice", label: "Multiple choice" },
-  { value: "true_false", label: "True / False" },
-  { value: "numeric", label: "Number" },
-  { value: "short_text", label: "Short text" },
-  { value: "written", label: "Written (marked by hand)" },
+const QUESTION_TYPE_CODES = [
+  "multiple_choice", "true_false", "numeric", "short_text", "written",
 ] as const;
 
 const questionSchema = z.object({
@@ -145,6 +142,7 @@ const createAssignmentSchema = z.object({
 type CreateAssignmentForm = z.infer<typeof createAssignmentSchema>;
 
 export default function CreateAssignment() {
+  const t = useT();
   const [, setLocation] = useLocation();
   const { teacher } = useAuth();
   const { toast } = useToast();
@@ -309,10 +307,8 @@ export default function CreateAssignment() {
       append(bankQuestionToAssignmentQuestion(q, newQid()));
     }
     toast({
-      title: chosen.length === 1
-        ? "1 question added from the bank"
-        : `${chosen.length} questions added from the bank`,
-      description: "They are copies — editing the saved question later will not change this paper.",
+      title: t.createAssignment.fromBank(chosen.length),
+      description: t.createAssignment.fromBankNote,
     });
   };
 
@@ -370,8 +366,8 @@ export default function CreateAssignment() {
     setPasteOpen(false);
     setPasteText("");
     toast({
-      title: `Added ${built.length} question${built.length === 1 ? "" : "s"}`,
-      description: "Each one is Short text, 1 mark, with its answer key filled in.",
+      title: t.createAssignment.pastedAdded(built.length),
+      description: t.createAssignment.pastedAddedNote,
     });
     setFocusIndex(firstNewIndex);
   };
@@ -490,8 +486,8 @@ export default function CreateAssignment() {
     // Validate student selection
     if (!assignToAll && selectedStudentIds.length === 0) {
       toast({
-        title: "No students selected",
-        description: "Select at least one student, or choose all students.",
+        title: t.createAssignment.noStudentsSelected,
+        description: t.createAssignment.noStudentsSelectedNote,
         variant: "destructive",
       });
       return false;
@@ -568,27 +564,27 @@ export default function CreateAssignment() {
         }
         if (navigate) {
           toast({
-            title: isEdit ? "Assignment updated" : asDraft ? "Draft saved" : "Assignment created",
+            title: isEdit ? t.createAssignment.updated : asDraft ? t.createAssignment.draftSaved : t.createAssignment.created,
             description: isEdit
-              ? "Your changes have been saved."
+              ? t.createAssignment.updatedNote
               : asDraft
-                ? "It is hidden from students until you tap Publish."
-                : "Your assignment has been created successfully.",
+                ? t.createAssignment.draftSavedNote
+                : t.createAssignment.createdNote,
           });
           setLocation(isEdit ? `/teacher/assignments/${editId}` : "/teacher/dashboard");
         }
         return true;
       }
       toast({
-        title: isEdit ? "Assignment not updated" : "Assignment not created",
-        description: data.message || "Check the form and try again.",
+        title: isEdit ? t.createAssignment.notUpdated : t.createAssignment.notCreated,
+        description: data.message || t.createAssignment.checkForm,
         variant: "destructive",
       });
       return false;
     } catch (error) {
       toast({
-        title: isEdit ? "Assignment not updated" : "Assignment not created",
-        description: "Check your connection and try again.",
+        title: isEdit ? t.createAssignment.notUpdated : t.createAssignment.notCreated,
+        description: t.common.checkConnection,
         variant: "destructive",
       });
       return false;
@@ -641,14 +637,14 @@ export default function CreateAssignment() {
         if (data.success) {
           queryClient.invalidateQueries({ queryKey: ["/api/submissions"] });
           toast({
-            title: "Re-marked",
+            title: t.createAssignment.remarked,
             description: `${data.affected} submission${data.affected === 1 ? "" : "s"} updated with the new correct answer.`,
           });
         } else {
-          toast({ title: "Couldn't re-mark", description: data.message || "Please try again.", variant: "destructive" });
+          toast({ title: t.createAssignment.couldNotRemark, description: data.message || t.createAssignment.tryAgainPlease, variant: "destructive" });
         }
       } catch {
-        toast({ title: "Couldn't re-mark", description: "Please try again.", variant: "destructive" });
+        toast({ title: t.createAssignment.couldNotRemark, description: t.createAssignment.tryAgainPlease, variant: "destructive" });
       } finally {
         setRemarkingQid(null);
       }
@@ -663,7 +659,7 @@ export default function CreateAssignment() {
         <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-4">
           <Link href="/teacher/dashboard" className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
-            <span className="text-sm">Back to Dashboard</span>
+            <span className="text-sm">{t.submit.backToDashboard}</span>
           </Link>
           <div className="flex items-center gap-3">
             <img src={logoPath} alt="On Point" className="h-8 w-auto" />
@@ -677,19 +673,18 @@ export default function CreateAssignment() {
             changing questions won't retroactively alter marks already given. */}
         {isEdit && submissionCount > 0 && (
           <div className="mb-4 rounded-xl border border-orange-400/60 bg-orange-500/10 px-4 py-3 text-sm" data-testid="submissions-notice">
-            <AlertTriangle className="inline h-4 w-4 mr-1 align-text-bottom" aria-hidden="true" /><span className="font-semibold">{submissionCount} student{submissionCount === 1 ? " has" : "s have"} already handed in.</span>{" "}
-            Changes to questions will <span className="font-semibold">not</span> alter marks already given. To update a fixed answer, use the{" "}
-            <span className="font-semibold">Re-mark</span> button on that question.
+            <AlertTriangle className="inline h-4 w-4 mr-1 align-text-bottom" aria-hidden="true" /><span className="font-semibold">{t.createAssignment.alreadyHandedIn(submissionCount)}</span>{" "}
+            {t.createAssignment.marksUnchangedNote}
           </div>
         )}
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-2xl">{isEdit ? "Edit Assignment" : "Create New Assignment"}</CardTitle>
+            <CardTitle className="text-2xl">{isEdit ? t.createAssignment.editTitle : t.createAssignment.createTitle}</CardTitle>
             <CardDescription>
               {isEdit
-                ? "Change any field or question. Total Marks updates as you go."
-                : "Create an assignment with questions for your students. You can add images to questions."}
+                ? t.createAssignment.editNote
+                : t.createAssignment.createNote}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -701,11 +696,11 @@ export default function CreateAssignment() {
                     name="subject"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Subject</FormLabel>
+                        <FormLabel>{t.createAssignment.subject}</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
                             <SelectTrigger data-testid="select-subject">
-                              <SelectValue placeholder="Select subject" />
+                              <SelectValue placeholder={t.createAssignment.selectSubject} />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
@@ -732,11 +727,11 @@ export default function CreateAssignment() {
                     name="form"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Form</FormLabel>
+                        <FormLabel>{t.createAssignment.form}</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
                             <SelectTrigger data-testid="select-form">
-                              <SelectValue placeholder="Select form" />
+                              <SelectValue placeholder={t.createAssignment.selectForm} />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
@@ -759,11 +754,11 @@ export default function CreateAssignment() {
                   name="topic"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Topic (Optional)</FormLabel>
+                      <FormLabel>{t.createAssignment.topic}</FormLabel>
                       <FormControl>
                         <Input 
                           {...field} 
-                          placeholder="e.g., Algebra, Photosynthesis, World War II"
+                          placeholder={t.createAssignment.topicPlaceholder}
                           data-testid="input-topic"
                         />
                       </FormControl>
@@ -777,10 +772,10 @@ export default function CreateAssignment() {
                   name="title"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Title</FormLabel>
+                      <FormLabel>{t.createAssignment.title}</FormLabel>
                       <FormControl>
                         <Input 
-                          placeholder="e.g., Week 1 Maths Homework" 
+                          placeholder={t.createAssignment.titlePlaceholder} 
                           data-testid="input-title"
                           {...field} 
                         />
@@ -795,10 +790,10 @@ export default function CreateAssignment() {
                   name="instructions"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Instructions</FormLabel>
+                      <FormLabel>{t.createAssignment.instructions}</FormLabel>
                       <FormControl>
                         <Textarea 
-                          placeholder="Provide instructions for students..." 
+                          placeholder={t.createAssignment.instructionsPlaceholder} 
                           className="min-h-[100px]"
                           data-testid="textarea-instructions"
                           {...field} 
@@ -814,7 +809,7 @@ export default function CreateAssignment() {
                   name="dueDate"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Due Date</FormLabel>
+                      <FormLabel>{t.createAssignment.dueDate}</FormLabel>
                       <FormControl>
                         <Input 
                           type="date" 
@@ -831,7 +826,7 @@ export default function CreateAssignment() {
                 <div className="space-y-4 p-4 border rounded-md">
                   <div className="flex items-center gap-2">
                     <Users className="h-5 w-5 text-primary" />
-                    <h3 className="font-semibold">Assign To</h3>
+                    <h3 className="font-semibold">{t.createAssignment.assignTo}</h3>
                   </div>
                   
                   <div className="flex items-center space-x-2">
@@ -894,7 +889,7 @@ export default function CreateAssignment() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <div>
-                      <h3 className="font-semibold">Questions</h3>
+                      <h3 className="font-semibold">{t.createAssignment.questions}</h3>
                       <p className="text-sm text-muted-foreground">Total Marks: {totalMarks}</p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -906,7 +901,7 @@ export default function CreateAssignment() {
                         data-testid="button-paste-questions"
                       >
                         <ClipboardPaste className="h-4 w-4 mr-2" />
-                        Paste questions
+                        {t.createAssignment.pasteQuestions}
                       </Button>
                       {/* Pull a saved question in, rather than typing it again. */}
                       <Button
@@ -940,11 +935,11 @@ export default function CreateAssignment() {
                           <div className="flex items-center gap-1.5 flex-wrap">
                             {/* Reorder */}
                             <Button type="button" variant="ghost" size="icon" disabled={index === 0}
-                              onClick={() => move(index, index - 1)} title="Move up" data-testid={`button-move-up-${index}`}>
+                              onClick={() => move(index, index - 1)} title={t.createAssignment.moveUp} data-testid={`button-move-up-${index}`}>
                               <ChevronUp className="h-4 w-4" />
                             </Button>
                             <Button type="button" variant="ghost" size="icon" disabled={index === fields.length - 1}
-                              onClick={() => move(index, index + 1)} title="Move down" data-testid={`button-move-down-${index}`}>
+                              onClick={() => move(index, index + 1)} title={t.createAssignment.moveDown} data-testid={`button-move-down-${index}`}>
                               <ChevronDown className="h-4 w-4" />
                             </Button>
 
@@ -955,12 +950,12 @@ export default function CreateAssignment() {
                               <Button type="button" variant="outline" size="sm"
                                 disabled={remarkingQid === formMethods.watch(`questions.${index}.qid`)}
                                 onClick={() => handleRemark(formMethods.getValues(`questions.${index}.qid`))}
-                                title="Save changes and re-mark this question for students who have already handed in"
+                                title={t.createAssignment.remarkNote}
                                 data-testid={`button-remark-${index}`}>
                                 {remarkingQid === formMethods.watch(`questions.${index}.qid`)
                                   ? <Loader2 className="h-4 w-4 animate-spin sm:mr-1" />
                                   : <RefreshCw className="h-4 w-4 sm:mr-1" />}
-                                <span className="hidden sm:inline">Re-mark</span>
+                                <span className="hidden sm:inline">{t.createAssignment.remark}</span>
                               </Button>
                             )}
 
@@ -971,11 +966,11 @@ export default function CreateAssignment() {
                               variant="outline"
                               size="sm"
                               onClick={() => duplicateQuestion(index)}
-                              title="Make another question with these same settings"
+                              title={t.createAssignment.duplicateNote}
                               data-testid={`button-duplicate-question-${index}`}
                             >
                               <Copy className="h-4 w-4 sm:mr-1" />
-                              <span className="hidden sm:inline">Duplicate</span>
+                              <span className="hidden sm:inline">{t.createAssignment.duplicate}</span>
                             </Button>
 
                             {/* Save a COPY of this question to the reusable
@@ -985,17 +980,17 @@ export default function CreateAssignment() {
                               variant="outline"
                               size="sm"
                               onClick={() => openSaveToBank(index)}
-                              title="Save a copy of this question to the Question Bank for reuse"
+                              title={t.createAssignment.saveToBankNote}
                               data-testid={`button-save-to-bank-${index}`}
                             >
                               <Library className="h-4 w-4 sm:mr-1" />
-                              <span className="hidden sm:inline">Save to bank</span>
+                              <span className="hidden sm:inline">{t.createAssignment.saveToBank}</span>
                             </Button>
 
                             <SimpleUploader
                               onUpload={(url) => handleQuestionImageUpload(index, url)}
                               accept="image/*"
-                              label="Add Image"
+                              label={t.createAssignment.addImage}
                             />
                             {fields.length > 1 && (
                               <Button
@@ -1039,10 +1034,10 @@ export default function CreateAssignment() {
                           name={`questions.${index}.questionText`}
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Question Text</FormLabel>
+                              <FormLabel>{t.createAssignment.questionText}</FormLabel>
                               <FormControl>
                                 <Textarea 
-                                  placeholder="Enter your question..." 
+                                  placeholder={t.createAssignment.questionTextPlaceholder} 
                                   data-testid={`textarea-question-${index}`}
                                   {...field} 
                                 />
@@ -1054,7 +1049,7 @@ export default function CreateAssignment() {
                         <div className="grid gap-4 sm:grid-cols-2">
                           {/* Pick how this question is answered and marked */}
                           <FormItem>
-                            <FormLabel>Answer Type</FormLabel>
+                            <FormLabel>{t.createAssignment.answerType}</FormLabel>
                             <Select
                               value={formMethods.watch(`questions.${index}.type`)}
                               onValueChange={(val) => changeQuestionType(index, val)}
@@ -1063,8 +1058,8 @@ export default function CreateAssignment() {
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                {QUESTION_TYPES.map((t) => (
-                                  <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                                {QUESTION_TYPE_CODES.map((qt) => (
+                                  <SelectItem key={qt} value={qt}>{t.createAssignment.types[qt]}</SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
@@ -1075,7 +1070,7 @@ export default function CreateAssignment() {
                             name={`questions.${index}.maxScore`}
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Max Score</FormLabel>
+                                <FormLabel>{t.createAssignment.maxScore}</FormLabel>
                                 <FormControl>
                                   <Input
                                     type="number"
@@ -1112,12 +1107,12 @@ export default function CreateAssignment() {
                                   render={({ field }) => (
                                     <FormItem>
                                       <FormLabel className="text-sm">
-                                        Model answer <span className="text-muted-foreground font-normal">(optional)</span>
+                                        Model answer <span className="text-muted-foreground font-normal">{t.createAssignment.optional}</span>
                                       </FormLabel>
                                       <FormControl>
                                         <Textarea
                                           rows={3}
-                                          placeholder="What a good answer looks like, in your own words."
+                                          placeholder={t.createAssignment.modelAnswerNote}
                                           data-testid={`input-model-answer-${index}`}
                                           {...field}
                                           value={field.value || ""}
@@ -1139,11 +1134,11 @@ export default function CreateAssignment() {
 
                           return (
                             <div className="space-y-3 rounded-md border-l-4 border-primary bg-primary/5 p-3">
-                              <p className="text-sm font-semibold text-primary">Answer Key (used for instant marking)</p>
+                              <p className="text-sm font-semibold text-primary">{t.createAssignment.answerKey}</p>
 
                               {qType === "multiple_choice" && (
                                 <div className="space-y-2">
-                                  <p className="text-xs text-muted-foreground">Add the options and tap the circle to mark the correct one.</p>
+                                  <p className="text-xs text-muted-foreground">{t.createAssignment.optionsNote}</p>
                                   {(formMethods.watch(`questions.${index}.options`) || []).map((opt, optIdx) => {
                                     const correct = formMethods.watch(`questions.${index}.correctOption`);
                                     const options = formMethods.watch(`questions.${index}.options`) || [];
@@ -1153,7 +1148,7 @@ export default function CreateAssignment() {
                                           type="button"
                                           onClick={() => patchQuestion(index, { correctOption: optIdx })}
                                           className="shrink-0"
-                                          title="Mark as correct"
+                                          title={t.createAssignment.markAsCorrect}
                                           data-testid={`radio-correct-${index}-${optIdx}`}
                                         >
                                           {correct === optIdx
@@ -1182,7 +1177,7 @@ export default function CreateAssignment() {
 
                               {qType === "true_false" && (
                                 <div className="flex items-center gap-2">
-                                  <span className="text-sm">Correct answer:</span>
+                                  <span className="text-sm">{t.createAssignment.correctAnswer}</span>
                                   {[true, false].map((val) => {
                                     const correct = formMethods.watch(`questions.${index}.correctBool`);
                                     return (
@@ -1194,7 +1189,7 @@ export default function CreateAssignment() {
                                         onClick={() => patchQuestion(index, { correctBool: val })}
                                         data-testid={`button-tf-${index}-${val}`}
                                       >
-                                        {val ? "True" : "False"}
+                                        {val ? t.createAssignment.trueLabel : t.createAssignment.falseLabel}
                                       </Button>
                                     );
                                   })}
@@ -1204,7 +1199,7 @@ export default function CreateAssignment() {
                               {qType === "numeric" && (
                                 <div className="grid gap-3 sm:grid-cols-2">
                                   <div>
-                                    <FormLabel className="text-sm">Correct number</FormLabel>
+                                    <FormLabel className="text-sm">{t.createAssignment.correctNumber}</FormLabel>
                                     <Input
                                       type="number"
                                       step="any"
@@ -1215,14 +1210,14 @@ export default function CreateAssignment() {
                                     />
                                   </div>
                                   <div>
-                                    <FormLabel className="text-sm">Tolerance (±)</FormLabel>
+                                    <FormLabel className="text-sm">{t.createAssignment.tolerance}</FormLabel>
                                     <Input
                                       type="number"
                                       step="any"
                                       min="0"
                                       value={formMethods.watch(`questions.${index}.tolerance`) ?? ""}
                                       onChange={(e) => patchQuestion(index, { tolerance: e.target.value === "" ? undefined : parseFloat(e.target.value) })}
-                                      placeholder="e.g. 0.05 (0 = exact)"
+                                      placeholder={t.createAssignment.tolerancePlaceholder}
                                       data-testid={`input-tolerance-${index}`}
                                     />
                                   </div>
@@ -1231,7 +1226,7 @@ export default function CreateAssignment() {
 
                               {qType === "short_text" && (
                                 <div className="space-y-2">
-                                  <p className="text-xs text-muted-foreground">Any of these count as correct. Matching ignores capital letters and extra spaces.</p>
+                                  <p className="text-xs text-muted-foreground">{t.createAssignment.acceptedNote}</p>
                                   {(formMethods.watch(`questions.${index}.acceptedAnswers`) || []).map((ans, ansIdx) => {
                                     const accepted = formMethods.watch(`questions.${index}.acceptedAnswers`) || [];
                                     return (
@@ -1258,11 +1253,11 @@ export default function CreateAssignment() {
 
                               {/* Optional one-line note shown to students with the correct answer */}
                               <div>
-                                <FormLabel className="text-sm">Explanation (optional)</FormLabel>
+                                <FormLabel className="text-sm">{t.createAssignment.explanation}</FormLabel>
                                 <Input
                                   value={formMethods.watch(`questions.${index}.explanation`) ?? ""}
                                   onChange={(e) => patchQuestion(index, { explanation: e.target.value })}
-                                  placeholder="A one-line note shown with the correct answer"
+                                  placeholder={t.createAssignment.explanationPlaceholder}
                                   data-testid={`input-explanation-${index}`}
                                 />
                               </div>
@@ -1295,8 +1290,8 @@ export default function CreateAssignment() {
                 <BulkPasteDialog
                   open={pasteOpen}
                   onOpenChange={setPasteOpen}
-                  title="Paste questions"
-                  description="One question per line, with the answer after a bar. Each line becomes a Short text question worth 1 mark, marked automatically."
+                  title={t.createAssignment.pasteQuestions}
+                  description={t.createAssignment.pasteNote}
                   noun={{ one: "question", many: "questions" }}
                   value={pasteText}
                   onValueChange={setPasteText}
@@ -1340,7 +1335,7 @@ export default function CreateAssignment() {
                 )}
 
                 {/* Saving one question to the reusable library. Opened from the
-                    "Save to bank" button on a question; changes nothing here. */}
+                    t.createAssignment.saveToBank button on a question; changes nothing here. */}
                 {bankingQuestion && (
                   <SaveToBankDialog
                     question={bankingQuestion}
@@ -1352,12 +1347,12 @@ export default function CreateAssignment() {
                 )}
 
                 <div className="space-y-2">
-                  <h3 className="font-semibold">Attachments (optional)</h3>
-                  <p className="text-sm text-muted-foreground">Upload reference materials for students — images, PDFs, Word documents</p>
+                  <h3 className="font-semibold">{t.createAssignment.attachments}</h3>
+                  <p className="text-sm text-muted-foreground">{t.createAssignment.attachmentsNote}</p>
                   <FileAttachmentZone
                     attachments={attachments}
                     onChange={setAttachments}
-                    label="Upload Reference Files"
+                    label={t.createAssignment.uploadReference}
                     hint="Images (JPG, PNG), PDFs, Word documents, text files"
                   />
                 </div>
@@ -1389,7 +1384,7 @@ export default function CreateAssignment() {
                     ) : (
                       <Save className="h-4 w-4 mr-2" />
                     )}
-                    {isEdit ? (isEditingDraft ? "Save Draft" : "Save Changes") : "Create Assignment"}
+                    {isEdit ? (isEditingDraft ? t.createAssignment.saveDraft : t.createAssignment.saveChanges) : t.createAssignment.createButton}
                   </Button>
 
                   {!isEdit && (

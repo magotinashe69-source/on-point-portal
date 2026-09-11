@@ -79,6 +79,8 @@ const SAME_IN_BOTH = new Set([
   "— On Point Education Centre",  // the school's own name
   "—",                            // a dash, standing in for a score nobody has yet
   "On Point Education Centre",    // the school's name, printed on a certificate
+  "total",                        // the same word in both
+  "Zero",                         // and so is this
 ]);
 
 /**

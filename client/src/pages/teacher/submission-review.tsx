@@ -18,6 +18,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { PageErrorBoundary } from "@/components/ErrorBoundary";
 import { ArrowLeft, CheckCircle2, XCircle, Loader2, Pencil } from "lucide-react";
 import logoPath from "@assets/logo.webp";
+import { useT, type Translation } from "@/lib/i18n";
 
 interface QReview {
   index: number;
@@ -54,15 +55,9 @@ interface ReviewData {
   questions: QReview[];
 }
 
-const TYPE_LABEL: Record<string, string> = {
-  multiple_choice: "Multiple choice",
-  true_false: "True / False",
-  numeric: "Number",
-  short_text: "Short text",
-  written: "Written (hand-marked)",
-};
 
 function SubmissionReviewContent() {
+  const t = useT();
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { teacher } = useAuth();
@@ -86,7 +81,7 @@ function SubmissionReviewContent() {
   const saveOverride = async (q: QReview) => {
     const raw = scoreInputs[q.questionId];
     const value = raw === undefined ? q.score : Number(raw);
-    if (!Number.isFinite(value)) { toast({ title: "Enter a number", variant: "destructive" }); return; }
+    if (!Number.isFinite(value)) { toast({ title: t.review.enterNumber, variant: "destructive" }); return; }
     if (value < 0 || value > q.maxScore) { toast({ title: `Score must be 0–${q.maxScore}`, variant: "destructive" }); return; }
     setSavingQid(q.questionId);
     try {
@@ -96,12 +91,12 @@ function SubmissionReviewContent() {
         await queryClient.invalidateQueries({ queryKey });
         queryClient.invalidateQueries({ queryKey: ["/api/gradebook"] });
         setScoreInputs((s) => { const n = { ...s }; delete n[q.questionId]; return n; });
-        toast({ title: "Mark updated", description: `Q${q.index + 1} set to ${body.score}/${q.maxScore}. New total ${body.totalScore}/${review?.assignment.totalMarks}.` });
+        toast({ title: t.review.markUpdated, description: `Q${q.index + 1} set to ${body.score}/${q.maxScore}. New total ${body.totalScore}/${review?.assignment.totalMarks}.` });
       } else {
-        toast({ title: "Couldn't update", description: body.message || "Please try again.", variant: "destructive" });
+        toast({ title: t.review.couldNotUpdate, description: body.message || t.review.tryAgainPlease, variant: "destructive" });
       }
     } catch {
-      toast({ title: "Couldn't update", description: "Please try again.", variant: "destructive" });
+      toast({ title: t.review.couldNotUpdate, description: t.review.tryAgainPlease, variant: "destructive" });
     } finally {
       setSavingQid(null);
     }
@@ -113,21 +108,21 @@ function SubmissionReviewContent() {
   const renderLoadError = () => {
     const status = /^(\d{3}):/.exec(String((error as Error)?.message || ""))?.[1];
     const message =
-      status === "401" ? "Your teacher login has expired. Please sign in again to view this submission."
-      : status === "404" ? "This submission no longer exists. It may have been deleted."
-      : status === "500" ? "The server had a problem loading this submission."
-      : "Couldn't load this submission. Please check your connection and try again.";
+      status === "401" ? t.review.expired
+      : status === "404" ? t.review.gone
+      : status === "500" ? t.review.serverProblem
+      : t.review.couldNotLoad;
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center" data-testid="review-error">
         <p className="font-medium">{message}</p>
         <div className="flex gap-2 mt-4">
           {status === "401" ? (
-            <Button onClick={() => setLocation("/teacher/login")} data-testid="button-review-login">Go to login</Button>
+            <Button onClick={() => setLocation("/teacher/login")} data-testid="button-review-login">{t.review.goToLogin}</Button>
           ) : (
-            <Button variant="outline" onClick={() => refetch()} data-testid="button-review-retry">Try again</Button>
+            <Button variant="outline" onClick={() => refetch()} data-testid="button-review-retry">{t.review.tryAgain}</Button>
           )}
           <Link href="/teacher/gradebook">
-            <Button variant="ghost" data-testid="button-review-back">Back to Grade Book</Button>
+            <Button variant="ghost" data-testid="button-review-back">{t.review.backToGradeBook}</Button>
           </Link>
         </div>
       </div>
@@ -138,8 +133,10 @@ function SubmissionReviewContent() {
 
   const wrongList = (review?.questions || []).filter((q) => q.verdict === "wrong" || q.verdict === "partial");
   const mistakesLabel = wrongList.length === 0
-    ? "All answers correct"
-    : "Missed " + wrongList.map((q) => `Q${q.index + 1}${q.verdict === "partial" ? " (partial)" : ""}`).join(", ");
+    ? t.review.allCorrect
+    : t.review.missed(
+        wrongList.map((q) => `Q${q.index + 1}${q.verdict === "partial" ? t.review.partialSuffix : ""}`).join(", "),
+      );
 
   return (
     <div className="min-h-screen bg-background">
@@ -147,7 +144,7 @@ function SubmissionReviewContent() {
         <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-4">
           <Link href="/teacher/gradebook" className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
-            <span className="text-sm">Back to Grade Book</span>
+            <span className="text-sm">{t.review.backToGradeBook}</span>
           </Link>
           <div className="flex items-center gap-3">
             <img src={logoPath} alt="On Point" className="h-8 w-auto" />
@@ -177,7 +174,7 @@ function SubmissionReviewContent() {
                     <div className="text-2xl font-bold tabular-nums" data-testid="text-total-score">
                       {isMarked ? `${review.totalScore}/${review.assignment.totalMarks}` : "—"}
                     </div>
-                    <div className="text-xs text-muted-foreground">{isMarked ? "total" : "awaiting mark"}</div>
+                    <div className="text-xs text-muted-foreground">{isMarked ? t.review.total : t.review.awaitingMark}</div>
                   </div>
                 </div>
               </CardHeader>
@@ -215,15 +212,15 @@ function SubmissionReviewContent() {
                         <div className="min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-semibold">Question {q.index + 1}</span>
-                            <Badge variant="outline" className="text-[10px]">{TYPE_LABEL[q.type] || q.type}</Badge>
-                            {q.teacherAdjusted && <Badge variant="secondary" className="text-[10px]" data-testid={`badge-adjusted-${q.index}`}>Teacher-adjusted</Badge>}
+                            <Badge variant="outline" className="text-[10px]">{typeLabel(t, q.type) || q.type}</Badge>
+                            {q.teacherAdjusted && <Badge variant="secondary" className="text-[10px]" data-testid={`badge-adjusted-${q.index}`}>{t.review.teacherAdjusted}</Badge>}
                           </div>
                           <p className="text-sm mt-1">{q.questionText}</p>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           {q.verdict === "correct" && <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />}
                           {q.verdict === "wrong" && <XCircle className="h-5 w-5 text-destructive" />}
-                          {q.verdict === "partial" && <Badge className="bg-amber-500 text-white">Partial</Badge>}
+                          {q.verdict === "partial" && <Badge className="bg-amber-500 text-white">{t.review.partial}</Badge>}
                           <span className="font-bold tabular-nums" data-testid={`score-${q.index}`}>{q.score}/{q.maxScore}</span>
                         </div>
                       </div>
@@ -238,14 +235,14 @@ function SubmissionReviewContent() {
 
                       {/* Student answer — prominent for written work. */}
                       <div className={`rounded-lg border p-3 ${isWritten ? "bg-muted/40" : ""}`}>
-                        <div className="text-xs font-medium text-muted-foreground mb-1">Student's answer</div>
+                        <div className="text-xs font-medium text-muted-foreground mb-1">{t.review.studentsAnswer}</div>
                         {q.studentAnswerDisplay ? (
                           <p className={`whitespace-pre-wrap break-words ${isWritten ? "text-base" : "text-sm font-medium"}`} data-testid={`answer-${q.index}`}>
                             {q.studentAnswerDisplay}
                           </p>
                         ) : (
                           <p className="text-sm italic text-muted-foreground">
-                            {review.hasAnswerData ? "No answer given" : "Answer data not recorded"}
+                            {review.hasAnswerData ? t.review.noAnswerGiven : t.review.noAnswerData}
                           </p>
                         )}
                         {q.studentAnswerImages.length > 0 && (
@@ -266,7 +263,7 @@ function SubmissionReviewContent() {
                           className="rounded-lg border-l-4 border-primary bg-primary/5 p-3"
                           data-testid={`model-answer-${q.index}`}
                         >
-                          <div className="text-xs font-medium text-primary mb-1">Model answer</div>
+                          <div className="text-xs font-medium text-primary mb-1">{t.review.modelAnswer}</div>
                           <p className="text-sm whitespace-pre-wrap break-words">{q.modelAnswer}</p>
                         </div>
                       )}
@@ -274,7 +271,7 @@ function SubmissionReviewContent() {
                       {/* Correct answer (auto-markable types only). */}
                       {q.autoMarkable && (
                         <div className="text-sm">
-                          <span className="text-muted-foreground">Correct answer: </span>
+                          <span className="text-muted-foreground">{t.review.correctAnswer} </span>
                           <span className="font-medium">{q.correctAnswerDisplay || "—"}</span>
                           {q.acceptedAnswers && q.acceptedAnswers.length > 1 && (
                             <span className="text-muted-foreground"> (also accepts: {q.acceptedAnswers.slice(1).join(", ")})</span>
@@ -289,7 +286,7 @@ function SubmissionReviewContent() {
                       {isMarked && (
                         <div className="flex items-center gap-2 pt-1 border-t mt-1">
                           <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-                          <span className="text-xs text-muted-foreground">Override:</span>
+                          <span className="text-xs text-muted-foreground">{t.review.override}</span>
                           <Input
                             type="number" min={0} max={q.maxScore}
                             className="h-8 w-20"
@@ -323,9 +320,15 @@ function SubmissionReviewContent() {
 // The safety net. If anything inside the review throws, the teacher sees a
 // message with a way back instead of the whole app going blank — one odd
 // submission can never white-screen them out of the Grade Book.
+/** A question type, as a teacher reads it. The code is the data. */
+function typeLabel(t: Translation, type: string): string {
+  return (t.review.types as Record<string, string>)[type] ?? type;
+}
+
 export default function SubmissionReview() {
+  const t = useT();
   return (
-    <PageErrorBoundary backHref="/teacher/gradebook" backLabel="Back to Grade Book" label="submission-review">
+    <PageErrorBoundary backHref="/teacher/gradebook" backLabel={t.review.backToGradeBook} label="submission-review">
       <SubmissionReviewContent />
     </PageErrorBoundary>
   );

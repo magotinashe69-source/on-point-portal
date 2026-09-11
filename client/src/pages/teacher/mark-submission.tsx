@@ -29,6 +29,7 @@ import {
 import { Lightbox } from "@/components/Lightbox";
 import type { Submission, Assignment, Mark, Student } from "@shared/schema";
 import logoPath from "@assets/logo.webp";
+import { useT } from "@/lib/i18n";
 
 const markQuestionSchema = z.object({
   questionId: z.string(),
@@ -45,6 +46,7 @@ const markFormSchema = z.object({
 type MarkForm = z.infer<typeof markFormSchema>;
 
 export default function MarkSubmission() {
+  const t = useT();
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { teacher } = useAuth();
@@ -134,21 +136,21 @@ export default function MarkSubmission() {
         queryClient.invalidateQueries({ queryKey: ["/api/submissions"] });
         queryClient.invalidateQueries({ queryKey: ["/api/marks"] });
         toast({
-          title: "Submission marked",
-          description: "The student can now see the mark.",
+          title: t.marking.marked,
+          description: t.marking.markedNote,
         });
         setLocation(`/teacher/assignments/${submission.assignmentId}`);
       } else {
         toast({
-          title: "Mark not saved",
+          title: t.marking.notSaved,
           description: data.message || "Check the form and try again.",
           variant: "destructive",
         });
       }
     } catch (error) {
       toast({
-        title: "Mark not saved",
-        description: "Check your connection and try again.",
+        title: t.marking.notSaved,
+        description: t.common.checkConnection,
         variant: "destructive",
       });
     } finally {
@@ -176,7 +178,7 @@ export default function MarkSubmission() {
         <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-4">
           <Link href="/teacher/dashboard" className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
-            <span className="text-sm">Back to Dashboard</span>
+            <span className="text-sm">{t.submit.backToDashboard}</span>
           </Link>
           <div className="flex items-center gap-3">
             <img src={logoPath} alt="On Point" className="h-8 w-auto" />
@@ -194,9 +196,9 @@ export default function MarkSubmission() {
           <>
             <div className="mb-8">
               <div className="flex items-center gap-3 mb-2 flex-wrap">
-                <h1 className="text-3xl font-bold">Mark Submission</h1>
+                <h1 className="text-3xl font-bold">{t.marking.title}</h1>
                 <Badge variant={submission.status === "MARKED" ? "default" : "secondary"}>
-                  {submission.status === "MARKED" ? "Already Marked" : "Needs Review"}
+                  {submission.status === "MARKED" ? t.marking.alreadyMarked : t.marking.needsReview}
                 </Badge>
               </div>
               <p className="text-muted-foreground">
@@ -209,12 +211,12 @@ export default function MarkSubmission() {
                 <CardHeader className="pb-2">
                   <div className="flex items-center gap-2">
                     <AlertTriangle className="h-5 w-5 text-destructive" />
-                    <CardTitle className="text-destructive">AI Detection Alert</CardTitle>
+                    <CardTitle className="text-destructive">{t.marking.aiAlert}</CardTitle>
                   </div>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm mb-2">
-                    <strong>AI Score:</strong> {aiAnalysis?.overallScore}% likelihood of AI-generated content
+                    <strong>{t.marking.aiScore}</strong> {t.marking.aiScoreNote(aiAnalysis?.overallScore ?? 0)}
                   </p>
                   <div className="flex flex-wrap gap-2 mb-2">
                     {aiAnalysis?.flags.map((flag, i) => (
@@ -258,7 +260,7 @@ export default function MarkSubmission() {
                       <CardContent className="space-y-4">
                         <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
                           <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium">Quick Mark:</span>
+                            <span className="text-sm font-medium">{t.marking.quickMark}</span>
                             <Button
                               type="button"
                               size="sm"
@@ -268,7 +270,7 @@ export default function MarkSubmission() {
                               data-testid={`button-full-marks-${index}`}
                             >
                               <Check className="h-4 w-4 mr-1" />
-                              Full
+                              {t.marking.full}
                             </Button>
                             <Button
                               type="button"
@@ -279,7 +281,7 @@ export default function MarkSubmission() {
                               data-testid={`button-zero-marks-${index}`}
                             >
                               <XCircle className="h-4 w-4 mr-1" />
-                              Zero
+                              {t.marking.zero}
                             </Button>
                             <Button
                               type="button"
@@ -288,12 +290,12 @@ export default function MarkSubmission() {
                               onClick={() => form.setValue(`questionMarks.${index}.score`, Math.round(question.maxScore / 2))}
                               data-testid={`button-half-marks-${index}`}
                             >
-                              Half
+                              {t.marking.half}
                             </Button>
                           </div>
                           <div className="flex items-center gap-1">
                             <span className="text-xs text-muted-foreground mr-1">
-                              <Highlighter className="h-3 w-3 inline" /> Highlight:
+                              <Highlighter className="h-3 w-3 inline" /> {t.marking.highlight}
                             </span>
                             <Button
                               type="button"
@@ -328,9 +330,9 @@ export default function MarkSubmission() {
                           answerHighlights[question.id] === 'red' ? 'bg-red-100 dark:bg-red-900/40 border-2 border-red-400' :
                           'bg-muted'
                         }`}>
-                          <p className="text-sm font-medium mb-2">Student's Answer:</p>
+                          <p className="text-sm font-medium mb-2">{t.marking.studentsAnswer}</p>
                           <p className="whitespace-pre-wrap mb-4">
-                            {studentAnswer?.answerText || <em className="text-muted-foreground">No text answer provided</em>}
+                            {studentAnswer?.answerText || <em className="text-muted-foreground">{t.marking.noTextAnswer}</em>}
                           </p>
                           
                           {hasImages && (
@@ -428,10 +430,10 @@ export default function MarkSubmission() {
                             name={`questionMarks.${index}.feedback`}
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Feedback (optional)</FormLabel>
+                                <FormLabel>{t.marking.feedback}</FormLabel>
                                 <FormControl>
                                   <Input
-                                    placeholder="Feedback for this question..."
+                                    placeholder={t.marking.feedbackPlaceholder}
                                     data-testid={`input-feedback-${index}`}
                                     {...field}
                                   />
@@ -448,7 +450,7 @@ export default function MarkSubmission() {
 
                 <Card>
                   <CardHeader>
-                    <CardTitle>Overall Feedback</CardTitle>
+                    <CardTitle>{t.marking.overallFeedback}</CardTitle>
                     <CardDescription>
                       Total Score: <strong>{totalScore}</strong> / {totalMaxScore}
                     </CardDescription>
@@ -459,10 +461,10 @@ export default function MarkSubmission() {
                       name="feedback"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>General Comments</FormLabel>
+                          <FormLabel>{t.marking.generalComments}</FormLabel>
                           <FormControl>
                             <Textarea
-                              placeholder="Provide overall feedback for the student..."
+                              placeholder={t.marking.generalCommentsPlaceholder}
                               className="min-h-[100px]"
                               data-testid="textarea-overall-feedback"
                               {...field}
@@ -486,14 +488,14 @@ export default function MarkSubmission() {
                   ) : (
                     <CheckCircle className="h-4 w-4 mr-2" />
                   )}
-                  {submission.status === "MARKED" ? "Update Mark" : "Save mark"}
+                  {submission.status === "MARKED" ? t.marking.updateMark : t.marking.saveMark}
                 </Button>
               </form>
             </Form>
           </>
         ) : (
           <div className="text-center py-16">
-            <p className="text-muted-foreground">Submission not found</p>
+            <p className="text-muted-foreground">{t.marking.notFound}</p>
           </div>
         )}
       </main>

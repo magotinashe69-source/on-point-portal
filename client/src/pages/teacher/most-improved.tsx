@@ -20,9 +20,10 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { apiErrorMessage } from "@/lib/api-error";
 import { subjectLabel, SUBJECT_LABELS } from "@shared/weekly-report";
-import { IMPROVED_TEXT, type ImprovementRow } from "@shared/certificates";
+import { type ImprovementRow } from "@shared/certificates";
 import { ArrowLeft, Award, Loader2, TrendingUp } from "lucide-react";
 import logoPath from "@assets/logo.webp";
+import { subjectName, useT } from "@/lib/i18n";
 
 const FORMS = ["Stage 3", "Stage 4", "Stage 5", "Stage 6", "Form 1", "Form 2"];
 const SUBJECTS = Object.keys(SUBJECT_LABELS);
@@ -44,6 +45,7 @@ function defaultPeriods() {
 }
 
 export default function MostImprovedPage() {
+  const t = useT();
   const [, setLocation] = useLocation();
   const { teacher } = useAuth();
   const { toast } = useToast();
@@ -97,7 +99,7 @@ export default function MostImprovedPage() {
       if (body.success) {
         setAwarded((prev) => new Set(prev).add(row.studentId));
         toast({
-          title: body.alreadyAwarded ? body.message : IMPROVED_TEXT.awarded,
+          title: body.alreadyAwarded ? body.message : t.mostImproved.awarded,
           description: body.alreadyAwarded ? undefined : `${row.fullName} — it is on their certificates page now.`,
         });
       } else {
@@ -137,9 +139,9 @@ export default function MostImprovedPage() {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <Award className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-bold">{IMPROVED_TEXT.title}</h1>
+            <h1 className="text-2xl font-bold">{t.mostImproved.title}</h1>
           </div>
-          <p className="text-sm text-muted-foreground">{IMPROVED_TEXT.subtitle}</p>
+          <p className="text-sm text-muted-foreground">{t.mostImproved.subtitle}</p>
         </div>
 
         <Card>
@@ -147,7 +149,7 @@ export default function MostImprovedPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Select value={form} onValueChange={setForm}>
                 <SelectTrigger data-testid="select-improved-form">
-                  <SelectValue placeholder={IMPROVED_TEXT.pickClass} />
+                  <SelectValue placeholder={t.mostImproved.pickClass} />
                 </SelectTrigger>
                 <SelectContent>
                   {FORMS.map((f) => <SelectItem key={f} value={f}>{f}</SelectItem>)}
@@ -156,17 +158,17 @@ export default function MostImprovedPage() {
 
               <Select value={subject} onValueChange={setSubject}>
                 <SelectTrigger data-testid="select-improved-subject">
-                  <SelectValue placeholder={IMPROVED_TEXT.pickSubject} />
+                  <SelectValue placeholder={t.mostImproved.pickSubject} />
                 </SelectTrigger>
                 <SelectContent>
-                  {SUBJECTS.map((s) => <SelectItem key={s} value={s}>{subjectLabel(s)}</SelectItem>)}
+                  {SUBJECTS.map((s) => <SelectItem key={s} value={s}>{subjectName(t, s)}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs">{IMPROVED_TEXT.before}</Label>
+                <Label className="text-xs">{t.mostImproved.before}</Label>
                 <div className="flex gap-2 mt-1">
                   <Input type="date" value={periods.beforeFrom}
                     onChange={(e) => setPeriods({ ...periods, beforeFrom: e.target.value })}
@@ -177,7 +179,7 @@ export default function MostImprovedPage() {
                 </div>
               </div>
               <div>
-                <Label className="text-xs">{IMPROVED_TEXT.after}</Label>
+                <Label className="text-xs">{t.mostImproved.after}</Label>
                 <div className="flex gap-2 mt-1">
                   <Input type="date" value={periods.afterFrom}
                     onChange={(e) => setPeriods({ ...periods, afterFrom: e.target.value })}
@@ -191,7 +193,7 @@ export default function MostImprovedPage() {
 
             <Button onClick={compare} disabled={loading} data-testid="button-compare">
               {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <TrendingUp className="h-4 w-4 mr-2" />}
-              {IMPROVED_TEXT.run}
+              {t.mostImproved.run}
             </Button>
           </CardContent>
         </Card>
@@ -199,7 +201,7 @@ export default function MostImprovedPage() {
         {rows && rankable.length === 0 && (
           <Card>
             <CardContent className="py-10 text-center text-sm text-muted-foreground" data-testid="text-no-candidates">
-              {IMPROVED_TEXT.noCandidates}
+              {t.mostImproved.noCandidates}
             </CardContent>
           </Card>
         )}
@@ -215,7 +217,7 @@ export default function MostImprovedPage() {
                 {/* The school's id, because two children can share a name. */}
                 <p className="text-xs text-muted-foreground">ID: {r.pupilId}</p>
                 <p className="text-sm mt-1" data-testid={`text-movement-${r.studentId}`}>
-                  {IMPROVED_TEXT.movement(r.beforePercent!, r.afterPercent!)}
+                  {t.mostImproved.movement(r.beforePercent!, r.afterPercent!)}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {r.beforeMarked} marked before · {r.afterMarked} after
@@ -231,7 +233,7 @@ export default function MostImprovedPage() {
                 {awarding === r.studentId
                   ? <Loader2 className="h-4 w-4 mr-1 animate-spin" />
                   : <Award className="h-4 w-4 mr-1" />}
-                {awarded.has(r.studentId) ? "Awarded" : IMPROVED_TEXT.award}
+                {awarded.has(r.studentId) ? "Awarded" : t.mostImproved.award}
               </Button>
             </CardContent>
           </Card>
@@ -250,7 +252,7 @@ export default function MostImprovedPage() {
                   </Badge>
                 ))}
               </div>
-              <p className="text-xs text-muted-foreground mt-2">{IMPROVED_TEXT.cannotRank}.</p>
+              <p className="text-xs text-muted-foreground mt-2">{t.mostImproved.cannotRank}.</p>
             </CardContent>
           </Card>
         )}
