@@ -26,7 +26,7 @@ import { SimpleUploader } from "@/components/SimpleUploader";
 import { FileAttachmentZone } from "@/components/FileAttachmentZone";
 import type { AttachmentFile } from "@/components/FileAttachmentZone";
 import type { Student, Assignment, Submission } from "@shared/schema";
-import { useT } from "@/lib/i18n";
+import { SUBJECT_CODES, subjectName, useT } from "@/lib/i18n";
 
 // The question types a teacher can choose. "written" is marked by hand (the
 // original behaviour); the other four are marked automatically in code.
@@ -107,7 +107,10 @@ export interface ParsedPaste {
   skipped: SkippedLine[];
 }
 
-export function parsePastedQuestions(raw: string): ParsedPaste {
+export function parsePastedQuestions(
+  raw: string,
+  reasons = { noQuestionText: "No question text", noAnswer: 'No answer — put it after a "|"' },
+): ParsedPaste {
   const questions: ParsedPasteLine[] = [];
   const skipped: SkippedLine[] = [];
 
@@ -116,11 +119,11 @@ export function parsePastedQuestions(raw: string): ParsedPaste {
     const answers = line.parts.slice(1).filter(a => a !== "");
 
     if (questionText === "") {
-      skipped.push({ lineNumber: line.lineNumber, text: line.text, reason: "No question text" });
+      skipped.push({ lineNumber: line.lineNumber, text: line.text, reason: reasons.noQuestionText });
       continue;
     }
     if (answers.length === 0) {
-      skipped.push({ lineNumber: line.lineNumber, text: line.text, reason: 'No answer — put it after a "|"' });
+      skipped.push({ lineNumber: line.lineNumber, text: line.text, reason: reasons.noAnswer });
       continue;
     }
     questions.push({ lineNumber: line.lineNumber, text: line.text, questionText, answers });
@@ -336,7 +339,10 @@ export default function CreateAssignment() {
 
   // What the pasted box currently works out to. Recomputed as they type, so the
   // preview below the box is always what would actually be added.
-  const pastePreview = parsePastedQuestions(pasteText);
+  const pastePreview = parsePastedQuestions(pasteText, {
+    noQuestionText: t.createAssignment.noQuestionText,
+    noAnswer: t.createAssignment.noAnswer,
+  });
 
   // Turn the preview into real questions. Each pasted line becomes a Short text
   // question worth 1 mark, with its answers as the answer key.
@@ -507,7 +513,7 @@ export default function CreateAssignment() {
         explanation: q.explanation?.trim() || undefined,
       };
       const fail = (msg: string) => {
-        toast({ title: `Question ${i + 1}`, description: msg, variant: "destructive" });
+        toast({ title: t.createAssignment.questionNumber(i + 1), description: msg, variant: "destructive" });
       };
 
       if (q.type === "multiple_choice") {
@@ -704,18 +710,9 @@ export default function CreateAssignment() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="MATHS">Maths</SelectItem>
-                            <SelectItem value="ENGLISH">English</SelectItem>
-                            <SelectItem value="SCIENCE">Science</SelectItem>
-                            <SelectItem value="PHYSICS">Physics</SelectItem>
-                            <SelectItem value="CHEMISTRY">Chemistry</SelectItem>
-                            <SelectItem value="BIOLOGY">Biology</SelectItem>
-                            <SelectItem value="ECONOMICS">Economics</SelectItem>
-                            <SelectItem value="BUSINESS_STUDIES">Business Studies</SelectItem>
-                            <SelectItem value="GEOGRAPHY">Geography</SelectItem>
-                            <SelectItem value="COMPUTER_SCIENCE">Computer Science</SelectItem>
-                            <SelectItem value="HISTORY">History</SelectItem>
-                            <SelectItem value="ACCOUNTING">Accounting</SelectItem>
+                            {SUBJECT_CODES.map((code) => (
+                              <SelectItem key={code} value={code}>{subjectName(t, code)}</SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -1012,7 +1009,7 @@ export default function CreateAssignment() {
                               <div key={imgIdx} className="relative group">
                                 <img 
                                   src={url} 
-                                  alt={`Question ${index + 1} image ${imgIdx + 1}`} 
+                                  alt={t.createAssignment.questionImageAlt(index + 1, imgIdx + 1)} 
                                   className="h-20 w-20 object-cover rounded-md border"
                                 />
                                 <Button
@@ -1157,7 +1154,7 @@ export default function CreateAssignment() {
                                         </button>
                                         <Input
                                           value={opt}
-                                          placeholder={`Option ${optIdx + 1}`}
+                                          placeholder={t.createAssignment.optionPlaceholder(optIdx + 1)}
                                           onChange={(e) => setOption(index, optIdx, e.target.value)}
                                           data-testid={`input-option-${index}-${optIdx}`}
                                         />
@@ -1233,7 +1230,7 @@ export default function CreateAssignment() {
                                       <div key={ansIdx} className="flex items-center gap-2">
                                         <Input
                                           value={ans}
-                                          placeholder={`Accepted answer ${ansIdx + 1}`}
+                                          placeholder={t.createAssignment.acceptedPlaceholder(ansIdx + 1)}
                                           onChange={(e) => setAccepted(index, ansIdx, e.target.value)}
                                           data-testid={`input-accepted-${index}-${ansIdx}`}
                                         />
@@ -1295,7 +1292,7 @@ export default function CreateAssignment() {
                   noun={{ one: "question", many: "questions" }}
                   value={pasteText}
                   onValueChange={setPasteText}
-                  placeholder={"What is the capital of Zimbabwe? | Harare\nHow many sides does a triangle have? | 3 | three\nWho wrote Nervous Conditions? | Tsitsi Dangarembga"}
+                  placeholder={t.createAssignment.pasteExample}
                   hint="Tip: add more answers after further bars — “2 + 2 = ? | 4 | four” accepts both."
                   toAdd={pastePreview.questions}
                   keyOfRow={(q) => q.lineNumber}

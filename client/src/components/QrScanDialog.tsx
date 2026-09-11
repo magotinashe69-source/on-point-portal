@@ -14,6 +14,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { AlertTriangle, Loader2 } from "lucide-react";
+import { useT } from "@/lib/i18n";
 
 /** Where the video is mounted. html5-qrcode takes an element id, not a ref. */
 const REGION_ID = "qr-scan-region";
@@ -26,6 +27,7 @@ interface Props {
 }
 
 export function QrScanDialog({ open, onOpenChange, onScanned }: Props) {
+  const t = useT();
   const [status, setStatus] = useState<"starting" | "scanning" | "checking" | "failed">("starting");
   const [message, setMessage] = useState<string | null>(null);
   const scannerRef = useRef<any>(null);
@@ -103,7 +105,7 @@ export function QrScanDialog({ open, onOpenChange, onScanned }: Props) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Scan your card</DialogTitle>
+          <DialogTitle>{t.visiting.scanYourCard}</DialogTitle>
           <DialogDescription>
             Hold your On Point card up to the camera. It will log you in on its own.
           </DialogDescription>
@@ -137,7 +139,7 @@ export function QrScanDialog({ open, onOpenChange, onScanned }: Props) {
         </div>
 
         <Button variant="outline" onClick={() => onOpenChange(false)} data-testid="button-qr-scan-close">
-          {status === "failed" ? "Close" : "Cancel"}
+          {status === "failed" ? t.controls.close : t.controls.cancel}
         </Button>
       </DialogContent>
     </Dialog>

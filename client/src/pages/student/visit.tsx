@@ -10,10 +10,12 @@ import { isPrimaryForm } from "@shared/schema";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ArrowLeft, Loader2, ArrowRight } from "lucide-react";
 import logoPath from "@assets/logo.webp";
+import { useT } from "@/lib/i18n";
 
 interface Neighbour { studentId: number; firstName: string; townName: string; buildingCount: number; }
 
 export default function VisitTowns() {
+  const t = useT();
   const [, setLocation] = useLocation();
   const { student } = useAuth();
 
@@ -36,7 +38,7 @@ export default function VisitTowns() {
         <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-4">
           <Link href="/student/dream-world" className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
-            <span className="text-sm">Back to My Town</span>
+            <span className="text-sm">{t.visiting.backToMyTown}</span>
           </Link>
           <div className="flex items-center gap-3">
             <img src={logoPath} alt="On Point" className="h-8 w-auto" />
@@ -47,14 +49,14 @@ export default function VisitTowns() {
 
       <main className="container mx-auto px-4 py-6 max-w-xl">
         <div className="text-center mb-4">
-          <h1 className="text-2xl font-bold">Visit towns</h1>
+          <h1 className="text-2xl font-bold">{t.visiting.visitTowns}</h1>
           <p className="text-muted-foreground text-sm mt-1">Look around towns built by your classmates in {student.form}.</p>
         </div>
 
         {isLoading ? (
           <div className="flex items-center justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
         ) : neighbours.length === 0 ? (
-          <p className="text-center text-sm text-muted-foreground py-10">No one in your class has started a town yet. Build yours and classmates will be able to visit it.</p>
+          <p className="text-center text-sm text-muted-foreground py-10">{t.visiting.nobodyYet}</p>
         ) : (
           <div className="grid gap-2" data-testid="neighbour-list">
             {neighbours.map((n) => (

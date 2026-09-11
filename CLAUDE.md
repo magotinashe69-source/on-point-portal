@@ -1340,24 +1340,47 @@ Deliberately not on the account: it has to work on the login page, where nobody
 is signed in yet. On a shared family phone this means siblings share the
 setting. Moving it to the account later would still need this as the fallback.
 
-### Covered so far, and what is not
+### What is covered
 
-Done: the three login pages, the student dashboard, the teacher dashboard, the
-assignment screen, the parent portal, and `SyncStatus`.
+Every screen: the three logins, both dashboards, the assignment screen and a
+child's results, the parent portal (dashboard, completed work, areas to
+practise), resources and lessons on both sides, certificates, the skills map,
+the register, the Grade Book, reports, the daily WhatsApp snapshot, the CSV
+export, marking, one submission opened question by question, report cards, Most
+Improved, the question bank, create-assignment, all three games, Dream World,
+and the public front page.
 
 **Still English, and worth knowing:**
 
 * **Messages the SERVER writes.** "That name is not on the class list", and
   every other `data.message`, is composed in `server/routes.ts` and shown as it
   arrives. Translating those means sending a code the client can look up, or
-  telling the server which language to answer in — neither is a small change.
-* **`QueryError`.** Its sentences are built from a `what` phrase passed at
-  around thirty call sites across every screen. Doing it properly means
-  translating the component AND every one of those phrases, which is a pass of
-  its own rather than part of this one.
-* **The other screens** — results, resources, lessons, the games, the report
-  cards, the question bank, mark-submission.
-* **Dates** still use the browser's own locale rather than the chosen language.
+  telling the server which language to answer in — neither is a small change,
+  and it is the one real gap left.
+* **Feedback already STORED on a mark.** `markAnswer()` writes a sentence
+  ("Correct answer: 6.") into the submission when it is marked. That is data by
+  the time anyone reads it, and translating it later would not change a row
+  already written.
+* **Most dates** still follow the browser's own locale. The exception is
+  `longDate()` in `lib/i18n`, used where a date is READ rather than scanned — a
+  certificate, an award — which spells the month out in the chosen language.
+
+### Three rules that came out of doing it
+
+1. **A plain function cannot call a hook.** `parsePastedStudents()`,
+   `parsePastedQuestions()`, `buildWhatsAppText()` and `describeError()` all
+   compose text outside a component, so the wording is handed in as an argument
+   with the English kept as the default. Any other caller reads exactly as it
+   did before.
+2. **A list that is typed out on six screens gets typed out wrong on one of
+   them.** The twelve subjects, the resource types, the question types and the
+   Grade Book's columns were each duplicated across screens; they are now one
+   list in the dictionary, mapped over, keyed by the code the database already
+   stores. `SUBJECT_CODES` and `subjectName()` are in `lib/i18n`.
+3. **Keep the KEY, translate the label.** Where a module-scope map held both
+   (`OUTCOME_STYLE`, the Grade Book's columns, the certificate kinds), the map
+   keeps its colours, icons and codes and the label became the name of a
+   dictionary entry. Nothing at module scope holds a sentence.
 
 ### Proving it — `npm run check:language`
 
@@ -1366,7 +1389,15 @@ missing, nothing blank, nothing left in English). Then a real browser, driven
 with `script/chrome.ts`: switch to Portuguese on the login page, reload to prove
 it stuck, walk a child's dashboard and a real paper, switch back to English,
 then a teacher's dashboard and a parent's portal — checking at each step that
-the interface changed and the teacher's own words did not. 41 checks.
+the interface changed and the teacher's own words did not. It then walks
+fourteen more screens, checking each says the Portuguese and not the English.
+69 checks.
+
+The walk is grouped by **who is signed in**, and signs in again before each
+group. The three portals share one browser, and `setSessionRole()` gives a
+browser exactly one role — so logging in as the teacher ends the child's session
+in the other tab. Without the re-login every screen would quietly be a login
+page, which passes "no English left" while proving nothing.
 
 ## How to work in this codebase (important)
 

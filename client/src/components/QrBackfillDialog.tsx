@@ -22,6 +22,7 @@ import { AlertTriangle, Check, HelpCircle, Loader2 } from "lucide-react";
 import { parsePastedCardCodes, type SkippedLine } from "@/lib/bulk-paste";
 import { matchName, type MatchKind } from "@/lib/name-match";
 import type { Student } from "@shared/schema";
+import { useT } from "@/lib/i18n";
 
 /** One pasted line, once we have decided who it refers to. */
 interface Row {
@@ -45,6 +46,7 @@ interface Props {
 }
 
 export function QrBackfillDialog({ open, onOpenChange, students, onSave, onDone }: Props) {
+  const t = useT();
   const [pasted, setPasted] = useState("");
   const [reviewing, setReviewing] = useState(false);
   const [approved, setApproved] = useState<Record<number, boolean>>({});
@@ -303,10 +305,10 @@ export function QrBackfillDialog({ open, onOpenChange, students, onSave, onDone 
 
         <DialogFooter>
           {result ? (
-            <Button onClick={close} data-testid="button-qr-close">Close</Button>
+            <Button onClick={close} data-testid="button-qr-close">{t.controls.close}</Button>
           ) : !reviewing ? (
             <>
-              <Button variant="outline" onClick={close}>Cancel</Button>
+              <Button variant="outline" onClick={close}>{t.controls.cancel}</Button>
               <Button onClick={review} disabled={pasted.trim() === ""} data-testid="button-qr-review">
                 Check matches
               </Button>

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import logoPath from "@assets/logo.webp";
+import { useT } from "@/lib/i18n";
 
 // ---------------------------------------------------------------------------
 // On Point landing page.
@@ -29,44 +30,45 @@ const GOLD = "#BF9000";
 // The subjects shown as tiles, each with its own colour. "More subjects"
 // points at the rest.
 const SUBJECTS = [
-  { name: "Maths", color: "#EF6F6C" },
-  { name: "English", color: "#5B8DEF" },
-  { name: "Science", color: "#3DB47E" },
-  { name: "Business", color: "#E0A106" },
-  { name: "Computer Science", color: "#9B6DDF" },
-  { name: "More subjects", color: "#EF8FB4" },
-];
+  { key: "maths", color: "#EF6F6C" },
+  { key: "english", color: "#5B8DEF" },
+  { key: "science", color: "#3DB47E" },
+  { key: "business", color: "#E0A106" },
+  { key: "computing", color: "#9B6DDF" },
+  { key: "more", color: "#EF8FB4" },
+] as const;
 
 // The four feature cards. Pastel backgrounds keep them light.
 // Features that aren't built yet carry a "Coming soon" ribbon.
 const FEATURES = [
-  { title: "Homework", bg: "#E3F2FD", desc: "See your assignments and hand in your work.", href: "/student/login", soon: false },
-  { title: "Practice Quizzes", bg: "#E8F5E9", desc: "Get an instant score the moment you finish.", href: "/student/login", soon: false },
-  { title: "Earn Rewards", bg: "#FFF3E0", desc: "Earn XP and awards for work you hand in.", href: "/student/login", soon: false },
-  { title: "Games", bg: "#F3E8FF", desc: "Practise by playing — penalty shootout, treasure island and dream world.", href: "/student/login", soon: false },
-];
+  { key: "homework", bg: "#E3F2FD", href: "/student/login", soon: false },
+  { key: "quizzes", bg: "#E8F5E9", href: "/student/login", soon: false },
+  { key: "rewards", bg: "#FFF3E0", href: "/student/login", soon: false },
+  { key: "games", bg: "#F3E8FF", href: "/student/login", soon: false },
+] as const;
 
 // Honest facts about the app (checked against the code — no exaggeration).
 // Stage 3-6 plus Form 1-2 is six. Nothing else here was verifiable, so
 // nothing else is claimed.
 const STATS = [
-  { value: "6", label: "Year groups" },
-];
+  { value: "6", key: "yearGroups" },
+] as const;
 
 // Nav links. "#" links scroll to a section on this page; Games and Rewards go
 // to the student login (the real games/rewards live behind login for primary
 // classes) rather than to a "coming soon" placeholder.
 const NAV_LINKS = [
-  { label: "Home", href: "/" },
-  { label: "Subjects", href: "#subjects" },
-  { label: "Games", href: "/student/login" },
-  { label: "Rewards", href: "/student/login" },
-];
+  { key: "home", href: "/" },
+  { key: "subjects", href: "#subjects" },
+  { key: "games", href: "/student/login" },
+  { key: "rewards", href: "/student/login" },
+] as const;
 
 // A little backpack drawn as SVG — floats over the subjects strip.
 function Backpack() {
+  const t = useT();
   return (
-    <svg viewBox="0 0 100 110" className="w-full h-full" role="img" aria-label="Backpack">
+    <svg viewBox="0 0 100 110" className="w-full h-full" role="img" aria-label={t.landing.backpack}>
       <rect x="18" y="30" width="64" height="70" rx="18" fill={GOLD} />
       <rect x="30" y="55" width="40" height="30" rx="8" fill="#fff" opacity="0.9" />
       <path d="M35 32 q15 -22 30 0" fill="none" stroke="#fff" strokeWidth="6" strokeLinecap="round" />
@@ -76,6 +78,7 @@ function Backpack() {
 }
 
 export default function Landing() {
+  const t = useT();
   // Tiny bit of state: whether the mobile menu is open. Kept simple.
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -94,12 +97,12 @@ export default function Landing() {
           <nav className="hidden md:flex items-center gap-6 font-semibold" style={{ color: NAVY }}>
             {NAV_LINKS.map((l) => (
               l.href.startsWith("#") ? (
-                <a key={l.label} href={l.href} className="hover:opacity-70 transition-opacity" data-testid={`nav-${l.label.toLowerCase()}`}>
-                  {l.label}
+                <a key={l.key} href={l.href} className="hover:opacity-70 transition-opacity" data-testid={`nav-${l.key}`}>
+                  {t.landing[l.key]}
                 </a>
               ) : (
-                <Link key={l.label} href={l.href} className="hover:opacity-70 transition-opacity" data-testid={`nav-${l.label.toLowerCase()}`}>
-                  {l.label}
+                <Link key={l.key} href={l.href} className="hover:opacity-70 transition-opacity" data-testid={`nav-${l.key}`}>
+                  {t.landing[l.key]}
                 </Link>
               )
             ))}
@@ -107,14 +110,14 @@ export default function Landing() {
 
           <div className="flex items-center gap-2">
             <Link href="/student/login" className="font-semibold px-3 py-2 rounded-full hover:bg-black/5 transition-colors" style={{ color: NAVY }} data-testid="link-login">
-              Log In
+              {t.landing.logIn}
             </Link>
             {/* Mobile menu button */}
             <button
               className="md:hidden p-2 rounded-lg"
               style={{ color: NAVY }}
               onClick={() => setMenuOpen((o) => !o)}
-              aria-label={menuOpen ? "Close menu" : "Open menu"}
+              aria-label={menuOpen ? t.landing.closeMenu : t.landing.openMenu}
               aria-expanded={menuOpen}
               data-testid="button-menu"
             >
@@ -130,16 +133,16 @@ export default function Landing() {
           <nav className="md:hidden border-t border-black/5 bg-white px-4 py-3 flex flex-col gap-1 font-semibold" style={{ color: NAVY }}>
             {NAV_LINKS.map((l) => (
               l.href.startsWith("#") ? (
-                <a key={l.label} href={l.href} className="py-2 px-2 rounded-lg hover:bg-black/5" onClick={() => setMenuOpen(false)}>
-                  {l.label}
+                <a key={l.key} href={l.href} className="py-2 px-2 rounded-lg hover:bg-black/5" onClick={() => setMenuOpen(false)}>
+                  {t.landing[l.key]}
                 </a>
               ) : (
-                <Link key={l.label} href={l.href} className="py-2 px-2 rounded-lg hover:bg-black/5" onClick={() => setMenuOpen(false)}>
-                  {l.label}
+                <Link key={l.key} href={l.href} className="py-2 px-2 rounded-lg hover:bg-black/5" onClick={() => setMenuOpen(false)}>
+                  {t.landing[l.key]}
                 </Link>
               )
             ))}
-            <Link href="/student/login" className="py-2 px-2 rounded-lg hover:bg-black/5" onClick={() => setMenuOpen(false)}>Log In</Link>
+            <Link href="/student/login" className="py-2 px-2 rounded-lg hover:bg-black/5" onClick={() => setMenuOpen(false)}>{t.landing.logIn}</Link>
           </nav>
         )}
       </header>
@@ -184,7 +187,7 @@ export default function Landing() {
                 className="inline-block rounded-lg bg-accent px-8 py-4 font-sans text-lg font-semibold text-accent-foreground transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
                 data-testid="button-student-start"
               >
-                Log In
+                {t.landing.logIn}
               </Link>
             </div>
           </div>
@@ -209,7 +212,7 @@ export default function Landing() {
           <div className="op-slide-in flex justify-center" style={{ animationDelay: "0.15s" }}>
             <img
               src="/assignment.jpeg"
-              alt="The assignment screen on a phone: a list of maths questions, each in its own card with the marks available beside it — place value, number sequences, the faces of a cube, multiplication and addition."
+              alt={t.landing.screenshotAlt}
               className="w-full h-auto max-w-xs rounded-lg border border-white/25"
               width={725}
               height={1280}
@@ -229,7 +232,7 @@ export default function Landing() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           {FEATURES.map((f, i) => (
             <Link
-              key={f.title}
+              key={t.landing.features[f.key]}
               href={f.href}
               className="op-lift op-slide-in relative rounded-3xl p-5 sm:p-6 text-center overflow-hidden block"
               style={{ backgroundColor: f.bg, animationDelay: `${i * 0.08}s` }}
@@ -243,8 +246,8 @@ export default function Landing() {
                   Coming soon
                 </span>
               )}
-              <h3 className="font-extrabold text-base sm:text-lg mb-1" style={{ color: NAVY }}>{f.title}</h3>
-              <p className="text-xs sm:text-sm text-black/60">{f.desc}</p>
+              <h3 className="font-extrabold text-base sm:text-lg mb-1" style={{ color: NAVY }}>{t.landing.features[f.key]}</h3>
+              <p className="text-xs sm:text-sm text-black/60">{t.landing.features[`${f.key}Note`]}</p>
             </Link>
           ))}
         </div>
@@ -263,7 +266,7 @@ export default function Landing() {
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             {SUBJECTS.map((s, i) => (
               <div
-                key={s.name}
+                key={t.landing.subjectTiles[s.key]}
                 className="op-lift op-slide-in rounded-2xl bg-white/95 p-5 flex items-center gap-3 shadow-sm"
                 style={{ animationDelay: `${i * 0.06}s` }}
                 data-testid={`tile-subject-${i}`}
@@ -273,7 +276,7 @@ export default function Landing() {
                   style={{ width: 48, height: 48, backgroundColor: s.color }}
                   aria-hidden="true"
                 />
-                <span className="font-bold" style={{ color: NAVY }}>{s.name}</span>
+                <span className="font-bold" style={{ color: NAVY }}>{t.landing.subjectTiles[s.key]}</span>
               </div>
             ))}
           </div>
@@ -284,9 +287,9 @@ export default function Landing() {
       <section className="py-10" style={{ backgroundColor: "#FFF7E6" }}>
         <div className="mx-auto max-w-6xl px-4 flex flex-wrap justify-center gap-12 text-center">
           {STATS.map((s, i) => (
-            <div key={s.label} className="op-slide-in" style={{ animationDelay: `${i * 0.08}s` }} data-testid={`stat-${i}`}>
+            <div key={t.landing[s.key]} className="op-slide-in" style={{ animationDelay: `${i * 0.08}s` }} data-testid={`stat-${i}`}>
               <div className="text-3xl sm:text-4xl font-extrabold" style={{ color: GOLD }}>{s.value}</div>
-              <div className="font-semibold mt-1" style={{ color: NAVY }}>{s.label}</div>
+              <div className="font-semibold mt-1" style={{ color: NAVY }}>{t.landing[s.key]}</div>
             </div>
           ))}
         </div>
@@ -307,7 +310,7 @@ export default function Landing() {
             style={{ backgroundColor: GOLD }}
             data-testid="button-final-cta"
           >
-            Log In
+            {t.landing.logIn}
           </Link>
         </div>
       </section>
@@ -319,7 +322,7 @@ export default function Landing() {
             <img src={logoPath} alt="On Point Education Centre" className="h-8 w-auto" />
             <span className="font-extrabold" style={{ color: NAVY }}>On Point Education Centre</span>
           </div>
-          <p className="text-sm text-black/50 mb-4">Quality Beyond Measure</p>
+          <p className="text-sm text-black/50 mb-4">{t.common.tagline}</p>
           {/* Parent and teacher access are kept discreet here — the main page
               is for pupils — while still being easy to find. */}
           <div className="flex items-center justify-center gap-4">

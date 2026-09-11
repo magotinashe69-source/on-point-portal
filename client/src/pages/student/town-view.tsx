@@ -14,6 +14,7 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import { AWARDS, type AwardId, type Placed } from "@shared/dreamworld";
 import { TownPlot } from "@/components/TownPlot";
 import logoPath from "@assets/logo.webp";
+import { useT } from "@/lib/i18n";
 
 interface TownView {
   studentId: number;
@@ -28,6 +29,7 @@ interface TownView {
 }
 
 export default function TownViewPage() {
+  const t = useT();
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { student } = useAuth();
@@ -54,7 +56,7 @@ export default function TownViewPage() {
         <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-4">
           <Link href="/student/visit" className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
-            <span className="text-sm">Back to Towns</span>
+            <span className="text-sm">{t.visiting.backToTowns}</span>
           </Link>
           <div className="flex items-center gap-3">
             <img src={logoPath} alt="On Point" className="h-8 w-auto" />
@@ -86,7 +88,7 @@ export default function TownViewPage() {
 
             <TownPlot layout={town.layout} interactive={false} gridSize={town.gridSize} />
 
-            <p className="text-center text-xs text-muted-foreground mt-3">You are visiting. You cannot change this town.</p>
+            <p className="text-center text-xs text-muted-foreground mt-3">{t.visiting.visitingNote}</p>
           </>
         )}
       </main>

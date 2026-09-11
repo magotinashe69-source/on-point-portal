@@ -3,8 +3,10 @@
 // Resources with a zero amount (usually gems on a lower score) are hidden.
 
 import { resourceLabel, type Wallet } from "@shared/dreamworld";
+import { useT } from "@/lib/i18n";
 
 export function ResourcePayout({ payout }: { payout: Wallet }) {
+  const t = useT();
   const parts = [
     { key: "coins" as const, n: payout.coins },
     { key: "bricks" as const, n: payout.bricks },
@@ -19,7 +21,7 @@ export function ResourcePayout({ payout }: { payout: Wallet }) {
       className="inline-flex flex-wrap items-center justify-center gap-x-3 gap-y-1 rounded-full border bg-muted/40 px-4 py-2 text-sm"
       data-testid="resource-payout"
     >
-      <span className="text-muted-foreground">You earned</span>
+      <span className="text-muted-foreground">{t.visiting.youEarned}</span>
       {parts.map((p, i) => (
         <span key={i} className="font-bold tabular-nums">
           {p.n} {resourceLabel(p.key, p.n)}

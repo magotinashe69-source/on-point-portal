@@ -10,6 +10,7 @@ import { XpRewardBadge } from "@/components/XpRewardBadge";
 import { ResourcePayout } from "@/components/ResourcePayout";
 import type { XpAward } from "@/lib/xp-handoff";
 import type { Wallet } from "@shared/dreamworld";
+import { useT } from "@/lib/i18n";
 
 interface TreasureRewardModalProps {
   rewardName: string;        // e.g. "Golden Compass"
@@ -20,6 +21,7 @@ interface TreasureRewardModalProps {
 }
 
 export function TreasureRewardModal({ rewardName, xp, resources, onClose, onViewMap }: TreasureRewardModalProps) {
+  const t = useT();
   const Treasure = collectibleIcon(rewardName);
   const description = COLLECTIBLES.find((c) => c.name === rewardName)?.description ?? "";
 
@@ -116,7 +118,7 @@ export function TreasureRewardModal({ rewardName, xp, resources, onClose, onView
 
         </svg>
 
-        <p className="text-sm font-semibold uppercase tracking-wide text-primary mt-2">Treasure found!</p>
+        <p className="text-sm font-semibold uppercase tracking-wide text-primary mt-2">{t.visiting.treasureFound}</p>
         <h2 className="text-2xl font-bold mt-1" data-testid="text-reward-name">{rewardName}</h2>
         {description && <p className="text-sm text-muted-foreground mt-1">{description}</p>}
 
@@ -134,7 +136,7 @@ export function TreasureRewardModal({ rewardName, xp, resources, onClose, onView
           </div>
         )}
 
-        <p className="text-xs text-muted-foreground mt-3">Added to your Treasure Island collection.</p>
+        <p className="text-xs text-muted-foreground mt-3">{t.visiting.addedToCollection}</p>
 
         <div className="mt-5 flex flex-col sm:flex-row gap-2">
           <Button variant="outline" className="flex-1" onClick={onViewMap} data-testid="button-view-treasure-map">

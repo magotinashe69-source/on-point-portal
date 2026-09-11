@@ -23,6 +23,7 @@ import {
 import { DreamBuilding, TILE } from "@/components/DreamBuilding";
 import { TownPlot } from "@/components/TownPlot";
 import logoPath from "@assets/logo.webp";
+import { useT } from "@/lib/i18n";
 
 const ZERO: Wallet = { coins: 0, bricks: 0, wood: 0, gems: 0 };
 
@@ -44,6 +45,7 @@ interface DreamData {
 }
 
 export default function DreamWorld() {
+  const t = useT();
   const [, setLocation] = useLocation();
   const { student } = useAuth();
 
@@ -213,7 +215,7 @@ export default function DreamWorld() {
         <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-4">
           <Link href="/student/dashboard" className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
-            <span className="text-sm">Back to Dashboard</span>
+            <span className="text-sm">{t.submit.backToDashboard}</span>
           </Link>
           <div className="flex items-center gap-3">
             <img src={logoPath} alt="On Point" className="h-8 w-auto" />
@@ -230,13 +232,13 @@ export default function DreamWorld() {
               <input
                 autoFocus value={nameInput} maxLength={TOWN_NAME_MAX}
                 onChange={(e) => { setNameInput(e.target.value); setNameError(null); }}
-                placeholder="Name your town"
+                placeholder={t.dreamWorld.nameYourTown}
                 className="w-full max-w-xs rounded-lg border bg-background px-3 py-2 text-center text-sm"
                 data-testid="input-town-name"
               />
               <div className="flex gap-2">
-                <button className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-50" onClick={saveName} disabled={busy} data-testid="button-save-town-name">Save</button>
-                <button className="rounded-lg border px-3 py-1.5 text-xs" onClick={() => { setEditingName(false); setNameError(null); }}>Cancel</button>
+                <button className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-50" onClick={saveName} disabled={busy} data-testid="button-save-town-name">{t.dreamWorld.save}</button>
+                <button className="rounded-lg border px-3 py-1.5 text-xs" onClick={() => { setEditingName(false); setNameError(null); }}>{t.controls.cancel}</button>
               </div>
               {nameError && <p className="text-xs text-destructive" data-testid="text-name-error">{nameError}</p>}
               <p className="text-[11px] text-muted-foreground">Letters, numbers &amp; spaces • up to {TOWN_NAME_MAX} • rename once a week</p>
@@ -257,7 +259,7 @@ export default function DreamWorld() {
                   onClick={() => { setNameInput(town.name); setEditingName(true); }}
                   data-testid="button-edit-town-name"
                 >
-                  <Pencil className="h-3 w-3" /> {town.name ? "Rename" : "Name it"}
+                  <Pencil className="h-3 w-3" /> {town.name ? t.dreamWorld.rename : t.dreamWorld.nameIt}
                 </button>
               )}
             </div>
@@ -270,7 +272,7 @@ export default function DreamWorld() {
             <div className="mb-3 rounded-xl border-2 border-[#BF9000]/50 bg-[#BF9000]/10 px-4 py-3 text-center cursor-pointer" data-testid="award-banner">
               <span className="font-bold">{award.name}</span>
               {town.term && <span className="text-muted-foreground"> • {town.term}</span>}
-              <span className="block text-xs text-primary mt-0.5">View and print your certificate</span>
+              <span className="block text-xs text-primary mt-0.5">{t.dreamWorld.viewCertificate}</span>
             </div>
           </Link>
         )}
@@ -324,14 +326,14 @@ export default function DreamWorld() {
         {overdue && (
           <Link href={`/student/submit/${overdue.id}`}>
             <div className="mt-4 rounded-xl border border-orange-400/50 bg-orange-500/10 px-4 py-3 text-sm cursor-pointer" data-testid="overdue-lock">
-              <span className="font-semibold">Homework first</span>{" "}
+              <span className="font-semibold">{t.dreamWorld.homeworkFirst}</span>{" "}
               You have an assignment due: <span className="font-semibold">“{overdue.title}”</span>. Finish it to unlock building again.
             </div>
           </Link>
         )}
 
         {/* The shop. */}
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mt-6 mb-2">Build shop</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mt-6 mb-2">{t.dreamWorld.buildShop}</h2>
         <div className={locked ? "opacity-40 pointer-events-none select-none" : ""} aria-disabled={locked} data-testid="build-shop">
           {CATEGORY_ORDER.map((cat) => {
             const meta = CATEGORY_META[cat];
@@ -366,7 +368,7 @@ export default function DreamWorld() {
           })}
         </div>
         <p className="text-xs text-muted-foreground mt-1 text-center">
-          {locked ? "Building is paused until your homework is done." : selected ? "Now tap an empty tile to build. Tap a building to remove it." : "Tap an unlocked building, then tap a tile."}
+          {locked ? t.dreamWorld.paused : selected ? t.dreamWorld.tapEmptyTile : t.dreamWorld.tapBuilding}
         </p>
       </main>
 
@@ -392,7 +394,7 @@ export default function DreamWorld() {
                 <div>
                   <div className="font-bold">{def.name}</div>
                   <div className="text-xs text-muted-foreground">
-                    {isUpgradable(def) ? `Level ${level} of ${max}` : "Decoration"}
+                    {isUpgradable(def) ? `Level ${level} of ${max}` : t.dreamWorld.decoration}
                   </div>
                 </div>
               </div>
@@ -409,7 +411,7 @@ export default function DreamWorld() {
                     Upgrade to Level {level + 1} — {(["coins", "bricks", "wood", "gems"] as const).filter((k) => (up![k] ?? 0) > 0).map((k) => `${up![k]} ${resourceLabel(k, up![k] ?? 0)}`).join(", ")}
                   </button>
                 ) : isUpgradable(def) ? (
-                  <div className="rounded-lg bg-muted px-4 py-2 text-center text-sm font-medium">Highest level reached</div>
+                  <div className="rounded-lg bg-muted px-4 py-2 text-center text-sm font-medium">{t.dreamWorld.highestLevel}</div>
                 ) : null}
 
                 <button
@@ -420,7 +422,7 @@ export default function DreamWorld() {
                 >
                   <Trash2 className="h-4 w-4" /> Remove (half refund)
                 </button>
-                <button className="rounded-lg px-4 py-2 text-sm text-muted-foreground" onClick={() => setActioning(null)}>Cancel</button>
+                <button className="rounded-lg px-4 py-2 text-sm text-muted-foreground" onClick={() => setActioning(null)}>{t.controls.cancel}</button>
               </div>
             </div>
           </div>
@@ -430,7 +432,7 @@ export default function DreamWorld() {
       {celebrate && celebrate.length > 0 && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" role="dialog" aria-modal="true" onClick={() => setCelebrate(null)} data-testid="unlock-celebration">
           <div className="dw-modal w-full max-w-xs rounded-2xl border bg-card p-6 text-center shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <p className="text-sm font-semibold uppercase tracking-wide text-primary">New building unlocked!</p>
+            <p className="text-sm font-semibold uppercase tracking-wide text-primary">{t.dreamWorld.newBuilding}</p>
             <div className="mt-3 flex flex-wrap items-center justify-center gap-3">
               {celebrate.map((id) => {
                 const def = buildingById(id);
@@ -446,7 +448,7 @@ export default function DreamWorld() {
                 );
               })}
             </div>
-            <button className="mt-5 w-full rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground" onClick={() => setCelebrate(null)} data-testid="celebration-continue">Start building</button>
+            <button className="mt-5 w-full rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground" onClick={() => setCelebrate(null)} data-testid="celebration-continue">{t.dreamWorld.startBuilding}</button>
           </div>
         </div>
       )}
@@ -457,6 +459,7 @@ export default function DreamWorld() {
 function BuildingTile({ def, unlocked, affordable, active, remaining, onPick }: {
   def: BuildingDef; unlocked: boolean; affordable: boolean; active: boolean; remaining: number; onPick: () => void;
 }) {
+  const t = useT();
   const previewSize = def.size === 2 ? 80 : TILE;
   const canPick = unlocked && affordable;
   return (
@@ -477,7 +480,7 @@ function BuildingTile({ def, unlocked, affordable, active, remaining, onPick }: 
       </svg>
       {!unlocked && <Lock className="absolute right-2 top-2 h-3.5 w-3.5 text-muted-foreground" />}
       <div className="min-w-0">
-        <div className="text-xs font-bold truncate">{unlocked ? def.name : "Locked"}</div>
+        <div className="text-xs font-bold truncate">{unlocked ? def.name : t.dreamWorld.locked}</div>
         {unlocked ? (
           <div className="text-[11px] text-muted-foreground tabular-nums">
             {(["coins", "bricks", "wood", "gems"] as const)

@@ -78,11 +78,6 @@ type Phase =
   | "reveal"     // got it wrong, showing the right answer
   | "results";
 
-const CORNER_LABEL: Record<Corner, string> = {
-  left: "Left",
-  middle: "Middle",
-  right: "Right",
-};
 
 // Where the ball ends up for each corner, as a nudge from the penalty spot.
 const CORNER_SHIFT: Record<Corner, { x: number; y: number }> = {
@@ -343,7 +338,7 @@ function PenaltyShootoutContent() {
         <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-4">
           <Link href="/student/dashboard" className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
-            <span className="text-sm">Back to Dashboard</span>
+            <span className="text-sm">{t.submit.backToDashboard}</span>
           </Link>
           <div className="flex items-center gap-3">
             <img src={logoPath} alt="On Point" className="h-8 w-auto" />
@@ -363,7 +358,7 @@ function PenaltyShootoutContent() {
         {phase === "subject" && (
           <>
             <div className="text-center mb-6">
-                  <h1 className="text-2xl font-bold">Penalty Shootout</h1>
+                  <h1 className="text-2xl font-bold">{t.penalty.title}</h1>
               <p className="text-sm text-muted-foreground mt-1">
                 Take {SHOTS_PER_ROUND} penalties, then save {SHOTS_PER_ROUND}. Answer correctly to score.
               </p>
@@ -378,7 +373,7 @@ function PenaltyShootoutContent() {
               // could still be told there was nothing to play.
               <Card>
                 <CardContent className="py-10 text-center text-sm text-muted-foreground">
-                  <p className="font-medium text-foreground mb-1">Nothing to play yet</p>
+                  <p className="font-medium text-foreground mb-1">{t.penalty.nothingToPlay}</p>
                   <p>
                     A shootout is built from questions you have already answered.
                     Finish an assignment and come back — it will be here.
@@ -417,7 +412,7 @@ function PenaltyShootoutContent() {
                   </button>
                 )}
 
-                <p className="text-sm font-medium">{canResume ? "Or pick a subject:" : "Pick a subject:"}</p>
+                <p className="text-sm font-medium">{canResume ? t.penalty.orPickSubject : t.penalty.pickSubject}</p>
                 {subjects.map((s) => (
                   <button
                     key={s.subject}
@@ -441,7 +436,7 @@ function PenaltyShootoutContent() {
                             <div className="text-[10px] text-muted-foreground">your best</div>
                           </>
                         ) : (
-                          <Badge variant="secondary" className="text-[10px]">New</Badge>
+                          <Badge variant="secondary" className="text-[10px]">{t.penalty.newBadge}</Badge>
                         )}
                       </div>
                     </div>
@@ -458,10 +453,10 @@ function PenaltyShootoutContent() {
             <div className="flex items-center justify-between mb-3">
               <div>
                 <div className="font-semibold">
-                  {isKeeperRound ? "Keeper round" : "Striker round"}
+                  {isKeeperRound ? t.penalty.keeperRound : t.penalty.strikerRound}
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {isKeeperRound ? "Save" : "Shot"} {shot.index + 1} of {SHOTS_PER_ROUND} · {subject}
+                  {isKeeperRound ? t.penalty.saveWord : t.penalty.shotWord} {shot.index + 1} of {SHOTS_PER_ROUND} · {subject}
                 </div>
                 {resumed && (
                   <div className="text-xs text-muted-foreground" data-testid="text-resumed-note">
@@ -508,8 +503,8 @@ function PenaltyShootoutContent() {
             {phase === "aiming" && (
               <Card className="mt-4 border-green-500/40">
                 <CardContent className="pt-5">
-                  <p className="text-base font-semibold text-green-700 dark:text-green-400 mb-1">Correct!</p>
-                  <p className="text-sm text-muted-foreground mb-4">Now pick your corner:</p>
+                  <p className="text-base font-semibold text-green-700 dark:text-green-400 mb-1">{t.penalty.correct}</p>
+                  <p className="text-sm text-muted-foreground mb-4">{t.penalty.pickYourCorner}</p>
                   <div className="grid grid-cols-3 gap-2">
                     {CORNERS.map((c) => (
                       <button
@@ -518,7 +513,7 @@ function PenaltyShootoutContent() {
                         className="rounded-xl border-2 border-primary/40 bg-primary/5 px-2 py-5 text-sm font-semibold hover:bg-primary/15 active:scale-[0.97] transition-transform"
                         data-testid={`corner-${c}`}
                       >
-                        {CORNER_LABEL[c]}
+                        {t.penalty.corners[c]}
                       </button>
                     ))}
                   </div>
@@ -531,9 +526,9 @@ function PenaltyShootoutContent() {
               <Card className="mt-4 border-amber-500/50" data-testid="answer-reveal">
                 <CardContent className="pt-5 text-center">
                   <p className="text-base font-semibold text-amber-700 dark:text-amber-400">
-                    {isKeeperRound ? "Goal conceded" : "Saved by the keeper"}
+                    {isKeeperRound ? t.penalty.goalConceded : t.penalty.savedByKeeper}
                   </p>
-                  <p className="text-sm text-muted-foreground mt-2">The correct answer was</p>
+                  <p className="text-sm text-muted-foreground mt-2">{t.penalty.correctAnswerWas}</p>
                   <p className="text-xl font-bold mt-1">{correctAnswerText || "—"}</p>
                 </CardContent>
               </Card>
@@ -546,7 +541,7 @@ function PenaltyShootoutContent() {
             {phase === "shooting" && (
               <p className="mt-4 text-center text-sm text-muted-foreground">
                 {lastCorrect
-                  ? (isKeeperRound ? "Great save!" : "Good strike!")
+                  ? (isKeeperRound ? t.penalty.greatSave : t.penalty.goodStrike)
                   : "…"}
               </p>
             )}
@@ -559,11 +554,11 @@ function PenaltyShootoutContent() {
             {result?.newRecord && (
               <div className="pk-pop mb-4 rounded-xl border-2 border-amber-400 bg-amber-50 dark:bg-amber-950/40 px-4 py-3" data-testid="new-record">
                 <Trophy className="mx-auto mb-1 h-7 w-7" aria-hidden="true" />
-                <p className="font-bold text-amber-800 dark:text-amber-200">New personal best!</p>
+                <p className="font-bold text-amber-800 dark:text-amber-200">{t.penalty.newBest}</p>
                 <p className="text-sm text-amber-700 dark:text-amber-300">
                   {result.previousOutOf > 0
-                    ? `You beat your old record of ${result.previousBest}/${result.previousOutOf} in ${subject}.`
-                    : `Your first record in ${subject}. Try to beat it next time.`}
+                    ? t.penalty.beatOldRecord(result.previousBest, result.previousOutOf, subject)
+                    : t.penalty.firstRecord(subject)}
                 </p>
               </div>
             )}
@@ -580,11 +575,11 @@ function PenaltyShootoutContent() {
 
             <Card className="mt-5 text-left">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">How you did</CardTitle>
+                <CardTitle className="text-base">{t.penalty.howYouDid}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
-                <Row label="Penalties scored" value={`${result?.strikerScore ?? 0} / ${SHOTS_PER_ROUND}`} />
-                <Row label="Saves made" value={`${result?.keeperScore ?? 0} / ${SHOTS_PER_ROUND}`} />
+                <Row label={t.penalty.penaltiesScored} value={`${result?.strikerScore ?? 0} / ${SHOTS_PER_ROUND}`} />
+                <Row label={t.penalty.savesMade} value={`${result?.keeperScore ?? 0} / ${SHOTS_PER_ROUND}`} />
                 <Row
                   label={<span className="flex items-center gap-1"><Trophy className="h-3.5 w-3.5" /> Your best in {subject}</span>}
                   value={`${result?.bestScore ?? 0} / ${result?.bestOutOf || TOTAL_SHOTS}`}
@@ -596,7 +591,7 @@ function PenaltyShootoutContent() {
             </Card>
 
             <div className="flex gap-2 mt-5">
-              <Button className="flex-1" onClick={playAgain} data-testid="button-play-again">Play again</Button>
+              <Button className="flex-1" onClick={playAgain} data-testid="button-play-again">{t.penalty.playAgain}</Button>
               <Button variant="outline" className="flex-1" onClick={() => setLocation("/student/dashboard")} data-testid="button-done">
                 Done
               </Button>
@@ -623,6 +618,7 @@ function Pitch({
 }: {
   phase: Phase; round: string; corner: Corner; correct: boolean; reduceMotion: boolean;
 }) {
+  const t = useT();
   const isKeeperRound = round === "keeper";
   const moving = phase === "shooting";
   const scored = moving && correct && !isKeeperRound;
@@ -656,7 +652,7 @@ function Pitch({
 
   return (
     <div className="relative rounded-xl overflow-hidden border bg-[#2e7d32]">
-      <svg viewBox="0 0 320 200" className="w-full block" role="img" aria-label="Football pitch with a goal">
+      <svg viewBox="0 0 320 200" className="w-full block" role="img" aria-label={t.penalty.pitchAlt}>
         {/* Grass, with simple mown stripes. */}
         <rect x="0" y="0" width="320" height="200" fill="#2e7d32" />
         {[0, 1, 2, 3, 4].map((i) => (
@@ -745,7 +741,7 @@ function Pitch({
       {(saved || conceded) && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <span className="text-2xl font-extrabold text-white/90 drop-shadow-lg" data-testid="miss">
-            {saved ? "SAVED!" : "Goal against"}
+            {saved ? "SAVED!" : t.penalty.goalAgainst}
           </span>
         </div>
       )}
@@ -754,9 +750,10 @@ function Pitch({
 }
 
 export default function PenaltyShootout() {
+  const t = useT();
   return (
     <div className="min-h-screen bg-background">
-      <PageErrorBoundary backHref="/student/dashboard" backLabel="Back to Dashboard" label="penalty-shootout">
+      <PageErrorBoundary backHref="/student/dashboard" backLabel={t.submit.backToDashboard} label="penalty-shootout">
         <PenaltyShootoutContent />
       </PageErrorBoundary>
     </div>

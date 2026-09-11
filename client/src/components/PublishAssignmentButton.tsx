@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Loader2, Send } from "lucide-react";
 import type { Assignment } from "@shared/schema";
+import { useT } from "@/lib/i18n";
 
 // The one-tap "Publish" button for a draft assignment, plus its small
 // "are you sure?" check so a draft is never released by accident.
@@ -25,6 +26,7 @@ export function PublishAssignmentButton({
   size?: "sm" | "default" | "lg";
   className?: string;
 }) {
+  const t = useT();
   const { toast } = useToast();
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
@@ -35,19 +37,19 @@ export function PublishAssignmentButton({
     },
     onSuccess: (data) => {
       if (!data.success) {
-        toast({ title: "Assignment not published", description: data.message || "Check your connection and try again.", variant: "destructive" });
+        toast({ title: t.publish.notPublished, description: data.message || t.common.checkConnection, variant: "destructive" });
         return;
       }
       setIsConfirmOpen(false);
       toast({
-        title: "Published",
-        description: `"${assignment.title}" is now visible to ${assignment.form}.`,
+        title: t.publish.published,
+        description: t.publish.publishedNote(assignment.title, assignment.form),
       });
       // Refresh every list that shows assignments (teacher's and students').
       queryClient.invalidateQueries({ queryKey: ["/api/assignments"] });
     },
     onError: () => {
-      toast({ title: "Assignment not published", description: "Check your connection and try again.", variant: "destructive" });
+      toast({ title: t.publish.notPublished, description: t.common.checkConnection, variant: "destructive" });
     },
   });
 

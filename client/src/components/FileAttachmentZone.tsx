@@ -4,6 +4,7 @@ import { Upload, Loader2, X, FileText, File, Image, FileArchive } from "lucide-r
 import { useUpload } from "@/hooks/use-upload";
 import { useToast } from "@/hooks/use-toast";
 import { Lightbox } from "@/components/Lightbox";
+import { useT } from "@/lib/i18n";
 
 export interface AttachmentFile {
   name: string;
@@ -47,9 +48,14 @@ export function FileAttachmentZone({
   onChange,
   accept = "image/*,.pdf,.doc,.docx,.txt",
   maxFiles = 10,
-  label = "Attach Files",
-  hint = "Images, PDFs, Word documents, text files",
+  label,
+  hint,
 }: FileAttachmentZoneProps) {
+  const t = useT();
+  // Defaults are read here rather than in the parameter list: a default cannot
+  // call a hook, and these two are wording.
+  const zoneLabel = label ?? t.attachments.attachFiles;
+  const zoneHint = hint ?? t.attachments.hint;
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -145,9 +151,9 @@ export function FileAttachmentZone({
           )}
           <div>
             <p className="text-sm font-medium">
-              {uploading ? "Uploading..." : isDragging ? "Drop files here" : label}
+              {uploading ? t.attachments.uploading : isDragging ? t.attachments.dropFilesHere : zoneLabel}
             </p>
-            <p className="text-xs text-muted-foreground mt-0.5">{hint}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{zoneHint}</p>
             {!uploading && (
               <p className="text-xs text-muted-foreground">
                 Drag & drop or click to browse
@@ -216,7 +222,7 @@ interface AttachmentDisplayProps {
   title?: string;
 }
 
-export function AttachmentDisplay({ attachments, title = "Attachments" }: AttachmentDisplayProps) {
+export function AttachmentDisplay({ attachments, title }: AttachmentDisplayProps) {
   const [lightboxImages, setLightboxImages] = useState<string[]>([]);
   const [lightboxIndex, setLightboxIndex] = useState(0);
 

@@ -620,9 +620,163 @@ export const en = {
     alreadyHandedIn: (n: number) =>
       `${n} student${n === 1 ? " has" : "s have"} already handed in.`,
     marksUnchangedNote: "Changes to questions will not alter marks already given. To update a fixed answer, use the Re-mark button on that question.",
+    questionNumber: (n: number) => `Question ${n}`,
+    questionImageAlt: (question: number, image: number) => `Question ${question} image ${image}`,
+    optionPlaceholder: (n: number) => `Option ${n}`,
+    acceptedPlaceholder: (n: number) => `Accepted answer ${n}`,
+    pasteExample: "What is the capital of Zimbabwe? | Harare\nHow many sides does a triangle have? | 3 | three\nWho wrote Nervous Conditions? | Tsitsi Dangarembga",
   },
 
   /** Writing a paper: the questions, their answer keys, and the marks. */
+
+  /** The public front page, before anyone signs in. */
+  landing: {
+    home: "Home",
+    subjects: "Subjects",
+    games: "Games",
+    rewards: "Rewards",
+    logIn: "Log In",
+    openMenu: "Open menu",
+    closeMenu: "Close menu",
+    yearGroups: "Year groups",
+    backpack: "Backpack",
+    screenshotAlt: "The assignment screen on a phone: a list of maths questions, each in its own card with the marks available beside it — place value, number sequences, the faces of a cube, multiplication and addition.",
+
+    subjectTiles: {
+      maths: "Maths",
+      english: "English",
+      science: "Science",
+      business: "Business",
+      computing: "Computer Science",
+      more: "More subjects",
+    },
+
+    features: {
+      homework: "Homework",
+      homeworkNote: "See your assignments and hand in your work.",
+      quizzes: "Practice Quizzes",
+      quizzesNote: "Get an instant score the moment you finish.",
+      rewards: "Earn Rewards",
+      rewardsNote: "Earn XP and awards for work you hand in.",
+      games: "Games",
+      gamesNote: "Practise by playing — penalty shootout, treasure island and dream world.",
+    },
+  },
+
+  /** Treasure Island. */
+  treasure: {
+    title: "Treasure Island",
+    chest: "Your Treasure Chest",
+    log: "Your Treasure Log",
+    next: "Your next treasure. Finish an assignment to open it.",
+    locked: "Locked. Finish more assignments to reach this one.",
+    unlockNext: "Finish another assignment to unlock this treasure.",
+    mapAlt: "Treasure island map showing which treasures you have collected",
+  },
+
+  /** Small shared controls. */
+  controls: {
+    close: "Close",
+    cancel: "Cancel",
+    previous: "Previous",
+    next: "Next",
+  },
+
+  /** Dream World: the town a child builds from finished homework. */
+  dreamWorld: {
+    nameYourTown: "Name your town",
+    save: "Save",
+    rename: "Rename",
+    nameIt: "Name it",
+    viewCertificate: "View and print your certificate",
+    homeworkFirst: "Homework first",
+    buildShop: "Build shop",
+    paused: "Building is paused until your homework is done.",
+    tapEmptyTile: "Now tap an empty tile to build. Tap a building to remove it.",
+    tapBuilding: "Tap an unlocked building, then tap a tile.",
+    decoration: "Decoration",
+    highestLevel: "Highest level reached",
+    newBuilding: "New building unlocked!",
+    startBuilding: "Start building",
+    locked: "Locked",
+  },
+
+  /** Attaching files, and publishing a draft. */
+  attachments: {
+    hint: "Images, PDFs, Word documents, text files",
+    attachFiles: "Attach Files",
+    attachments: "Attachments",
+    uploading: "Uploading...",
+    dropFilesHere: "Drop files here",
+  },
+
+  publish: {
+    published: "Published",
+    publishedNote: (title: string, form: string) => `"${title}" is now visible to ${form}.`,
+    notPublished: "Assignment not published",
+  },
+
+  /** Visiting a classmate's town, and the last few small pieces. */
+  visiting: {
+    backToMyTown: "Back to My Town",
+    backToTowns: "Back to Towns",
+    visitTowns: "Visit towns",
+    nobodyYet: "No one in your class has started a town yet. Build yours and classmates will be able to visit it.",
+    visitingNote: "You are visiting. You cannot change this town.",
+    youEarned: "You earned",
+    treasureFound: "Treasure found!",
+    addedToCollection: "Added to your Treasure Island collection.",
+    scanYourCard: "Scan your card",
+    toggleTheme: "Toggle theme",
+    notFound: "404 Page Not Found",
+    comingSoon: "Coming soon",
+  },
+
+  /** Penalty Shootout, and the question bank's own screen. */
+  penalty: {
+    title: "Penalty Shootout",
+    nothingToPlay: "Nothing to play yet",
+    orPickSubject: "Or pick a subject:",
+    pickSubject: "Pick a subject:",
+    newBadge: "New",
+    keeperRound: "Keeper round",
+    strikerRound: "Striker round",
+    saveWord: "Save",
+    shotWord: "Shot",
+    correct: "Correct!",
+    pickYourCorner: "Now pick your corner:",
+    goalConceded: "Goal conceded",
+    savedByKeeper: "Saved by the keeper",
+    correctAnswerWas: "The correct answer was",
+    greatSave: "Great save!",
+    goodStrike: "Good strike!",
+    newBest: "New personal best!",
+    beatOldRecord: (best: number, outOf: number, subject: string) =>
+      `You beat your old record of ${best}/${outOf} in ${subject}.`,
+    firstRecord: (subject: string) => `Your first record in ${subject}. Try to beat it next time.`,
+    howYouDid: "How you did",
+    penaltiesScored: "Penalties scored",
+    savesMade: "Saves made",
+    playAgain: "Play again",
+    pitchAlt: "Football pitch with a goal",
+    goalAgainst: "Goal against",
+    corners: {
+      left: "Left",
+      middle: "Middle",
+      right: "Right",
+    },
+  },
+
+  bankScreen: {
+    removed: "Removed from the question bank",
+    updated: "Question updated",
+    anySubject: "Any subject",
+    anyClass: "Any class",
+    anyDifficulty: "Any difficulty",
+    anyTopic: "Any topic",
+    confirmRemove: "Remove this question from the bank?",
+    keepIt: "Keep it",
+  },
 
   errors: {
     couldNotLoad: (what: string) => `Could not load ${what}`,

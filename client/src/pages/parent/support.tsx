@@ -23,7 +23,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
 import { useT } from "@/lib/i18n";
 import { subjectLabel } from "@shared/weekly-report";
-import { WORK_TEXT, practiseLine, type SupportReport } from "@shared/parent-work";
+import { practiseLine, type SupportReport } from "@shared/parent-work";
 import { ArrowLeft, Loader2, Sparkles, TrendingUp, Target } from "lucide-react";
 import logoPath from "@assets/logo.webp";
 
@@ -66,8 +66,8 @@ export default function ParentSupportPage() {
       </header>
 
       <main className="container mx-auto px-4 py-6 max-w-2xl">
-        <h1 className="text-2xl font-bold mb-1">{WORK_TEXT.supportTitle}</h1>
-        <p className="text-muted-foreground text-sm mb-6">{WORK_TEXT.supportNote}</p>
+        <h1 className="text-2xl font-bold mb-1">{t.work.supportTitle}</h1>
+        <p className="text-muted-foreground text-sm mb-6">{t.work.supportNote}</p>
 
         {isLoading && (
           <div className="flex items-center gap-2 text-muted-foreground">
@@ -93,7 +93,7 @@ export default function ParentSupportPage() {
                   <div className="rounded-md border p-4" data-testid="row-support-strongest">
                     <div className="flex items-center gap-2 text-muted-foreground mb-1">
                       <TrendingUp className="h-4 w-4" />
-                      <span className="text-xs">{WORK_TEXT.strongest}</span>
+                      <span className="text-xs">{t.work.strongest}</span>
                     </div>
                     <p className="font-semibold">{subjectLabel(report.strongest.subject)}</p>
                     <p className="text-sm text-muted-foreground">{report.strongest.averagePercent}%</p>
@@ -103,7 +103,7 @@ export default function ParentSupportPage() {
                   <div className="rounded-md border p-4" data-testid="row-support-working-on">
                     <div className="flex items-center gap-2 text-muted-foreground mb-1">
                       <Target className="h-4 w-4" />
-                      <span className="text-xs">{WORK_TEXT.workingOn}</span>
+                      <span className="text-xs">{t.work.workingOn}</span>
                     </div>
                     <p className="font-semibold">{subjectLabel(report.workingOn.subject)}</p>
                     <p className="text-sm text-muted-foreground">{report.workingOn.averagePercent}%</p>
@@ -116,7 +116,7 @@ export default function ParentSupportPage() {
               <Card>
                 <CardContent className="py-8 text-center" data-testid="text-support-all-correct">
                   <Sparkles className="h-6 w-6 mx-auto mb-3 text-muted-foreground" />
-                  <p className="text-muted-foreground">{WORK_TEXT.supportAllCorrect}</p>
+                  <p className="text-muted-foreground">{t.work.supportAllCorrect}</p>
                 </CardContent>
               </Card>
             )}
@@ -124,7 +124,7 @@ export default function ParentSupportPage() {
             {!allCorrect && subjects.length === 0 && (
               <Card>
                 <CardContent className="py-8 text-center text-muted-foreground" data-testid="text-support-empty">
-                  {WORK_TEXT.supportEmpty}
+                  {t.work.supportEmpty}
                 </CardContent>
               </Card>
             )}
@@ -141,7 +141,7 @@ export default function ParentSupportPage() {
                     )}
                   </div>
                   <CardDescription data-testid={`text-practise-line-${subject.subject}`}>
-                    {WORK_TEXT.practise}: {practiseLine(subject.topics)}
+                    {t.work.practise}: {practiseLine(subject.topics)}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -164,11 +164,11 @@ export default function ParentSupportPage() {
 
             {report.questionsReviewed > 0 && (
               <p className="text-xs text-muted-foreground border-t pt-4">
-                {WORK_TEXT.basedOn} {report.questionsReviewed} {WORK_TEXT.questionsMarked}.
+                {t.work.basedOn} {report.questionsReviewed} {t.work.questionsMarked}.
               </p>
             )}
 
-            <p className="text-xs text-muted-foreground">{WORK_TEXT.readOnly}</p>
+            <p className="text-xs text-muted-foreground">{t.work.readOnly}</p>
           </div>
         )}
       </main>

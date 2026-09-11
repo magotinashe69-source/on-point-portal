@@ -1,4 +1,5 @@
 import { Link } from "wouter";
+import { useT } from "@/lib/i18n";
 
 // A placeholder page used for features that are not built yet (Games,
 // Rewards, Parents), so a child who taps the link still lands somewhere
@@ -13,6 +14,7 @@ export default function ComingSoon({
   title: string;
   message?: string;
 }) {
+  const t = useT();
   return (
     <div
       className="min-h-screen flex flex-col items-center justify-center px-6 text-center text-white"
@@ -21,7 +23,7 @@ export default function ComingSoon({
       style={{ backgroundColor: "var(--onpoint-blue)" }}
     >
       <h1 className="text-3xl sm:text-4xl font-extrabold mb-3">{title}</h1>
-      <p className="text-lg text-white/80 max-w-md mb-2">Coming soon</p>
+      <p className="text-lg text-white/80 max-w-md mb-2">{t.visiting.comingSoon}</p>
       <p className="text-white/70 max-w-md mb-8">{message}</p>
 
       <div className="flex flex-col sm:flex-row gap-3">

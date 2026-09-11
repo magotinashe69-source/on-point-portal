@@ -104,7 +104,7 @@ export default function QuestionBankPage() {
       const res = await apiRequest("DELETE", `/api/question-bank/${deleting.id}`);
       const body = await res.json();
       if (body.success) {
-        toast({ title: "Removed from the question bank" });
+        toast({ title: t.bankScreen.removed });
         refresh();
       } else {
         toast({ title: body.message || "Could not remove it", variant: "destructive" });
@@ -126,7 +126,7 @@ export default function QuestionBankPage() {
         <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-4">
           <Link href="/teacher/dashboard" className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
-            <span className="text-sm">Dashboard</span>
+            <span className="text-sm">{t.common.dashboard}</span>
           </Link>
           <div className="flex items-center gap-2">
             <img src={logoPath} alt="On Point" className="h-8 w-auto" />
@@ -161,10 +161,10 @@ export default function QuestionBankPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Select value={subject} onValueChange={setSubject}>
                 <SelectTrigger data-testid="select-bank-subject">
-                  <SelectValue placeholder="Any subject" />
+                  <SelectValue placeholder={t.bankScreen.anySubject} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={ANY}>Any subject</SelectItem>
+                  <SelectItem value={ANY}>{t.bankScreen.anySubject}</SelectItem>
                   {SUBJECTS.map((sub) => (
                     <SelectItem key={sub} value={sub}>{subjectLabel(sub)}</SelectItem>
                   ))}
@@ -173,10 +173,10 @@ export default function QuestionBankPage() {
 
               <Select value={form} onValueChange={setForm}>
                 <SelectTrigger data-testid="select-bank-form">
-                  <SelectValue placeholder="Any class" />
+                  <SelectValue placeholder={t.bankScreen.anyClass} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={ANY}>Any class</SelectItem>
+                  <SelectItem value={ANY}>{t.bankScreen.anyClass}</SelectItem>
                   {FORMS.map((f) => (
                     <SelectItem key={f} value={f}>{f}</SelectItem>
                   ))}
@@ -185,10 +185,10 @@ export default function QuestionBankPage() {
 
               <Select value={difficulty} onValueChange={setDifficulty}>
                 <SelectTrigger data-testid="select-bank-difficulty">
-                  <SelectValue placeholder="Any difficulty" />
+                  <SelectValue placeholder={t.bankScreen.anyDifficulty} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={ANY}>Any difficulty</SelectItem>
+                  <SelectItem value={ANY}>{t.bankScreen.anyDifficulty}</SelectItem>
                   {DIFFICULTIES.map((d) => (
                     <SelectItem key={d} value={d}>{t.bank.difficulties[d]}</SelectItem>
                   ))}
@@ -198,7 +198,7 @@ export default function QuestionBankPage() {
               <Input
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}
-                placeholder="Any topic"
+                placeholder={t.bankScreen.anyTopic}
                 data-testid="input-bank-topic"
               />
             </div>
@@ -290,13 +290,13 @@ export default function QuestionBankPage() {
       <AlertDialog open={!!deleting} onOpenChange={(open) => !open && setDeleting(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove this question from the bank?</AlertDialogTitle>
+            <AlertDialogTitle>{t.bankScreen.confirmRemove}</AlertDialogTitle>
             <AlertDialogDescription>
               {t.bank.deleteWarning}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-delete">Keep it</AlertDialogCancel>
+            <AlertDialogCancel data-testid="button-cancel-delete">{t.bankScreen.keepIt}</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} data-testid="button-confirm-delete">
               Remove it
             </AlertDialogAction>
@@ -373,7 +373,7 @@ function EditQuestionDialog({
       const res = await apiRequest("PATCH", `/api/question-bank/${question.id}`, changes);
       const body = await res.json();
       if (body.success) {
-        toast({ title: "Question updated" });
+        toast({ title: t.bankScreen.updated });
         onSaved();
       } else {
         toast({ title: body.message || "Could not save the change", variant: "destructive" });

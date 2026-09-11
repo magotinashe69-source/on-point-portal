@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback } from "react";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
+import { useT } from "@/lib/i18n";
 
 interface LightboxProps {
   images: string[];
@@ -9,6 +10,7 @@ interface LightboxProps {
 }
 
 export function Lightbox({ images, index, onClose, onChange }: LightboxProps) {
+  const t = useT();
   const touchStartX = useRef<number | null>(null);
   const hasMultiple = images.length > 1;
 
@@ -59,7 +61,7 @@ export function Lightbox({ images, index, onClose, onChange }: LightboxProps) {
       <button
         onClick={onClose}
         className="absolute top-4 right-4 z-10 flex items-center justify-center w-10 h-10 rounded-full bg-white/15 hover:bg-white/30 text-white transition-colors"
-        aria-label="Close"
+        aria-label={t.controls.close}
         data-testid="button-lightbox-close"
       >
         <X className="h-5 w-5" />
@@ -70,7 +72,7 @@ export function Lightbox({ images, index, onClose, onChange }: LightboxProps) {
           <button
             onClick={(e) => { e.stopPropagation(); prev(); }}
             className="absolute left-4 z-10 flex items-center justify-center w-10 h-10 rounded-full bg-white/15 hover:bg-white/30 text-white transition-colors"
-            aria-label="Previous"
+            aria-label={t.controls.previous}
             data-testid="button-lightbox-prev"
           >
             <ChevronLeft className="h-6 w-6" />
@@ -78,7 +80,7 @@ export function Lightbox({ images, index, onClose, onChange }: LightboxProps) {
           <button
             onClick={(e) => { e.stopPropagation(); next(); }}
             className="absolute right-4 z-10 flex items-center justify-center w-10 h-10 rounded-full bg-white/15 hover:bg-white/30 text-white transition-colors"
-            aria-label="Next"
+            aria-label={t.controls.next}
             data-testid="button-lightbox-next"
           >
             <ChevronRight className="h-6 w-6" />

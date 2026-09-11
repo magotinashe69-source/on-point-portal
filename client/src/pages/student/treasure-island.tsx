@@ -12,6 +12,7 @@ import { isPrimaryForm, type StudentReward } from "@shared/schema";
 import { collectibleIcon } from "@/lib/collectible-icon";
 import { HelpCircle, type LucideIcon } from "lucide-react";
 import logoPath from "@assets/logo.webp";
+import { useT } from "@/lib/i18n";
 
 // Where each of the 12 treasures sits on the island. The order matches
 // COLLECTIBLES (spot 1 is the first item, spot 12 the last), and the trail is
@@ -69,6 +70,7 @@ type SpotState = "open" | "next" | "locked";
 // few shapes — a body, a lid, a metal band and a lock — and we change their
 // colours (and lift the lid) depending on the state.
 function TreasureSpot({ state, Icon, name }: { state: SpotState; Icon: LucideIcon; name: string }) {
+  const t = useT();
   const isLocked = state === "locked";
 
   // Warm wooden chest normally; drained to grey when still locked.
@@ -142,8 +144,8 @@ function TreasureSpot({ state, Icon, name }: { state: SpotState; Icon: LucideIco
         {state === "open"
           ? name
           : state === "next"
-            ? "Your next treasure. Finish an assignment to open it."
-            : "Locked. Finish more assignments to reach this one."}
+            ? t.treasure.next
+            : t.treasure.locked}
       </title>
     </g>
   );
@@ -153,6 +155,7 @@ function TreasureSpot({ state, Icon, name }: { state: SpotState; Icon: LucideIco
 // glow in gold with their picture; ones you haven't found yet stay a faded,
 // dashed mystery. The next treasure to aim for gets a gentle pulsing ring.
 function IslandMap({ earnedNames }: { earnedNames: Set<string> }) {
+  const t = useT();
   // The first treasure the student hasn't collected yet — highlighted as "next".
   const nextIndex = COLLECTIBLES.findIndex((c) => !earnedNames.has(c.name));
 
@@ -162,7 +165,7 @@ function IslandMap({ earnedNames }: { earnedNames: Set<string> }) {
         viewBox="0 0 400 760"
         className="w-full h-auto block"
         role="img"
-        aria-label="Treasure island map showing which treasures you have collected"
+        aria-label={t.treasure.mapAlt}
       >
         {/* A soft gold glow used behind the "next" treasure. */}
         <defs>
@@ -223,6 +226,7 @@ function IslandMap({ earnedNames }: { earnedNames: Set<string> }) {
 }
 
 export default function TreasureIsland() {
+  const t = useT();
   const [, setLocation] = useLocation();
   const { student } = useAuth();
 
@@ -266,7 +270,7 @@ export default function TreasureIsland() {
         <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-4">
           <Link href="/student/dashboard" className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
-            <span className="text-sm">Back to Dashboard</span>
+            <span className="text-sm">{t.submit.backToDashboard}</span>
           </Link>
           <div className="flex items-center gap-3">
             <img src={logoPath} alt="On Point" className="h-8 w-auto" />
@@ -278,7 +282,7 @@ export default function TreasureIsland() {
       <main className="container mx-auto px-4 py-8 max-w-4xl">
         {/* Island banner — warm gold on navy to match the school colours. */}
         <div className="rounded-xl border bg-gradient-to-br from-primary to-primary/80 text-primary-foreground p-6 mb-6 text-center shadow-sm">
-          <h1 className="text-2xl font-bold">Treasure Island</h1>
+          <h1 className="text-2xl font-bold">{t.treasure.title}</h1>
           <p className="text-primary-foreground/80 mt-1">
             Finish assignments to collect all {TREASURE_HUNT_TOTAL} treasures.
           </p>
@@ -297,7 +301,7 @@ export default function TreasureIsland() {
         <Card className="mb-6">
           <CardContent className="py-5">
             <div className="flex items-center justify-between mb-2">
-              <span className="font-medium">Your Treasure Chest</span>
+              <span className="font-medium">{t.treasure.chest}</span>
               <span className="text-sm font-semibold text-primary" data-testid="text-collected-count">
                 {collectedCount} / {TREASURE_HUNT_TOTAL} collected
               </span>
@@ -316,7 +320,7 @@ export default function TreasureIsland() {
             <IslandMap earnedNames={earnedNames} />
 
             {/* The full treasure log below the map, with names and descriptions. */}
-            <h2 className="text-lg font-semibold mt-8 mb-3">Your Treasure Log</h2>
+            <h2 className="text-lg font-semibold mt-8 mb-3">{t.treasure.log}</h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
             {COLLECTIBLES.map((collectible) => {
               const earned = earnedNames.has(collectible.name);
@@ -347,7 +351,7 @@ export default function TreasureIsland() {
                           <Lock className="h-4 w-4 shrink-0" />
                           Locked
                         </div>
-                        <p className="text-xs text-muted-foreground">Finish another assignment to unlock this treasure.</p>
+                        <p className="text-xs text-muted-foreground">{t.treasure.unlockNext}</p>
                       </>
                     )}
                   </CardContent>

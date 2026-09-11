@@ -349,6 +349,101 @@ async function main() {
     "and the weekly report, whose wording lives in shared/");
   check(!parentDash.includes(en.parentDash.portal), "with no English portal heading");
   check(parentDash.includes(pupil.fullName), "and their child is named exactly as the school registered them");
+
+  // =======================================================================
+  section("Walking the rest of the app in Portuguese");
+  // =======================================================================
+  //
+  // One screen at a time: open it, and check it says the Portuguese and not
+  // the English. Cheaper than a check per label, and it is the thing that
+  // actually breaks — a screen nobody converted, or a page that kept its own
+  // copy of a list.
+
+  // The language was deliberately switched back to English above, and the
+  // choice belongs to the DEVICE - so every tab is in English now. Back to
+  // Portuguese before walking.
+  await switchTo("pt");
+
+  /**
+   * Open each screen and check it says the Portuguese and not the English.
+   * Cheaper than a check per label, and it catches the thing that actually
+   * goes wrong: a screen nobody converted, or one that kept its own copy of a
+   * list.
+   *
+   * Grouped by WHO is signed in, and each group signs in again first. The three
+   * portals share one browser, and setSessionRole() gives a browser exactly one
+   * role - so logging in as the teacher ends the child's session in the other
+   * tab. Without the re-login every screen below would quietly be a login page,
+   * which passes "no English left" while proving nothing.
+   */
+  async function walk(
+    who: string,
+    tab: Page,
+    stops: { what: string; path: string; says: string; notSays: string }[],
+  ) {
+    for (const stop of stops) {
+      await tab.goto(`${BASE}${stop.path}`);
+      const arrived = await waitUntil(async () => (await tab.bodyText()).includes(stop.says), 20000);
+      const text = await tab.bodyText();
+      check(arrived, `${stop.what} is in Portuguese`, `looked for "${stop.says}" as ${who}`);
+      check(!text.includes(stop.notSays), `${stop.what} has no English left where it counts`,
+        `still says "${stop.notSays}"`);
+    }
+  }
+
+  // --- As the child ---
+  await page.goto(`${BASE}/student/login`);
+  await page.fill("input-fullname", pupil.fullName);
+  await page.fill("input-password", CHILD_PASSWORD);
+  await page.click("button-login");
+  await page.waitFor(`return location.pathname === "/student/dashboard"`, "the child to be back in");
+
+  await walk("the child", page, [
+    { what: "the front page", path: "/", says: pt.landing.logIn, notSays: en.landing.logIn },
+    { what: "a child's resources", path: "/student/resources", says: pt.studentDash.resources, notSays: en.studentDash.resources },
+    { what: "a child's lessons", path: "/student/lessons", says: pt.studentDash.lessons, notSays: en.studentDash.lessons },
+    { what: "a child's certificates", path: "/student/certificates", says: pt.certificates.areaTitle, notSays: en.certificates.areaTitle },
+  ]);
+
+  // --- As the teacher ---
+  await teacherPage.goto(`${BASE}/teacher/login`);
+  await teacherPage.fill("input-email", TEACHER.email);
+  await teacherPage.fill("input-password", TEACHER.password);
+  await teacherPage.click("button-login");
+  await teacherPage.waitFor(`return location.pathname === "/teacher/dashboard"`, "the teacher to be back in");
+
+  await walk("the teacher", teacherPage, [
+    { what: "the register", path: "/teacher/students", says: pt.register.pasteStudents, notSays: en.register.pasteStudents },
+    { what: "the Grade Book", path: "/teacher/gradebook", says: pt.gradeBook.filters, notSays: en.gradeBook.filters },
+    { what: "the question bank", path: "/teacher/question-bank", says: pt.bank.title, notSays: en.bank.title },
+    { what: "writing a paper", path: "/teacher/assignments/new", says: pt.createAssignment.createTitle, notSays: en.createAssignment.createTitle },
+    { what: "the teacher's lessons", path: "/teacher/lessons", says: pt.teacherLessons.title, notSays: en.teacherLessons.title },
+    { what: "the teacher's resources", path: "/teacher/resources", says: pt.teacherLibrary.resources, notSays: en.teacherLibrary.resources },
+    { what: "the export", path: "/teacher/export", says: pt.exportData.title, notSays: en.exportData.title },
+    { what: "report cards", path: "/teacher/report-cards", says: pt.reportCard.title, notSays: en.reportCard.title },
+  ]);
+
+  // --- As the parent ---
+  await parentPage.goto(`${BASE}/parent/login`);
+  await parentPage.fill("input-parent-username", parentCreds.username);
+  await parentPage.fill("input-parent-password", parentCreds.password);
+  await parentPage.click("button-parent-login");
+  await parentPage.waitFor(`return location.pathname === "/parent/dashboard"`, "the parent to be back in");
+
+  await walk("the parent", parentPage, [
+    { what: "completed work", path: "/parent/work", says: pt.work.completedTitle, notSays: en.work.completedTitle },
+    { what: "areas to practise", path: "/parent/support", says: pt.work.supportTitle, notSays: en.work.supportTitle },
+  ]);
+}
+
+/** Poll until true, or give up. Used where a page loads its panels one by one. */
+async function waitUntil(condition: () => Promise<boolean>, timeoutMs: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try { if (await condition()) return true; } catch { /* mid-navigation */ }
+    await sleep(200);
+  }
+  return false;
 }
 
 void runCheck(main, () => {
