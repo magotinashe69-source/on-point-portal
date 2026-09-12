@@ -26,7 +26,7 @@ import { SimpleUploader } from "@/components/SimpleUploader";
 import { FileAttachmentZone } from "@/components/FileAttachmentZone";
 import type { AttachmentFile } from "@/components/FileAttachmentZone";
 import type { Student, Assignment, Submission } from "@shared/schema";
-import { SUBJECT_CODES, subjectName, useT } from "@/lib/i18n";
+import { serverMessage, SUBJECT_CODES, subjectName, useT } from "@/lib/i18n";
 
 // The question types a teacher can choose. "written" is marked by hand (the
 // original behaviour); the other four are marked automatically in code.
@@ -583,7 +583,7 @@ export default function CreateAssignment() {
       }
       toast({
         title: isEdit ? t.createAssignment.notUpdated : t.createAssignment.notCreated,
-        description: data.message || t.createAssignment.checkForm,
+        description: serverMessage(t, data, t.createAssignment.checkForm),
         variant: "destructive",
       });
       return false;
@@ -647,7 +647,7 @@ export default function CreateAssignment() {
             description: `${data.affected} submission${data.affected === 1 ? "" : "s"} updated with the new correct answer.`,
           });
         } else {
-          toast({ title: t.createAssignment.couldNotRemark, description: data.message || t.createAssignment.tryAgainPlease, variant: "destructive" });
+          toast({ title: t.createAssignment.couldNotRemark, description: serverMessage(t, data, t.createAssignment.tryAgainPlease), variant: "destructive" });
         }
       } catch {
         toast({ title: t.createAssignment.couldNotRemark, description: t.createAssignment.tryAgainPlease, variant: "destructive" });

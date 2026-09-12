@@ -38,7 +38,7 @@ import {
 } from "lucide-react";
 import type { Resource } from "@shared/schema";
 import logoPath from "@assets/logo.webp";
-import { SUBJECT_CODES, subjectName, useT } from "@/lib/i18n";
+import { serverMessage, SUBJECT_CODES, subjectName, useT } from "@/lib/i18n";
 
 // Option lists shared by the single-resource form and the bulk paste dialog.
 const RESOURCE_FORMS = ["Stage 3", "Stage 4", "Stage 5", "Stage 6", "Form 1", "Form 2"] as const;
@@ -166,7 +166,7 @@ export default function TeacherResources() {
         setIsDialogOpen(false);
         form.reset();
       } else {
-        toast({ title: t.teacherLibrary.resourceNotAdded, description: data.message, variant: "destructive" });
+        toast({ title: t.teacherLibrary.resourceNotAdded, description: serverMessage(t, data), variant: "destructive" });
       }
     },
   });
@@ -241,7 +241,7 @@ export default function TeacherResources() {
         queryClient.invalidateQueries({ queryKey: ["/api/resources"] });
         toast({ title: t.teacherLibrary.resourceDeleted });
       } else {
-        toast({ title: t.teacherLibrary.resourceNotDeleted, description: data.message, variant: "destructive" });
+        toast({ title: t.teacherLibrary.resourceNotDeleted, description: serverMessage(t, data), variant: "destructive" });
       }
     },
   });

@@ -14,7 +14,7 @@ import { ArrowLeft, LogIn, Loader2, Eye, EyeOff } from "lucide-react";
 import { Link } from "wouter";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
-import { useT } from "@/lib/i18n";
+import { serverMessage, useT } from "@/lib/i18n";
 import logoPath from "@assets/logo.webp";
 
 export default function TeacherLogin() {
@@ -58,7 +58,7 @@ export default function TeacherLogin() {
       } else {
         toast({
           title: t.login.loginFailed,
-          description: data.message || t.login.student.invalidCredentials,
+          description: serverMessage(t, data, t.login.student.invalidCredentials),
           variant: "destructive",
         });
       }

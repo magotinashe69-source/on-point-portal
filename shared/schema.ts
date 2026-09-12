@@ -678,14 +678,14 @@ export type InsertQuestionBankRow = {
 
 // Login schemas
 export const teacherLoginSchema = z.object({
-  email: z.string().email("Valid email is required"),
-  password: z.string().min(1, "Password is required"),
+  email: z.string().email("emailRequired"),
+  password: z.string().min(1, "passwordRequired"),
 });
 export type TeacherLogin = z.infer<typeof teacherLoginSchema>;
 
 export const studentLoginSchema = z.object({
-  fullName: z.string().min(1, "Your name is required"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  fullName: z.string().min(1, "yourNameRequired"),
+  password: z.string().min(6, "passwordTooShort"),
 });
 export type StudentLogin = z.infer<typeof studentLoginSchema>;
 
@@ -693,8 +693,8 @@ export type StudentLogin = z.infer<typeof studentLoginSchema>;
 // password-setting like the student form, because a parent account always has
 // a password from the moment the teacher creates it.
 export const parentLoginSchema = z.object({
-  username: z.string().min(1, "Your username is required"),
-  password: z.string().min(1, "Password is required"),
+  username: z.string().min(1, "yourUsernameRequired"),
+  password: z.string().min(1, "passwordRequired"),
 });
 export type ParentLogin = z.infer<typeof parentLoginSchema>;
 
@@ -703,9 +703,9 @@ export type ParentLogin = z.infer<typeof parentLoginSchema>;
 // so a teacher cannot aim the new account at a different pupil by editing the
 // form they submit.
 export const createParentAccountSchema = z.object({
-  fullName: z.string().min(1, "The parent's name is required"),
-  username: z.string().min(3, "Username must be at least 3 characters"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  fullName: z.string().min(1, "parentNameRequired"),
+  username: z.string().min(3, "usernameTooShort"),
+  password: z.string().min(6, "passwordTooShort"),
 });
 export type CreateParentAccount = z.infer<typeof createParentAccountSchema>;
 
@@ -720,10 +720,10 @@ export type CreateParentAccount = z.infer<typeof createParentAccountSchema>;
 // A blank password means "leave the current one alone" — a teacher fixing a
 // spelling mistake in the name should not have to reissue the password.
 export const updateParentAccountSchema = z.object({
-  fullName: z.string().min(1, "The parent's name is required"),
-  username: z.string().min(3, "Username must be at least 3 characters"),
+  fullName: z.string().min(1, "parentNameRequired"),
+  username: z.string().min(3, "usernameTooShort"),
   password: z.union([
-    z.string().min(6, "Password must be at least 6 characters"),
+    z.string().min(6, "passwordTooShort"),
     z.literal(""),
   ]).optional(),
 });

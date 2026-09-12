@@ -44,7 +44,7 @@ import {
   scoreLine, type Corner, type Shot,
 } from "@shared/penalty";
 import logoPath from "@assets/logo.webp";
-import { useT } from "@/lib/i18n";
+import { serverMessage, useT } from "@/lib/i18n";
 
 interface SubjectChoice {
   subject: string;
@@ -162,7 +162,7 @@ function PenaltyShootoutContent() {
         // Out of plays is a refusal, not a breakage: show the game's own
         // wording and put the counter right.
         if (body.outOfPlays) refetchPlays();
-        setErrorText(body.message || "Couldn't start the game.");
+        setErrorText(serverMessage(t, body, "Couldn't start the game."));
         return;
       }
       // A game being picked up again: the server hands back the one they
@@ -192,7 +192,7 @@ function PenaltyShootoutContent() {
       setShotNo(0);
       setPhase("question");
     } catch {
-      setErrorText("Couldn't start the game. Please check your connection and try again.");
+      setErrorText(t.penalty.couldNotStartGame);
     } finally {
       setStarting(false);
     }
@@ -277,10 +277,10 @@ function PenaltyShootoutContent() {
         queryClient.invalidateQueries({ queryKey: ["/api/students", student!.id, "stats"] });
         queryClient.invalidateQueries({ queryKey: ["/api/students", student!.id, "penalty", "subjects"] });
       } else {
-        setErrorText(body.message || "Couldn't save your game.");
+        setErrorText(serverMessage(t, body, "Couldn't save your game."));
       }
     } catch {
-      setErrorText("Couldn't save your game. Please check your connection.");
+      setErrorText(t.penalty.couldNotSaveGame);
     }
     setPhase("results");
   };

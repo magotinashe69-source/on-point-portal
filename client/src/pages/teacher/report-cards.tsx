@@ -32,7 +32,7 @@ import {
 } from "@shared/report-card";
 import { ArrowLeft, FileText, Loader2, Printer, Save, SlidersHorizontal } from "lucide-react";
 import logoPath from "@assets/logo.webp";
-import { useT } from "@/lib/i18n";
+import { serverMessage, useT } from "@/lib/i18n";
 
 const FORMS = ["Stage 3", "Stage 4", "Stage 5", "Stage 6", "Form 1", "Form 2"];
 
@@ -80,7 +80,7 @@ export default function ReportCardsPage() {
       const res = await fetch(`/api/report-cards?${params}`);
       const body = await res.json();
       if (body.success) setCards(body.cards);
-      else toast({ title: body.message || "Could not build the cards", variant: "destructive" });
+      else toast({ title: serverMessage(t, body, "Could not build the cards"), variant: "destructive" });
     } catch {
       toast({ title: "Could not build the cards. Check your connection.", variant: "destructive" });
     } finally {
@@ -277,7 +277,7 @@ function CommentDialog({
         toast({ title: t.reportCard.commentSaved });
         onSaved(body.comment);
       } else {
-        toast({ title: body.message || "Could not save the comment", variant: "destructive" });
+        toast({ title: serverMessage(t, body, "Could not save the comment"), variant: "destructive" });
       }
     } catch (error) {
       toast({
@@ -350,7 +350,7 @@ function BoundariesDialog({ onClose, onSaved }: { onClose: () => void; onSaved: 
         toast({ title: t.reportCard.boundariesSaved });
         onSaved();
       } else {
-        toast({ title: body.message || "Could not save the boundaries", variant: "destructive" });
+        toast({ title: serverMessage(t, body, "Could not save the boundaries"), variant: "destructive" });
       }
     } catch (error) {
       toast({

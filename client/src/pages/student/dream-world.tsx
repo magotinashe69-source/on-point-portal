@@ -23,7 +23,7 @@ import {
 import { DreamBuilding, TILE } from "@/components/DreamBuilding";
 import { TownPlot } from "@/components/TownPlot";
 import logoPath from "@assets/logo.webp";
-import { useT } from "@/lib/i18n";
+import { serverMessage, useT } from "@/lib/i18n";
 
 const ZERO: Wallet = { coins: 0, bricks: 0, wood: 0, gems: 0 };
 
@@ -118,7 +118,7 @@ export default function DreamWorld() {
       const res = await apiRequest("POST", `/api/students/${student!.id}/dreamworld/place`, { buildingId: def.id, x, y });
       const body = await res.json();
       if (body.success) { setWallet(body.wallet); setLayout(body.layout); }
-      else { setWallet(prevWallet); setLayout(prevLayout); setMessage(body.message || "Couldn't build that."); }
+      else { setWallet(prevWallet); setLayout(prevLayout); setMessage(serverMessage(t, body, "Couldn't build that.")); }
     } catch {
       setWallet(prevWallet); setLayout(prevLayout); setMessage("Couldn't build that — try again.");
     } finally { setBusy(false); }
@@ -146,7 +146,7 @@ export default function DreamWorld() {
       const res = await apiRequest("POST", `/api/students/${student!.id}/dreamworld/remove`, { x, y });
       const body = await res.json();
       if (body.success) { setWallet(body.wallet); setLayout(body.layout); setActioning(null); }
-      else { setWallet(prevWallet); setLayout(prevLayout); setMessage(body.message || "Couldn't remove that."); }
+      else { setWallet(prevWallet); setLayout(prevLayout); setMessage(serverMessage(t, body, "Couldn't remove that.")); }
     } catch { setWallet(prevWallet); setLayout(prevLayout); }
     finally { setBusy(false); }
   }
@@ -166,7 +166,7 @@ export default function DreamWorld() {
       const res = await apiRequest("POST", `/api/students/${student!.id}/dreamworld/upgrade`, { x, y });
       const body = await res.json();
       if (body.success) { setWallet(body.wallet); setLayout(body.layout); setActioning(null); }
-      else setMessage(body.message || "Couldn't upgrade that.");
+      else setMessage(serverMessage(t, body, "Couldn't upgrade that."));
     } catch { setMessage("Couldn't upgrade — try again."); }
     finally { setBusy(false); }
   }
@@ -178,7 +178,7 @@ export default function DreamWorld() {
       const res = await apiRequest("POST", `/api/students/${student!.id}/dreamworld/expand`, {});
       const body = await res.json();
       if (body.success) { setWallet(body.wallet); setGridSize(body.gridSize); setMessage("Your plot is bigger now."); }
-      else setMessage(body.message || "Couldn't expand the plot.");
+      else setMessage(serverMessage(t, body, "Couldn't expand the plot."));
     } catch { setMessage("Couldn't expand — try again."); }
     finally { setBusy(false); }
   }
@@ -191,7 +191,7 @@ export default function DreamWorld() {
       const res = await apiRequest("POST", `/api/students/${student!.id}/dreamworld/name`, { name: nameInput });
       const body = await res.json();
       if (body.success) { setEditingName(false); setNameError(null); refetch(); }
-      else setNameError(body.message || "Couldn't save that name.");
+      else setNameError(serverMessage(t, body, "Couldn't save that name."));
     } catch { setNameError("Couldn't save that name — try again."); }
     finally { setBusy(false); }
   }

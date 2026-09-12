@@ -23,7 +23,7 @@ import { subjectLabel, SUBJECT_LABELS } from "@shared/weekly-report";
 import { type ImprovementRow } from "@shared/certificates";
 import { ArrowLeft, Award, Loader2, TrendingUp } from "lucide-react";
 import logoPath from "@assets/logo.webp";
-import { subjectName, useT } from "@/lib/i18n";
+import { serverMessage, subjectName, useT } from "@/lib/i18n";
 
 const FORMS = ["Stage 3", "Stage 4", "Stage 5", "Stage 6", "Form 1", "Form 2"];
 const SUBJECTS = Object.keys(SUBJECT_LABELS);
@@ -75,7 +75,7 @@ export default function MostImprovedPage() {
       const res = await fetch(`/api/reports/most-improved?${params}`);
       const body = await res.json();
       if (body.success) setRows(body.rows);
-      else toast({ title: body.message || "Could not compare those periods", variant: "destructive" });
+      else toast({ title: serverMessage(t, body, "Could not compare those periods"), variant: "destructive" });
     } catch {
       toast({ title: "Could not compare. Check your connection.", variant: "destructive" });
     } finally {
@@ -99,11 +99,11 @@ export default function MostImprovedPage() {
       if (body.success) {
         setAwarded((prev) => new Set(prev).add(row.studentId));
         toast({
-          title: body.alreadyAwarded ? body.message : t.mostImproved.awarded,
+          title: body.alreadyAwarded ? serverMessage(t, body) : t.mostImproved.awarded,
           description: body.alreadyAwarded ? undefined : `${row.fullName} — it is on their certificates page now.`,
         });
       } else {
-        toast({ title: body.message || "Could not award it", variant: "destructive" });
+        toast({ title: serverMessage(t, body, "Could not award it"), variant: "destructive" });
       }
     } catch (error) {
       toast({

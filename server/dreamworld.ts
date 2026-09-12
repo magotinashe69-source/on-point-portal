@@ -8,6 +8,7 @@
 
 import { storage } from "./storage";
 import type { DreamWorld, Student } from "@shared/schema";
+import { say, type ServerMessageCode } from "@shared/server-messages";
 import { isPrimaryForm, PRIMARY_FORMS } from "@shared/schema";
 import {
   buildingById, canAfford, footprint, inBounds, occupiedCells,
@@ -141,7 +142,7 @@ export async function setTownName(
   if (!cleaned.ok) return { ok: false, message: cleaned.message };
   const row = await loadOrCreate(student.id);
   if (row.townNamedAt && Date.now() - Date.parse(row.townNamedAt) < RENAME_COOLDOWN_MS) {
-    return { ok: false, message: "You can rename your town once a week. Try again in a few days." };
+    return { ok: false, ...say("renameOncePerWeek") };
   }
   await storage.updateDreamWorld(student.id, { townName: cleaned.value, townNamedAt: new Date().toISOString() });
   return { ok: true, townName: cleaned.value };
@@ -182,11 +183,17 @@ export interface TownView {
 
 export async function getTownView(
   viewer: Student, targetId: number,
-): Promise<{ ok: true; town: TownView } | { ok: false; code: number; message: string }> {
+): Promise<
+  | { ok: true; town: TownView }
+  // `status` rather than `code`: a refusal now also carries a `code` NAMING
+  // what happened, for the browser to translate, and two different meanings
+  // under one field name is how one of them ends up overwritten.
+  | { ok: false; status: number; code: ServerMessageCode; message: string }
+> {
   const target = await storage.getStudent(targetId);
-  if (!target) return { ok: false, code: 404, message: "Town not found." };
+  if (!target) return { ok: false, status: 404, ...say("townNotFound") };
   if (!isPrimaryForm(target.form) || target.form !== viewer.form) {
-    return { ok: false, code: 403, message: "You can only visit towns in your own class." };
+    return { ok: false, status: 403, ...say("visitOwnClassOnly") };
   }
   const row = await storage.getDreamWorld(targetId);
   const layout = row ? parseLayout(row.layout) : [];
@@ -255,24 +262,24 @@ export async function placeBuilding(
   studentId: number, buildingId: string, x: number, y: number,
 ): Promise<MutationResult> {
   const def = buildingById(buildingId);
-  if (!def) return { ok: false, message: "Unknown building." };
-  if (!Number.isInteger(x) || !Number.isInteger(y)) return { ok: false, message: "Invalid tile." };
+  if (!def) return { ok: false, ...say("unknownBuilding") };
+  if (!Number.isInteger(x) || !Number.isInteger(y)) return { ok: false, ...say("invalidTile") };
 
   const row = await loadOrCreate(studentId);
   const layout = parseLayout(row.layout);
 
   // Unlock check — computed from real completions, never trusted from the client.
   const progress = await computeProgress(studentId);
-  if (!isUnlocked(def, progress)) return { ok: false, message: "That building isn't unlocked yet." };
+  if (!isUnlocked(def, progress)) return { ok: false, ...say("buildingLocked") };
 
-  if (!inBounds(x, y, def.size, row.gridSize)) return { ok: false, message: "That doesn't fit on the map." };
+  if (!inBounds(x, y, def.size, row.gridSize)) return { ok: false, ...say("doesNotFit") };
 
   const occupied = occupiedCells(layout);
   const overlaps = footprint(x, y, def.size).some((c) => occupied.has(`${c.x},${c.y}`));
-  if (overlaps) return { ok: false, message: "That space is already taken." };
+  if (overlaps) return { ok: false, ...say("spaceTaken") };
 
   const wallet = walletOf(row);
-  if (!canAfford(wallet, def.cost)) return { ok: false, message: "Not enough resources yet." };
+  if (!canAfford(wallet, def.cost)) return { ok: false, ...say("notEnoughResources") };
 
   const newLayout: Placed[] = [...layout, { id: def.id, x, y, placedAt: Date.now(), level: 1 }];
   const updated = await storage.updateDreamWorld(studentId, {
@@ -294,7 +301,7 @@ export async function removeBuilding(
 
   const occupied = occupiedCells(layout);
   const target = occupied.get(`${x},${y}`);
-  if (!target) return { ok: false, message: "Nothing to remove there." };
+  if (!target) return { ok: false, ...say("nothingToRemove") };
 
   const def = buildingById(target.id);
   // Refund half of everything invested — the base cost plus any upgrades.
@@ -321,17 +328,17 @@ export async function upgradeBuilding(
   const layout = parseLayout(row.layout);
   const occupied = occupiedCells(layout);
   const target = occupied.get(`${x},${y}`);
-  if (!target) return { ok: false, message: "Nothing to upgrade there." };
+  if (!target) return { ok: false, ...say("nothingToUpgrade") };
 
   const def = buildingById(target.id);
-  if (!def || !isUpgradable(def)) return { ok: false, message: "This one can't be upgraded." };
+  if (!def || !isUpgradable(def)) return { ok: false, ...say("cannotUpgradeThis") };
 
   const level = levelOf(target);
-  if (level >= maxLevelOf(def)) return { ok: false, message: "This is already at the highest level." };
+  if (level >= maxLevelOf(def)) return { ok: false, ...say("alreadyHighestLevel") };
 
   const cost = upgradeCost(def, level);
   const wallet = walletOf(row);
-  if (!canAfford(wallet, cost)) return { ok: false, message: "Not enough resources to upgrade yet." };
+  if (!canAfford(wallet, cost)) return { ok: false, ...say("notEnoughToUpgrade") };
 
   const newLayout = layout.map((b) =>
     b.x === target.x && b.y === target.y && b.id === target.id ? { ...b, level: level + 1 } : b,
@@ -351,9 +358,9 @@ export async function expandPlot(
   studentId: number,
 ): Promise<{ ok: true; wallet: Wallet; gridSize: number } | { ok: false; message: string }> {
   const row = await loadOrCreate(studentId);
-  if (!canExpand(row.gridSize)) return { ok: false, message: "Your plot is already the largest size." };
+  if (!canExpand(row.gridSize)) return { ok: false, ...say("plotAlreadyLargest") };
   const wallet = walletOf(row);
-  if (!canAfford(wallet, EXPAND_COST)) return { ok: false, message: "Not enough resources to expand the plot yet." };
+  if (!canAfford(wallet, EXPAND_COST)) return { ok: false, ...say("notEnoughToExpand") };
 
   const updated = await storage.updateDreamWorld(studentId, {
     coins: row.coins - EXPAND_COST.coins,

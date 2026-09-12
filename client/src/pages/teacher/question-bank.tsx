@@ -44,7 +44,7 @@ import {
   ArrowLeft, Loader2, Library, Search, Pencil, Trash2, X, Save,
 } from "lucide-react";
 import logoPath from "@assets/logo.webp";
-import { useT } from "@/lib/i18n";
+import { serverMessage, useT } from "@/lib/i18n";
 
 const SUBJECTS = Object.keys(SUBJECT_LABELS);
 const FORMS = ["Stage 3", "Stage 4", "Stage 5", "Stage 6", "Form 1", "Form 2"];
@@ -107,7 +107,7 @@ export default function QuestionBankPage() {
         toast({ title: t.bankScreen.removed });
         refresh();
       } else {
-        toast({ title: body.message || "Could not remove it", variant: "destructive" });
+        toast({ title: serverMessage(t, body, "Could not remove it"), variant: "destructive" });
       }
     } catch (error) {
       toast({
@@ -376,7 +376,7 @@ function EditQuestionDialog({
         toast({ title: t.bankScreen.updated });
         onSaved();
       } else {
-        toast({ title: body.message || "Could not save the change", variant: "destructive" });
+        toast({ title: serverMessage(t, body, "Could not save the change"), variant: "destructive" });
       }
     } catch (error) {
       // An edit refused for leaving the question unmarkable arrives as a thrown

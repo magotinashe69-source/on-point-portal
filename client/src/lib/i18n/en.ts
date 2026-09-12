@@ -22,6 +22,7 @@
 
 import { CERTIFICATE_TEXT, IMPROVED_TEXT } from "@shared/certificates";
 import { REPORT_TEXT as REPORT_CARD_TEXT } from "@shared/report-card";
+import { SERVER_TEXT, VALIDATION_TEXT } from "@shared/server-messages";
 import { BLASTER_TEXT } from "@shared/blaster";
 import { PLAYS_TEXT, RESUME_TEXT } from "@shared/game-plays";
 import { CLASS_MASTERY_TEXT, MASTERY_TEXT } from "@shared/mastery";
@@ -760,6 +761,9 @@ export const en = {
     playAgain: "Play again",
     pitchAlt: "Football pitch with a goal",
     goalAgainst: "Goal against",
+    couldNotLoadGame: "Couldn't load the game. Check your connection and try again.",
+    couldNotStartGame: "Couldn't start the game. Check your connection and try again.",
+    couldNotSaveGame: "Couldn't save your game. Check your connection.",
     corners: {
       left: "Left",
       middle: "Middle",
@@ -1123,6 +1127,10 @@ export const en = {
   // Spread in rather than copied: these files are the English source, are
   // imported by pages that are not translated yet, and one of them
   // (weekly-report) is also used to build the WhatsApp message.
+  validation: VALIDATION_TEXT,
+
+  server: SERVER_TEXT,
+
   report: REPORT_TEXT,
   overview: OVERVIEW_TEXT,
   work: WORK_TEXT,

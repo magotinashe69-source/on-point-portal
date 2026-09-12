@@ -18,7 +18,7 @@ import { QueryError } from "@/components/QueryError";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
-import { useT } from "@/lib/i18n";
+import { serverMessage, useT } from "@/lib/i18n";
 import { ArrowLeft, Loader2, Send, Calendar, BookOpen, Edit, AlertTriangle, ImagePlus, X, FileText, Paperclip, Circle, CheckCircle2, Download, CloudOff } from "lucide-react";
 import { AttachmentDisplay } from "@/components/FileAttachmentZone";
 import { Lightbox } from "@/components/Lightbox";
@@ -305,7 +305,7 @@ export default function SubmitAssignment() {
       } else {
         toast({
           title: t.submit.notHandedIn,
-          description: data.message || t.submit.checkForm,
+          description: serverMessage(t, data, t.submit.checkForm),
           variant: "destructive",
         });
       }

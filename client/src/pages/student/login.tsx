@@ -15,7 +15,7 @@ import { ArrowLeft, LogIn, Loader2, Eye, EyeOff, Camera } from "lucide-react";
 import { Link } from "wouter";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
-import { useT } from "@/lib/i18n";
+import { serverMessage, useT } from "@/lib/i18n";
 import logoPath from "@assets/logo.webp";
 
 export default function StudentLoginPage() {
@@ -73,7 +73,7 @@ export default function StudentLoginPage() {
         body: JSON.stringify({ code }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!data.success) return data.message || t.login.student.cardNotRecognised;
+      if (!data.success) return serverMessage(t, data, t.login.student.cardNotRecognised);
 
       // Same as the form login below: forget any teacher or parent this
       // browser is remembering, without posting a logout that would destroy
@@ -112,7 +112,7 @@ export default function StudentLoginPage() {
       } else {
         toast({
           title: t.login.loginFailed,
-          description: data.message || t.login.student.invalidCredentials,
+          description: serverMessage(t, data, t.login.student.invalidCredentials),
           variant: "destructive",
         });
       }

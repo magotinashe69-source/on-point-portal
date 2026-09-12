@@ -1,3 +1,4 @@
+import { useT } from "@/lib/i18n"
 "use client"
 
 import * as React from "react"
@@ -147,7 +148,12 @@ const FormMessage = React.forwardRef<
   React.HTMLAttributes<HTMLParagraphElement>
 >(({ className, children, ...props }, ref) => {
   const { error, formMessageId } = useFormField()
-  const body = error ? String(error?.message ?? "") : children
+  const t = useT()
+  // A field's error is the NAME of the problem (see VALIDATION_TEXT), so it is
+  // turned into words here — the one place every form error passes through.
+  // Anything that is not one of ours is shown as it is.
+  const raw = error ? String(error?.message ?? "") : undefined
+  const body = raw !== undefined ? ((t.validation as Record<string, string>)[raw] ?? raw) : children
 
   if (!body) {
     return null

@@ -18,7 +18,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { PageErrorBoundary } from "@/components/ErrorBoundary";
 import { ArrowLeft, CheckCircle2, XCircle, Loader2, Pencil } from "lucide-react";
 import logoPath from "@assets/logo.webp";
-import { useT, type Translation } from "@/lib/i18n";
+import { serverMessage, type Translation, useT } from "@/lib/i18n";
 
 interface QReview {
   index: number;
@@ -93,7 +93,7 @@ function SubmissionReviewContent() {
         setScoreInputs((s) => { const n = { ...s }; delete n[q.questionId]; return n; });
         toast({ title: t.review.markUpdated, description: `Q${q.index + 1} set to ${body.score}/${q.maxScore}. New total ${body.totalScore}/${review?.assignment.totalMarks}.` });
       } else {
-        toast({ title: t.review.couldNotUpdate, description: body.message || t.review.tryAgainPlease, variant: "destructive" });
+        toast({ title: t.review.couldNotUpdate, description: serverMessage(t, body, t.review.tryAgainPlease), variant: "destructive" });
       }
     } catch {
       toast({ title: t.review.couldNotUpdate, description: t.review.tryAgainPlease, variant: "destructive" });

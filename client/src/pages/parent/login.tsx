@@ -13,7 +13,7 @@ import { ArrowLeft, LogIn, Loader2, Eye, EyeOff } from "lucide-react";
 import { Link } from "wouter";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
-import { useT } from "@/lib/i18n";
+import { serverMessage, useT } from "@/lib/i18n";
 import logoPath from "@assets/logo.webp";
 
 export default function ParentLoginPage() {
@@ -70,7 +70,7 @@ export default function ParentLoginPage() {
       } else {
         toast({
           title: t.login.loginFailed,
-          description: data.message || t.login.parent.tryAgain,
+          description: serverMessage(t, data, t.login.parent.tryAgain),
           variant: "destructive",
         });
       }

@@ -14,7 +14,7 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import { AWARDS, type AwardId, type Placed } from "@shared/dreamworld";
 import { TownPlot } from "@/components/TownPlot";
 import logoPath from "@assets/logo.webp";
-import { useT } from "@/lib/i18n";
+import { serverMessage, useT } from "@/lib/i18n";
 
 interface TownView {
   studentId: number;
@@ -70,7 +70,7 @@ export default function TownViewPage() {
           <div className="flex items-center justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
         ) : isError || !town ? (
           <p className="text-center text-sm text-muted-foreground py-10" data-testid="town-view-blocked">
-            {data?.message || "You can only visit towns in your own class."}
+            {serverMessage(t, data, t.server.visitOwnClassOnly)}
           </p>
         ) : (
           <>

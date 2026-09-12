@@ -29,7 +29,7 @@ import {
   validateBankQuestion, type Difficulty,
 } from "@shared/question-bank";
 import { Library, Loader2, Save } from "lucide-react";
-import { subjectName, useT } from "@/lib/i18n";
+import { serverMessage, subjectName, useT } from "@/lib/i18n";
 
 const SUBJECTS = Object.keys(SUBJECT_LABELS);
 const FORMS = ["Stage 3", "Stage 4", "Stage 5", "Stage 6", "Form 1", "Form 2"];
@@ -118,7 +118,7 @@ export function SaveToBankDialog({
         queryClient.invalidateQueries({ queryKey: ["/api/question-bank"] });
         onClose();
       } else {
-        toast({ title: body.message || "Could not save it", variant: "destructive" });
+        toast({ title: serverMessage(t, body, "Could not save it"), variant: "destructive" });
       }
     } catch (error) {
       // A refusal (400) arrives here as a thrown error, so the server's own

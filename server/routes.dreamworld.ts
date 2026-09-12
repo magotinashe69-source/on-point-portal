@@ -19,6 +19,7 @@
 
 import type { Express, Request, Response } from "express";
 import type { Student } from "@shared/schema";
+import { say } from "@shared/server-messages";
 import {
   getState as getDreamState,
   placeBuilding,
@@ -49,7 +50,7 @@ export function registerDreamWorldRoutes(app: Express, { requireTeacherAuth, req
       res.json({ success: true, ...state });
     } catch (error) {
       console.error("Get Dream World error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, ...say("serverErrorShort") });
     }
   });
 
@@ -59,7 +60,7 @@ export function registerDreamWorldRoutes(app: Express, { requireTeacherAuth, req
   async function blockedByOverdue(student: Student, res: Response): Promise<boolean> {
     const overdue = await computeOverdue(student);
     if (overdue) {
-      res.status(403).json({ success: false, message: "Finish your overdue homework before you build." });
+      res.status(403).json({ success: false, ...say("finishHomeworkBeforeBuilding") });
       return true;
     }
     return false;
@@ -77,7 +78,7 @@ export function registerDreamWorldRoutes(app: Express, { requireTeacherAuth, req
       res.json({ success: true, wallet: result.wallet, layout: result.layout });
     } catch (error) {
       console.error("Place building error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, ...say("serverErrorShort") });
     }
   });
 
@@ -92,7 +93,7 @@ export function registerDreamWorldRoutes(app: Express, { requireTeacherAuth, req
       res.json({ success: true, wallet: result.wallet, layout: result.layout });
     } catch (error) {
       console.error("Remove building error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, ...say("serverErrorShort") });
     }
   });
 
@@ -108,7 +109,7 @@ export function registerDreamWorldRoutes(app: Express, { requireTeacherAuth, req
       res.json({ success: true, wallet: result.wallet, layout: result.layout });
     } catch (error) {
       console.error("Upgrade building error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, ...say("serverErrorShort") });
     }
   });
 
@@ -123,7 +124,7 @@ export function registerDreamWorldRoutes(app: Express, { requireTeacherAuth, req
       res.json({ success: true, wallet: result.wallet, gridSize: result.gridSize });
     } catch (error) {
       console.error("Expand plot error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, ...say("serverErrorShort") });
     }
   });
 
@@ -137,7 +138,7 @@ export function registerDreamWorldRoutes(app: Express, { requireTeacherAuth, req
       res.json({ success: true, townName: result.townName });
     } catch (error) {
       console.error("Name town error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, ...say("serverErrorShort") });
     }
   });
 
@@ -149,7 +150,7 @@ export function registerDreamWorldRoutes(app: Express, { requireTeacherAuth, req
       res.json({ success: true, neighbours: await getNeighbours(student) });
     } catch (error) {
       console.error("Neighbours error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, ...say("serverErrorShort") });
     }
   });
 
@@ -159,11 +160,11 @@ export function registerDreamWorldRoutes(app: Express, { requireTeacherAuth, req
       const student = await requirePrimaryStudent(parseInt(req.params.id), req, res);
       if (!student) return;
       const result = await getTownView(student, parseInt(req.params.otherId));
-      if (!result.ok) return res.status(result.code).json({ success: false, message: result.message });
+      if (!result.ok) return res.status(result.status).json({ success: false, code: result.code, message: result.message });
       res.json({ success: true, town: result.town });
     } catch (error) {
       console.error("View town error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, ...say("serverErrorShort") });
     }
   });
 
@@ -178,7 +179,7 @@ export function registerDreamWorldRoutes(app: Express, { requireTeacherAuth, req
       res.json({ success: true, term, count: results.length, results });
     } catch (error) {
       console.error("Run term awards error:", error);
-      res.status(500).json({ success: false, message: "Server error" });
+      res.status(500).json({ success: false, ...say("serverErrorShort") });
     }
   });
 }

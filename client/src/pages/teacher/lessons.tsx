@@ -41,7 +41,7 @@ import {
 } from "lucide-react";
 import type { Lesson } from "@shared/schema";
 import logoPath from "@assets/logo.webp";
-import { SUBJECT_CODES, subjectName, useT } from "@/lib/i18n";
+import { serverMessage, SUBJECT_CODES, subjectName, useT } from "@/lib/i18n";
 
 // Option lists shared by the single-lesson form and the bulk paste dialog.
 const LESSON_FORMS = ["Stage 3", "Stage 4", "Stage 5", "Stage 6", "Form 1", "Form 2"] as const;
@@ -340,7 +340,7 @@ export default function TeacherLessons() {
         setRecordedBlob(null);
         setRecordedDuration("");
       } else {
-        toast({ title: t.teacherLessons.lessonNotAdded, description: data.message, variant: "destructive" });
+        toast({ title: t.teacherLessons.lessonNotAdded, description: serverMessage(t, data), variant: "destructive" });
       }
     },
   });

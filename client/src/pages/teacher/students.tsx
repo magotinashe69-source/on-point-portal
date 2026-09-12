@@ -21,7 +21,7 @@ import { ArrowLeft, PlusCircle, Pencil, Trash2, KeyRound, Loader2, Users, Clipbo
 import logoPath from "@assets/logo.webp";
 import type { Student, Parent } from "@shared/schema";
 import type { WeeklyReport } from "@shared/weekly-report";
-import { useT } from "@/lib/i18n";
+import { serverMessage, useT } from "@/lib/i18n";
 
 // --- Bulk paste ---------------------------------------------------------
 // Enrolling a class means typing the same thing thirty times. Each line is one
@@ -161,7 +161,7 @@ export default function StudentManagement() {
         setParentForStudent(null);
         setNewParent({ fullName: "", username: "", password: "" });
       } else {
-        toast({ title: t.register.parentNotCreated, description: data.message, variant: "destructive" });
+        toast({ title: t.register.parentNotCreated, description: serverMessage(t, data), variant: "destructive" });
       }
     },
   });
@@ -197,7 +197,7 @@ export default function StudentManagement() {
         setEditingParent(false);
         setParentEdits({ fullName: "", username: "", password: "" });
       } else {
-        toast({ title: t.register.parentNotUpdated, description: data.message, variant: "destructive" });
+        toast({ title: t.register.parentNotUpdated, description: serverMessage(t, data), variant: "destructive" });
       }
     },
   });
@@ -214,7 +214,7 @@ export default function StudentManagement() {
         setIsAddDialogOpen(false);
         setNewStudent({ studentId: "", qrCode: "", fullName: "", gender: "Male", form: "Form 1" });
       } else {
-        toast({ title: t.register.studentNotAdded, description: data.message, variant: "destructive" });
+        toast({ title: t.register.studentNotAdded, description: serverMessage(t, data), variant: "destructive" });
       }
     },
   });
@@ -231,7 +231,7 @@ export default function StudentManagement() {
         setIsEditDialogOpen(false);
         setEditingStudent(null);
       } else {
-        toast({ title: t.register.studentNotUpdated, description: data.message, variant: "destructive" });
+        toast({ title: t.register.studentNotUpdated, description: serverMessage(t, data), variant: "destructive" });
       }
     },
   });
@@ -257,7 +257,7 @@ export default function StudentManagement() {
         queryClient.invalidateQueries({ queryKey: ["/api/students"] });
         toast({ title: t.register.passwordReset, description: t.register.passwordResetNote });
       } else {
-        toast({ title: t.register.passwordNotReset, description: data.message, variant: "destructive" });
+        toast({ title: t.register.passwordNotReset, description: serverMessage(t, data), variant: "destructive" });
       }
     },
   });
@@ -484,7 +484,7 @@ export default function StudentManagement() {
                   try {
                     const res = await apiRequest("PUT", `/api/students/${studentId}`, { qrCode: code });
                     const data = await res.json();
-                    return data.success ? null : (data.message || "Did not save");
+                    return data.success ? null : (serverMessage(t, data, "Did not save"));
                   } catch {
                     return "Check your connection and try again.";
                   }

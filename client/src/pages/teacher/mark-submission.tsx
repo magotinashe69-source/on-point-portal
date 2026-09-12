@@ -29,7 +29,7 @@ import {
 import { Lightbox } from "@/components/Lightbox";
 import type { Submission, Assignment, Mark, Student } from "@shared/schema";
 import logoPath from "@assets/logo.webp";
-import { useT } from "@/lib/i18n";
+import { serverMessage, useT } from "@/lib/i18n";
 
 const markQuestionSchema = z.object({
   questionId: z.string(),
@@ -143,7 +143,7 @@ export default function MarkSubmission() {
       } else {
         toast({
           title: t.marking.notSaved,
-          description: data.message || "Check the form and try again.",
+          description: serverMessage(t, data, "Check the form and try again."),
           variant: "destructive",
         });
       }

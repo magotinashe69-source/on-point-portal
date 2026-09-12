@@ -156,11 +156,15 @@ function outbox(page: Page): Promise<any[]> {
  */
 async function saveToDevice(page: Page): Promise<void> {
   await page.waitForTestId("button-submit");
-  await page.waitFor(
-    `const b = document.querySelector('[data-testid="button-save-offline"]'); return !!b && !b.disabled;`,
-    "the save button to be ready",
-  );
+
   for (let attempt = 0; attempt < 3; attempt++) {
+    // Before EVERY tap, not just the first. The button disables itself while a
+    // save is in flight, so a retry that does not wait taps a disabled button
+    // and reports that as the failure instead of whatever went wrong.
+    await page.waitFor(
+      `const b = document.querySelector('[data-testid="button-save-offline"]'); return !!b && !b.disabled;`,
+      "the save button to be ready",
+    );
     await page.click("button-save-offline");
     try {
       await page.waitForTestId("text-saved-offline", 5000);

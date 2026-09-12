@@ -701,6 +701,9 @@ export const pt: Translation = {
     playAgain: "Jogar outra vez",
     pitchAlt: "Campo de futebol com uma baliza",
     goalAgainst: "Golo sofrido",
+    couldNotLoadGame: "Não foi possível carregar o jogo. Verifica a tua ligação e tenta outra vez.",
+    couldNotStartGame: "Não foi possível começar o jogo. Verifica a tua ligação e tenta outra vez.",
+    couldNotSaveGame: "Não foi possível guardar o teu jogo. Verifica a tua ligação.",
     corners: {
       left: "Esquerda",
       middle: "Meio",
@@ -1044,6 +1047,139 @@ export const pt: Translation = {
     lastWeek: "Semana passada",
     nothingMarkedThisWeek: "Ainda não foi corrigido nenhum trabalho desta semana.",
     tapAnyPiece: "Toque em qualquer trabalho para ver cada pergunta, a resposta do seu educando e a resposta correta.",
+  },
+
+  // --- O que um formulário diz (shared/server-messages.ts) ---
+  validation: {
+    yourNameRequired: "O seu nome é obrigatório",
+    yourUsernameRequired: "O seu nome de utilizador é obrigatório",
+    parentNameRequired: "O nome do encarregado de educação é obrigatório",
+    emailRequired: "É preciso um correio eletrónico válido",
+    passwordRequired: "A palavra-passe é obrigatória",
+    passwordTooShort: "A palavra-passe tem de ter pelo menos 6 caracteres",
+    usernameTooShort: "O nome de utilizador tem de ter pelo menos 3 caracteres",
+  },
+
+  // --- O que o servidor responde (shared/server-messages.ts) ---
+  server: {
+    // Iniciar sessão
+    notOnClassList: "Esse nome não está na lista da turma. Escreva o seu nome tal como o seu professor o registou.",
+    wrongPassword: "Essa palavra-passe não está correta. Verifique-a e tente novamente.",
+    wrongEmailOrPassword: "Esse correio eletrónico e essa palavra-passe não correspondem. Verifique os dois e tente novamente.",
+    wrongUsernameOrPassword: "Esse nome de utilizador e essa palavra-passe não correspondem. Verifique os dois e tente novamente.",
+    tooManyAttempts: "Demasiadas tentativas. Espere alguns minutos e tente novamente.",
+    signInAgain: "Volte a iniciar sessão.",
+    notLoggedIn: "Não tem a sessão iniciada. Entre e tente novamente.",
+    notLoggedInTeacher: "Não tem a sessão iniciada como professor. Entre e tente novamente.",
+    notLoggedInParent: "Não tem a sessão iniciada como encarregado de educação. Entre e tente novamente.",
+
+    // Cartões
+    cardNotRecognised: "Cartão não reconhecido. Peça ao seu professor para o verificar.",
+    cardNotLinked: "Ainda não há nenhum aluno ligado a esse cartão. Ligue-o no ecrã dos Alunos.",
+    scanOrTypeCode: "Digitalize um cartão, ou escreva o código dele.",
+    studentIdNotRecognised: "Esse número de aluno não foi reconhecido.",
+    studentIdExists: "Esse número de aluno já existe",
+
+    // Quem pode ver o quê
+    parentSeesOwnChild: "Uma conta de encarregado de educação só pode ver o seu próprio educando. Entre no portal do encarregado de educação.",
+    ownChildInfoOnly: "Só pode ver a informação do seu próprio educando.",
+    ownChildWorkOnly: "Só pode ver o trabalho do seu próprio educando.",
+    parentPortalReadOnly: "O portal do encarregado de educação é apenas de consulta.",
+    workBelongsToSomebodyElse: "Esse trabalho é de outra pessoa.",
+    notYourCertificate: "Esse certificado não é seu.",
+    notYourClass: "Este trabalho não foi marcado para a sua turma.",
+    notInThisClass: "Esse aluno não é desta turma.",
+
+    // Coisas que não existem
+    studentNotFound: "Aluno não encontrado",
+    assignmentNotFound: "Trabalho não encontrado",
+    submissionNotFound: "Entrega não encontrada",
+    markNotFound: "Nota não encontrada",
+    questionNotFound: "Pergunta não encontrada",
+    resourceNotFound: "Recurso não encontrado",
+    lessonNotFound: "Aula não encontrada",
+    parentNotFound: "Conta de encarregado de educação não encontrada",
+    townNotFound: "Vila não encontrada.",
+    pupilOffRegister: "Esse aluno já não está na lista. Peça à escola para verificar.",
+    workNoLongerAvailable: "Esse trabalho já não está disponível.",
+    notAValidPupil: "Esse aluno não é válido.",
+    notAValidParent: "Essa conta de encarregado de educação não é válida.",
+
+    // Entregar trabalhos
+    alreadyHandedIn: "Já entregou este trabalho.",
+    answerSomething: "Responda a pelo menos uma pergunta antes de entregar.",
+    cannotEditMarked: "Não é possível alterar uma entrega já corrigida",
+    notMarkedYet: "Esta entrega ainda não foi corrigida.",
+    handMarkedCannotAutoRemark: "Esta pergunta é corrigida à mão, por isso não pode ser corrigida automaticamente de novo.",
+
+    // O banco de perguntas
+    questionNotInBank: "Essa pergunta não está no banco.",
+    notAQuestionId: "Isso não é um número de pergunta.",
+
+    // Preencher um formulário
+    chooseAClass: "Escolha primeiro uma turma.",
+    chooseAStudent: "Escolha primeiro um aluno.",
+    chooseClassAndSubject: "Escolha uma turma e uma disciplina.",
+    chooseClassAndDate: "Escolha uma turma e uma data antes de gerar o relatório.",
+    choosePupilAndSubject: "Escolha um aluno e uma disciplina.",
+    choosePupilAndComment: "Escolha um aluno e escreva um comentário.",
+    chooseStudentAndDueDate: "Escolha um aluno e um novo prazo.",
+    chooseBothPeriods: "Escolha os dois períodos.",
+    nameTheTerm: "Dê um nome ao trimestre.",
+    nameTermAndDates: "Dê um nome ao trimestre e indique as suas datas.",
+    giveTermDates: "Indique as datas do trimestre.",
+    sendGradeBoundaries: "Envie a escala de notas para guardar.",
+    dateFormat: "Escreva a data como AAAA-MM-DD.",
+    scoreMustBeNumber: "Escreva a nota como um número.",
+    invalidForm: "Turma inválida",
+    usernameNoSpaces: "O nome de utilizador não pode ter espaços.",
+    usernameTaken: "Esse nome de utilizador já está a ser usado. Escolha outro.",
+
+    // Datas que não fazem sentido
+    termStartsAfterEnd: "O trimestre começa depois de terminar.",
+    periodStartsAfterEnd: "Um período começa depois de terminar.",
+    rangeStartsAfterEnd: "Esse intervalo de datas começa depois de terminar.",
+
+    // Boletins e prémios
+    alreadyHasCertificate: "Esse aluno já tem este certificado para estas datas.",
+    noFiguresToCompare: "Esse aluno não tem valores para comparar.",
+
+    // Os jogos
+    pickSubjectToPlay: "Escolhe uma disciplina para jogar.",
+    finishAssignmentFirst: "Termina primeiro um trabalho desta disciplina — o jogo é feito a partir de perguntas a que já respondeste.",
+    notYourGameQuestion: "Essa pergunta não faz parte do teu jogo.",
+    missingQuestion: "Falta a pergunta.",
+    missingSubject: "Falta a disciplina.",
+    missingSubjectOrQuestion: "Falta a disciplina ou a pergunta.",
+
+    // Mundo dos Sonhos
+    dreamWorldRetired: "O Mundo dos Sonhos foi encerrado. As vilas guardadas ficam, mas o jogo já não está disponível.",
+    dreamWorldPrimaryOnly: "O Mundo dos Sonhos é só para as turmas primárias",
+    finishHomeworkBeforeBuilding: "Termina os trabalhos de casa em atraso antes de construíres.",
+    notEnoughResources: "Ainda não tens recursos que cheguem.",
+    notEnoughToUpgrade: "Ainda não tens recursos que cheguem para melhorar.",
+    notEnoughToExpand: "Ainda não tens recursos que cheguem para aumentar o terreno.",
+    buildingLocked: "Esse edifício ainda não está desbloqueado.",
+    unknownBuilding: "Edifício desconhecido.",
+    invalidTile: "Espaço inválido.",
+    spaceTaken: "Esse espaço já está ocupado.",
+    doesNotFit: "Isso não cabe no mapa.",
+    nothingToRemove: "Não há nada para tirar aí.",
+    nothingToUpgrade: "Não há nada para melhorar aí.",
+    cannotUpgradeThis: "Este não pode ser melhorado.",
+    alreadyHighestLevel: "Já está no nível mais alto.",
+    plotAlreadyLargest: "O teu terreno já tem o tamanho máximo.",
+    visitOwnClassOnly: "Só podes visitar vilas da tua turma.",
+    renameOncePerWeek: "Só podes mudar o nome da tua vila uma vez por semana. Tenta daqui a uns dias.",
+
+    // Coisas que correram bem
+    deadlineExtended: "Prazo alargado com sucesso",
+    passwordReset: "Palavra-passe reposta. O aluno define uma nova da próxima vez que entrar.",
+    streakFreezeUsed: "O teu congelamento manteve a tua sequência.",
+
+    // Quando a culpa é nossa
+    serverError: "Algo correu mal do nosso lado. Tente novamente daqui a pouco.",
+    serverErrorShort: "Erro do servidor",
   },
 
   // --- O relatório semanal (shared/weekly-report.ts) ---

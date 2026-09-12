@@ -434,6 +434,75 @@ async function main() {
     { what: "completed work", path: "/parent/work", says: pt.work.completedTitle, notSays: en.work.completedTitle },
     { what: "areas to practise", path: "/parent/support", says: pt.work.supportTitle, notSays: en.work.supportTitle },
   ]);
+
+  // =======================================================================
+  section("What the SERVER says, in Portuguese");
+  // =======================================================================
+  //
+  // The last thing that was still English. A refusal is composed on the server,
+  // so it cannot carry words the browser chose — it carries a CODE naming what
+  // happened, and the browser looks that up. These checks follow one refusal
+  // the whole way: over HTTP, and then on a screen.
+
+  const refused = await child.post("/api/auth/student/login", {
+    fullName: "Nobody By This Name At All",
+    password: "whatever123",
+  });
+  check(refused.body?.success === false, "the server refuses a name that is not on the register");
+  check(refused.body?.code === "notOnClassList",
+    "and names what happened, rather than only saying it",
+    `code ${refused.body?.code}`);
+  check(refused.body?.message === en.server.notOnClassList,
+    "the English sentence still travels beside it, for anything that is not our app",
+    refused.body?.message);
+
+  // And now the same refusal, read by a family using the app in Portuguese.
+  await page.goto(`${BASE}/student/login`);
+  await page.waitForTestId("language-toggle");
+  await switchTo("pt");
+  await page.fill("input-fullname", "Nobody By This Name At All");
+  await page.fill("input-password", "whatever123");
+  await page.click("button-login");
+
+  const refusalShown = await waitUntil(
+    async () => (await page.bodyText()).includes(pt.server.notOnClassList),
+    15000,
+  );
+  const afterRefusal = await page.bodyText();
+  check(refusalShown, "and a family reading Portuguese is refused in Portuguese",
+    `looked for "${pt.server.notOnClassList}"`);
+  check(!afterRefusal.includes(en.server.notOnClassList),
+    "with the English sentence nowhere on the screen");
+
+  // A form's own complaint takes the same route: the schema carries the name of
+  // the problem, and each side turns it into words.
+  await page.goto(`${BASE}/student/login`);
+  await page.waitForTestId("button-login");
+  await page.click("button-login");
+  const formComplaint = await waitUntil(
+    async () => (await page.bodyText()).includes(pt.validation.yourNameRequired),
+    10000,
+  );
+  check(formComplaint, "an empty form complains in Portuguese too",
+    `looked for "${pt.validation.yourNameRequired}"`);
+  check(!(await page.bodyText()).includes(en.validation.yourNameRequired),
+    "and not in English beside it");
+
+  // A code this build has never heard of must not blank the screen.
+  const unknown = serverMessageFallback({ code: "somethingAddedLater", message: "A sentence from a newer server." });
+  check(unknown === "A sentence from a newer server.",
+    "a code the app does not know yet falls back to the server's own words", unknown);
+}
+
+/**
+ * The same rule serverMessage() follows in the app, restated here so the
+ * fallback can be checked without a browser: prefer the code, fall back to the
+ * sentence. Kept deliberately tiny — if it grows, it should be imported from
+ * lib/i18n instead of copied.
+ */
+function serverMessageFallback(reply: { code?: string; message?: string }): string {
+  const known = reply.code ? (pt.server as Record<string, string>)[reply.code] : undefined;
+  return known ?? reply.message ?? "";
 }
 
 /** Poll until true, or give up. Used where a page loads its panels one by one. */

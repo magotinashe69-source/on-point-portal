@@ -1350,13 +1350,10 @@ export, marking, one submission opened question by question, report cards, Most
 Improved, the question bank, create-assignment, all three games, Dream World,
 and the public front page.
 
+What the SERVER says is covered too — see below.
+
 **Still English, and worth knowing:**
 
-* **Messages the SERVER writes.** "That name is not on the class list", and
-  every other `data.message`, is composed in `server/routes.ts` and shown as it
-  arrives. Translating those means sending a code the client can look up, or
-  telling the server which language to answer in — neither is a small change,
-  and it is the one real gap left.
 * **Feedback already STORED on a mark.** `markAnswer()` writes a sentence
   ("Correct answer: 6.") into the submission when it is marked. That is data by
   the time anyone reads it, and translating it later would not change a row
@@ -1364,6 +1361,46 @@ and the public front page.
 * **Most dates** still follow the browser's own locale. The exception is
   `longDate()` in `lib/i18n`, used where a date is READ rather than scanned — a
   certificate, an award — which spells the month out in the chosen language.
+
+### What the server says
+
+A refusal is composed on the server, so it cannot carry words the browser chose.
+The same rule applies as everywhere else — **the server sends data, the client
+supplies the words** — so a refusal names WHAT HAPPENED and the browser looks
+that name up:
+
+```
+{ success: false, code: "notOnClassList", message: "That name is not on the class list. …" }
+```
+
+* `shared/server-messages.ts` — `SERVER_TEXT`, every sentence the server can
+  say, with a name. `say("notOnClassList")` returns the pair above, and is
+  spread into the reply: `res.status(404).json({ success: false, ...say("studentNotFound") })`.
+* `t.server` — the same names, in the reader's language. `SERVER_TEXT` is spread
+  into `en.ts`, so English has one source and `npm run check` demands the
+  Portuguese.
+* `serverMessage(t, data, fallback)` in `lib/i18n` — what a screen shows. It
+  prefers the code and falls back to the sentence.
+
+**The English sentence still travels**, and that is deliberate: a check script,
+curl or any future integration gets a readable answer with no lookup table, and
+a client that does not know a code yet shows English rather than a blank space.
+That is the property `serverMessage()` is built around, and it is checked.
+
+### What a form says
+
+A form's complaints come from the zod schemas in `shared/schema.ts`, which BOTH
+sides use — the browser before sending, the server on what arrives. So the
+schema carries the name of the problem (`z.string().min(1, "yourNameRequired")`)
+and each side turns it into words:
+
+* the browser in `FormMessage` (`components/ui/form.tsx`) — the one place every
+  field error is rendered;
+* the server in `validateRequest()`, through `validationText()`, for a caller
+  that is not our browser.
+
+`VALIDATION_TEXT` sits beside `SERVER_TEXT`, and anything that is not one of
+those names is shown exactly as it is.
 
 ### Three rules that came out of doing it
 
@@ -1390,8 +1427,8 @@ with `script/chrome.ts`: switch to Portuguese on the login page, reload to prove
 it stuck, walk a child's dashboard and a real paper, switch back to English,
 then a teacher's dashboard and a parent's portal — checking at each step that
 the interface changed and the teacher's own words did not. It then walks
-fourteen more screens, checking each says the Portuguese and not the English.
-69 checks.
+fourteen more screens, checking each says the Portuguese and not the English,
+and follows one server refusal and one form complaint the whole way. 77 checks.
 
 The walk is grouped by **who is signed in**, and signs in again before each
 group. The three portals share one browser, and `setSessionRole()` gives a

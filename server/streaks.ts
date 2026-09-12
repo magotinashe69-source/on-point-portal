@@ -17,6 +17,7 @@
 //     shaming one.
 
 import { storage } from "./storage";
+import { say } from "@shared/server-messages";
 import { awardXp } from "./xp";
 
 export const MAX_FREEZES = 2;
@@ -130,7 +131,7 @@ function settle(state: StreakState, today: string): { state: StreakState; notice
     // is measured from here. Freeze days do not add to the count.
     return {
       state: { ...state, freezes: state.freezes - missed, lastActiveDate: addDays(today, -1) },
-      notice: { type: "freeze", message: "Your streak freeze kept your streak going." },
+      notice: { type: "freeze", ...say("streakFreezeUsed") },
     };
   }
 

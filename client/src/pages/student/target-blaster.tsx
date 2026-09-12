@@ -32,7 +32,7 @@ import {
 } from "@shared/game-plays";
 import { ArrowLeft, Loader2, Target, Trophy, Zap } from "lucide-react";
 import logoPath from "@assets/logo.webp";
-import { subjectName, useT } from "@/lib/i18n";
+import { serverMessage, subjectName, useT } from "@/lib/i18n";
 
 /** Where each target sits and how it drifts. Fixed spots so it stays readable. */
 const TARGET_SPOTS = [
@@ -93,7 +93,7 @@ export default function TargetBlaster() {
       }
       setPhase("ready");
     } catch {
-      setErrorText("Couldn't load the game. Check your connection and try again.");
+      setErrorText(text.penalty.couldNotLoadGame);
       setPhase("ready");
     }
   };
@@ -125,7 +125,7 @@ export default function TargetBlaster() {
         // Out of plays is not an error — it is the game telling them how to
         // earn more.
         if (body.plays) setPlays(body.plays);
-        setErrorText(body.message || "Couldn't start the game.");
+        setErrorText(serverMessage(text, body, "Couldn't start the game."));
         return;
       }
 
@@ -157,7 +157,7 @@ export default function TargetBlaster() {
       setSecondsLeft(body.secondsPerRound ?? 12);
       setPhase("round");
     } catch {
-      setErrorText("Couldn't start the game. Check your connection and try again.");
+      setErrorText(text.penalty.couldNotStartGame);
     } finally {
       setStarting(false);
     }
@@ -221,7 +221,7 @@ export default function TargetBlaster() {
       }
       setPhase("over");
     } catch {
-      setErrorText("Couldn't save your game. Check your connection.");
+      setErrorText(text.penalty.couldNotSaveGame);
       setPhase("over");
     }
   };

@@ -163,6 +163,23 @@ export function longDate(t: Translation, iso: string): string {
   return t.dates.long(d.getDate(), t.dates.months[d.getMonth()], d.getFullYear());
 }
 
+/**
+ * What the SERVER said, in the reader's own language.
+ *
+ * A refusal carries a `code` naming what happened (see shared/server-messages.ts)
+ * and an English sentence beside it. This prefers the code, because that is the
+ * one the dictionary can translate, and falls back to the sentence for a code
+ * this build does not know yet — so a message added on the server can never
+ * show up as a blank space, only as English until somebody translates it.
+ *
+ *     toast({ description: serverMessage(t, data) });
+ */
+export function serverMessage(t: Translation, body: unknown, fallback?: string): string {
+  const reply = body as { code?: string; message?: string } | null | undefined;
+  const known = reply?.code ? (t.server as Record<string, string>)[reply.code] : undefined;
+  return known ?? reply?.message ?? fallback ?? t.errors.connection;
+}
+
 /** The chosen language and a way to change it. For the toggle. */
 export function useLanguage(): { language: Language; setLanguage: (l: Language) => void } {
   const { language, setLanguage } = useLanguageContext();
