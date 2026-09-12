@@ -488,6 +488,73 @@ async function main() {
   check(!(await page.bodyText()).includes(en.validation.yourNameRequired),
     "and not in English beside it");
 
+
+  // =======================================================================
+  section("The feedback written onto a mark");
+  // =======================================================================
+  //
+  // This line is STORED when the work is marked, so a sentence composed in
+  // English then would still be English on a Portuguese screen months later.
+  // The mark carries what the line is MADE OF, and the screen rebuilds it.
+  //
+  // The teacher's own note rides along inside it, and must come through exactly
+  // as they typed it — which is the thing worth checking hardest.
+
+  const TEACHERS_NOTE = "Lembra-te de mostrar o teu raciocínio";
+  const marked = must((await teacher.post("/api/assignments", {
+    subject: "MATHS", topic: "Adding", form: FORM, title: `Marked paper ${stamp}`,
+    instructions: "Answer it.", dueDate: "2026-12-01", totalMarks: 1, createdById: 1,
+    questions: [{
+      id: "q1", questionText: "What is 2 + 2?", maxScore: 1,
+      type: "numeric", correctNumber: 4, tolerance: 0,
+      explanation: TEACHERS_NOTE,
+    }],
+  })).body?.assignment, "a paper to get wrong");
+  onCleanup(`assignment ${marked.id}`, () => teacher.delete(`/api/assignments/${marked.id}`));
+
+  // Answered WRONG on purpose: that is the branch that names the right answer.
+  const handedIn = await child.post("/api/submissions", {
+    assignmentId: marked.id, studentId: pupil.id,
+    answers: [{ questionId: "q1", answerText: "5" }],
+  });
+  const markId = handedIn.body?.submission?.id;
+  check(typeof markId === "number", "a wrong answer is marked on arrival");
+
+  const markBody = (await child.get(`/api/marks/${markId}`)).body;
+  const mark = markBody?.mark ?? markBody;
+  const qm = mark?.questionMarks?.[0];
+
+  check(qm?.feedbackCode === "correctAnswerIs",
+    "the mark records WHAT the feedback line is, not only how it reads",
+    `code ${qm?.feedbackCode}`);
+  check(typeof qm?.feedback === "string" && qm.feedback.includes("Correct answer: 4."),
+    "the English sentence is still stored beside it", qm?.feedback);
+  check(qm?.explanation === TEACHERS_NOTE,
+    "and the teacher's own note is stored exactly as they typed it", qm?.explanation);
+
+  // Now read it as the child, in Portuguese. Signing in again first: the
+  // sections above deliberately failed a login, and the teacher and parent
+  // logins each ended the child's session — one browser holds one role.
+  await page.goto(`${BASE}/student/login`);
+  await page.waitForTestId("input-fullname");
+  await page.fill("input-fullname", pupil.fullName);
+  await page.fill("input-password", CHILD_PASSWORD);
+  await page.click("button-login");
+  await page.waitFor(`return location.pathname === "/student/dashboard"`, "the child to be signed in again");
+
+  await page.goto(`${BASE}/student/results/${markId}`);
+  const feedbackShown = await waitUntil(
+    async () => (await page.bodyText()).includes("Resposta correta: 4."),
+    20000,
+  );
+  const resultsText = await page.bodyText();
+  check(feedbackShown, "a child reading Portuguese is told the answer in Portuguese",
+    'looked for "Resposta correta: 4."');
+  check(!resultsText.includes("Correct answer: 4."),
+    "with the stored English sentence nowhere on the screen");
+  check(resultsText.includes(TEACHERS_NOTE),
+    "and the teacher's note inside it is word for word what they wrote", TEACHERS_NOTE);
+
   // A code this build has never heard of must not blank the screen.
   const unknown = serverMessageFallback({ code: "somethingAddedLater", message: "A sentence from a newer server." });
   check(unknown === "A sentence from a newer server.",

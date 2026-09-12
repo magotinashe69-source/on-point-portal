@@ -1,3 +1,4 @@
+import type { FeedbackCode } from "./auto-marking";
 // The parent's view of their child's finished work.
 //
 // Three things live here, and they are the three things a teacher goes through
@@ -77,6 +78,17 @@ export type ReviewedQuestion = {
   maxScore: number;
 
   teacherComment: string | null; // what the teacher wrote on this question
+  /**
+   * When that line came from the marking ENGINE, what it was made of, so the
+   * parent's screen can rebuild it in their own language. Absent when a teacher
+   * typed the comment themselves — those words are shown exactly as written.
+   */
+  commentParts?: {
+    feedback?: string;
+    feedbackCode?: FeedbackCode;
+    correctAnswerDisplay?: string;
+    explanation?: string;
+  };
   explanation: string | null;    // the note stored with the answer key
 };
 

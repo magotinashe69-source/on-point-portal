@@ -1352,15 +1352,59 @@ and the public front page.
 
 What the SERVER says is covered too — see below.
 
+The feedback written onto a mark is covered too — see below.
+
 **Still English, and worth knowing:**
 
-* **Feedback already STORED on a mark.** `markAnswer()` writes a sentence
-  ("Correct answer: 6.") into the submission when it is marked. That is data by
-  the time anyone reads it, and translating it later would not change a row
-  already written.
 * **Most dates** still follow the browser's own locale. The exception is
   `longDate()` in `lib/i18n`, used where a date is READ rather than scanned — a
   certificate, an award — which spells the month out in the chosen language.
+* **Marks given before this existed** keep their English feedback until somebody
+  runs the backfill below. Nothing can change a row that was written months ago
+  except writing to it.
+
+### The feedback written onto a mark
+
+This one is different from every other string in the app: it is **stored**. When
+work is auto-marked, `buildFeedback()` composes a line ("Correct answer: 6.")
+and it is written onto the mark — so a sentence composed in English at marking
+time would still be English on a Portuguese screen months later.
+
+So the mark stores what the line is MADE OF, beside the line itself:
+
+```
+{ questionId, score, maxScore,
+  feedback: "Correct answer: 6. Remember to show your working",   // as always
+  feedbackCode: "correctAnswerIs",                                 // what it is
+  correctAnswerDisplay: "6",                                       // the answer
+  explanation: "Remember to show your working" }                   // the teacher's note
+```
+
+`markFeedback(t, questionMark)` in `lib/i18n` rebuilds it from the parts, and
+falls back to the stored sentence when they are not there. **That fallback is
+doing real work in two different cases**, and both matter:
+
+* a mark given before this existed has only the sentence;
+* feedback a TEACHER typed has no parts either — `POST /api/marks` has no room
+  for them in its schema, so the engine is the only thing that can set them.
+  That is what makes it safe to translate a line at all: a teacher's words reach
+  a family exactly as written, which is the rule the whole app is built on.
+
+The answer and the teacher's note ride along INSIDE the translated line and are
+never touched. `npm run check:language` puts a teacher's note in Portuguese on
+an English paper and checks it comes back word for word.
+
+### Backfilling old marks — `npm run backfill:feedback`
+
+Attaches the parts to marks given before they existed, so those lines read in
+the family's language too. **A dry run unless you pass `--apply`.**
+
+It will not touch a teacher's words, and the way it knows is worth understanding
+before running it on a real school's marks: a line is only rebuilt when the
+stored sentence is EXACTLY what the marking engine would write today for that
+question and that answer. A comment a teacher typed, a line from a question that
+has been edited since, a sentence differing by a full stop — all left alone and
+counted as skipped, with the reason printed.
 
 ### What the server says
 
@@ -1428,7 +1472,8 @@ it stuck, walk a child's dashboard and a real paper, switch back to English,
 then a teacher's dashboard and a parent's portal — checking at each step that
 the interface changed and the teacher's own words did not. It then walks
 fourteen more screens, checking each says the Portuguese and not the English,
-and follows one server refusal and one form complaint the whole way. 77 checks.
+and follows one server refusal, one form complaint and one marked answer the
+whole way. 84 checks.
 
 The walk is grouped by **who is signed in**, and signs in again before each
 group. The three portals share one browser, and `setSessionRole()` gives a

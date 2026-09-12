@@ -782,6 +782,19 @@ export const en = {
     keepIt: "Keep it",
   },
 
+  /**
+   * The feedback line on one question.
+   *
+   * The answer and the teacher's note are passed through untouched — they are
+   * the teacher's own words, and the answer is the answer.
+   */
+  feedback: {
+    correct: "Correct",
+    correctWithNote: (note: string) => `Correct. ${note}`,
+    correctAnswerIs: (answer: string) => `Correct answer: ${answer}.`,
+    notQuite: "Not quite.",
+  },
+
   errors: {
     couldNotLoad: (what: string) => `Could not load ${what}`,
     expired: "Your login has expired. Log in again to carry on.",

@@ -28,7 +28,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
-import { useT } from "@/lib/i18n";
+import { markFeedback, useT } from "@/lib/i18n";
 import { subjectLabel } from "@shared/weekly-report";
 import {
   type CompletedWorkItem,
@@ -293,7 +293,7 @@ function QuestionCard({ question }: { question: ReviewedQuestion }) {
               <span className="text-xs">{t.work.teacherComment}</span>
             </div>
             <p className="text-sm" data-testid={`text-question-feedback-${question.number}`}>
-              {question.teacherComment}
+              {markFeedback(t, question.commentParts) || question.teacherComment}
             </p>
           </div>
         )}

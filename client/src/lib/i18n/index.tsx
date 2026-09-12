@@ -18,6 +18,7 @@
  */
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import type { FeedbackCode } from "@shared/auto-marking";
 import { en } from "./en";
 import { pt } from "./pt";
 
@@ -178,6 +179,51 @@ export function serverMessage(t: Translation, body: unknown, fallback?: string):
   const reply = body as { code?: string; message?: string } | null | undefined;
   const known = reply?.code ? (t.server as Record<string, string>)[reply.code] : undefined;
   return known ?? reply?.message ?? fallback ?? t.errors.connection;
+}
+
+/**
+ * The feedback line on one question, in the reader's own language.
+ *
+ * A mark carries the English sentence AND, when the marking engine wrote it,
+ * the parts it was made of. This rebuilds it from the parts when they are
+ * there, and otherwise shows the stored sentence exactly as it is.
+ *
+ * That fallback is doing real work, in two different cases:
+ *
+ *   * a mark given before this existed has only the sentence, and no amount of
+ *     translating changes a row that was written months ago;
+ *   * feedback a TEACHER typed has no parts either — POST /api/marks has no
+ *     room for them — so their words reach a family exactly as written, which
+ *     is the whole rule this app is built on.
+ */
+export function markFeedback(
+  t: Translation,
+  questionMark: {
+    feedback?: string;
+    feedbackCode?: FeedbackCode;
+    correctAnswerDisplay?: string;
+    explanation?: string;
+  } | null | undefined,
+): string {
+  if (!questionMark) return "";
+  const { feedbackCode: code, correctAnswerDisplay, explanation, feedback } = questionMark;
+  if (!code) return feedback ?? "";
+
+  switch (code) {
+    case "correct":
+      return t.feedback.correct;
+    case "correctWithNote":
+      return t.feedback.correctWithNote(explanation ?? "");
+    case "correctAnswerIs": {
+      const line = t.feedback.correctAnswerIs(correctAnswerDisplay ?? "");
+      return explanation ? `${line} ${explanation}` : line;
+    }
+    case "notQuite":
+      return explanation ? `${t.feedback.notQuite} ${explanation}` : t.feedback.notQuite;
+    default:
+      // A shape from a newer server. Its own words beat a blank space.
+      return feedback ?? "";
+  }
 }
 
 /** The chosen language and a way to change it. For the toggle. */

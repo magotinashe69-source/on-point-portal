@@ -136,18 +136,58 @@ export function markSubmission(
   return { results, totalScore };
 }
 
-// Build the short feedback line a student sees for one question.
-// Correct → a tick message; wrong → the right answer plus the explanation.
-export function buildFeedback(result: QuestionResult): string {
+// The four shapes the feedback line comes in.
+//
+// Named rather than only written out, because the line is STORED on the mark —
+// so a sentence written in English at marking time would still be English on a
+// Portuguese screen months later. The name and its ingredients are stored
+// beside the sentence, and the screen rebuilds it in the reader's own language.
+// See markFeedback() in client/src/lib/i18n.
+export type FeedbackCode = "correct" | "correctWithNote" | "correctAnswerIs" | "notQuite";
+
+export interface FeedbackParts {
+  // Named feedbackCode, not code, because these parts are SPREAD onto the
+  // stored question mark — so the field has to arrive there already carrying
+  // the name the mark uses.
+  feedbackCode: FeedbackCode;
+  /** The right answer, as the teacher wrote it. Never translated. */
+  correctAnswerDisplay?: string;
+  /** The teacher's one-line note, in their own words. Never translated. */
+  explanation?: string;
+}
+
+// What the feedback line is MADE OF, before it is any particular language.
+export function feedbackFor(result: QuestionResult): FeedbackParts {
   if (result.correct) {
-    return result.explanation ? `Correct. ${result.explanation}` : "Correct";
+    return result.explanation
+      ? { feedbackCode: "correctWithNote", explanation: result.explanation }
+      : { feedbackCode: "correct" };
   }
-  const parts: string[] = [];
-  if (result.correctAnswerDisplay) {
-    parts.push(`Correct answer: ${result.correctAnswerDisplay}.`);
-  } else {
-    parts.push("Not quite.");
+  return {
+    feedbackCode: result.correctAnswerDisplay ? "correctAnswerIs" : "notQuite",
+    correctAnswerDisplay: result.correctAnswerDisplay || undefined,
+    explanation: result.explanation,
+  };
+}
+
+// Build the short feedback line a student sees for one question, in English.
+// Correct → a tick message; wrong → the right answer plus the explanation.
+//
+// Still stored on the mark, and still what anything that is not our browser
+// reads — a check script, an export, a client that has not been updated.
+// Composed from feedbackFor() so the two cannot drift apart.
+export function buildFeedback(result: QuestionResult): string {
+  const parts = feedbackFor(result);
+  switch (parts.feedbackCode) {
+    case "correct":
+      return "Correct";
+    case "correctWithNote":
+      return `Correct. ${parts.explanation}`;
+    case "correctAnswerIs": {
+      const line = `Correct answer: ${parts.correctAnswerDisplay}.`;
+      return parts.explanation ? `${line} ${parts.explanation}` : line;
+    }
+    case "notQuite":
+      return parts.explanation ? `Not quite. ${parts.explanation}` : "Not quite.";
   }
-  if (result.explanation) parts.push(result.explanation);
-  return parts.join(" ");
 }

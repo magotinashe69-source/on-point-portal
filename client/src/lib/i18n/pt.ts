@@ -722,6 +722,13 @@ export const pt: Translation = {
     keepIt: "Manter",
   },
 
+  feedback: {
+    correct: "Certo",
+    correctWithNote: (note: string) => `Certo. ${note}`,
+    correctAnswerIs: (answer: string) => `Resposta correta: ${answer}.`,
+    notQuite: "Não é bem assim.",
+  },
+
   errors: {
     couldNotLoad: (what: string) => `Não foi possível carregar ${what}`,
     expired: "A sua sessão expirou. Volte a entrar para continuar.",

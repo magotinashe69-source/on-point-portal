@@ -14,7 +14,7 @@ import {
 import type { Assignment, Submission, Student } from "@shared/schema";
 import { say, validationText } from "@shared/server-messages";
 import { isPrimaryForm } from "@shared/schema";
-import { isFullyAutoMarked, markSubmission, markAnswer, buildFeedback, isAutoMarkable } from "@shared/auto-marking";
+import { isFullyAutoMarked, markSubmission, markAnswer, buildFeedback, feedbackFor, isAutoMarkable } from "@shared/auto-marking";
 import { awardRandomCollectible } from "./rewards";
 import { buildWeeklyReport } from "./weekly-report";
 import { buildParentOverview } from "./parent-overview";
@@ -72,6 +72,7 @@ async function autoMarkSubmission(
     score: r.score,
     maxScore: r.maxScore,
     feedback: buildFeedback(r),
+    ...feedbackFor(r),
   }));
 
   const correctCount = results.filter((r) => r.correct).length;
@@ -1684,7 +1685,10 @@ export async function registerRoutes(
 
         const answer = (sub.answers || []).find((a) => a.questionId === questionId);
         const result = markAnswer(question, answer?.answerText ?? "");
-        const newQm = { questionId, score: result.score, maxScore: result.maxScore, feedback: buildFeedback(result) };
+        const newQm = {
+          questionId, score: result.score, maxScore: result.maxScore,
+          feedback: buildFeedback(result), ...feedbackFor(result),
+        };
 
         const oldQm = mark.questionMarks.find((qm) => qm.questionId === questionId);
         const oldScore = oldQm?.score ?? 0;

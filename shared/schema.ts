@@ -1,5 +1,6 @@
 import { pgTable, text, serial, integer, timestamp, jsonb, boolean, doublePrecision } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
+import type { FeedbackCode } from "./auto-marking";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import type { SlotProgress } from "./game-plays";
@@ -253,7 +254,17 @@ export const marks = pgTable("marks", {
     questionId: string;
     score: number;
     maxScore: number;
+    // The feedback line in English, exactly as it has always been stored. It is
+    // what anything that is not our browser reads, and what a mark made before
+    // the fields below existed still has.
     feedback?: string;
+    // What that line is MADE OF, so a screen can rebuild it in the reader's own
+    // language. Set ONLY by the marking engine — a teacher's own words arrive
+    // through POST /api/marks, whose schema has no room for these, so their
+    // presence is what makes it safe to translate a line at all.
+    feedbackCode?: FeedbackCode;
+    correctAnswerDisplay?: string; // the right answer, as the teacher wrote it
+    explanation?: string;          // the teacher's note, in their own words
     teacherAdjusted?: boolean; // true when a teacher overrode the auto/hand mark
   }>>().notNull(),
 });

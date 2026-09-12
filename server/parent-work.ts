@@ -159,6 +159,14 @@ export async function buildSubmissionReview(
         questionMark?.feedback && questionMark.feedback.trim()
           ? questionMark.feedback.trim()
           : null,
+      commentParts: questionMark?.feedbackCode
+        ? {
+            feedback: questionMark.feedback,
+            feedbackCode: questionMark.feedbackCode,
+            correctAnswerDisplay: questionMark.correctAnswerDisplay,
+            explanation: questionMark.explanation,
+          }
+        : undefined,
       explanation: question.explanation?.trim() || null,
     };
   });

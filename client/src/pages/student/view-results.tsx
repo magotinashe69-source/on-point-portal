@@ -9,7 +9,7 @@ import { useAuth } from "@/lib/auth";
 import { QueryError } from "@/components/QueryError";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
-import { useT } from "@/lib/i18n";
+import { markFeedback, useT } from "@/lib/i18n";
 import { ArrowLeft, Loader2, CheckCircle, XCircle, Trophy, MessageSquare, Image as ImageIcon, RotateCcw } from "lucide-react";
 import { Lightbox } from "@/components/Lightbox";
 import { isFullyAutoMarked } from "@shared/auto-marking";
@@ -272,7 +272,7 @@ export default function ViewResults() {
                       {questionMark?.feedback && (
                         <div className="p-3 bg-primary/5 rounded-md border-l-4 border-primary">
                           <p className="text-sm font-medium mb-1">{t.results.feedback}</p>
-                          <p className="text-sm">{questionMark.feedback}</p>
+                          <p className="text-sm">{markFeedback(t, questionMark)}</p>
                         </div>
                       )}
                     </CardContent>
