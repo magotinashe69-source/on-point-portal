@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/auth";
 import { QueryError } from "@/components/QueryError";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
+import { ChangePasswordDialog } from "@/components/ChangePasswordDialog";
 import { longDate, useT } from "@/lib/i18n";
 import { 
   LogOut, 
@@ -163,6 +164,7 @@ export default function StudentDashboard() {
             </span>
             <LanguageToggle />
             <ThemeToggle />
+            <ChangePasswordDialog />
             <Button variant="outline" size="sm" onClick={handleLogout} data-testid="button-logout">
               <LogOut className="h-4 w-4 mr-2" />
               {t.common.logout}

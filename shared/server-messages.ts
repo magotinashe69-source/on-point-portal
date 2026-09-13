@@ -23,6 +23,11 @@
  */
 
 export const SERVER_TEXT = {
+  // --- Changing your own password ---
+  wrongCurrentPassword: "That is not your current password. Check it and try again.",
+  samePassword: "That is the password you already have. Choose a different one.",
+  passwordChanged: "Your password has been changed.",
+
   // --- Signing in ---
   notOnClassList: "That name is not on the class list. Enter your name exactly as your teacher registered it.",
   wrongPassword: "That password is not correct. Check it and try again.",
@@ -169,6 +174,7 @@ export function say(code: ServerMessageCode): { code: ServerMessageCode; message
  */
 export const VALIDATION_TEXT = {
   yourNameRequired: "Your name is required",
+  newPasswordTooShort: "Your new password must be at least 8 characters",
   yourUsernameRequired: "Your username is required",
   parentNameRequired: "The parent's name is required",
   emailRequired: "Valid email is required",

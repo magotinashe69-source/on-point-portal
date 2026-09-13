@@ -9,6 +9,7 @@ import {
   teacherLoginSchema,
   studentLoginSchema,
   parentLoginSchema,
+  changePasswordSchema,
   createParentAccountSchema,
   updateParentAccountSchema,
 } from "@shared/schema";
@@ -412,6 +413,113 @@ export async function registerRoutes(
 
   const teacherLoginLimiter = accountLimiter((body) => String(body.email ?? ""));
   const studentLoginLimiter = accountLimiter((body) => String(body.fullName ?? ""));
+
+  /**
+   * Whichever of the three is signed in on this request, and how to change
+   * their password. Null when nobody is.
+   *
+   * A session holds exactly one role (setSessionRole clears the other two), so
+   * at most one of these can match.
+   */
+  async function whoIsAsking(req: Request): Promise<
+    { password: string | null; setPassword: (plain: string) => Promise<void> } | null
+  > {
+    const { teacherId, studentId, parentId } = req.session ?? {};
+
+    if (teacherId) {
+      const teacher = await storage.getTeacher(teacherId);
+      if (!teacher) return null;
+      return {
+        password: teacher.password,
+        setPassword: (plain) => storage.updateTeacherPassword(teacher.id, plain),
+      };
+    }
+    if (studentId) {
+      const student = await storage.getStudent(studentId);
+      if (!student) return null;
+      return {
+        password: student.password,
+        setPassword: (plain) => storage.updateStudentPassword(student.id, plain),
+      };
+    }
+    if (parentId) {
+      const parent = await storage.getParent(parentId);
+      if (!parent) return null;
+      return {
+        password: parent.password,
+        setPassword: (plain) => storage.updateParentPassword(parent.id, plain),
+      };
+    }
+    return null;
+  }
+
+  // Changing a password is a form that says whether a password is right, so it
+  // is guessable in exactly the way a login is. Keyed on the session rather
+  // than on a name typed into it, because that IS the account here.
+  const changePasswordLimiter = rateLimit({
+    windowMs: 5 * 60 * 1000,
+    limit: 10,
+    standardHeaders: "draft-7",
+    legacyHeaders: false,
+    message: { success: false, ...say("tooManyAttempts") },
+    keyGenerator: (req) => {
+      const { teacherId, studentId, parentId } = req.session ?? {};
+      const account = teacherId ? `t${teacherId}` : studentId ? `s${studentId}` : parentId ? `p${parentId}` : "none";
+      return `${ipKeyGenerator(req.ip ?? "")}:change:${account}`;
+    },
+    ...onlyCountFailures,
+  });
+
+  /**
+   * Change your own password.
+   *
+   * ONE endpoint for all three roles, not three, and that follows from how
+   * sessions already work: setSessionRole() gives a browser exactly one role,
+   * so "who is asking" is never ambiguous and there is nothing to pass in. It
+   * also means the account being changed is ALWAYS the one asking — there is no
+   * id in the request to tamper with, the way the parent routes deliberately
+   * have none.
+   *
+   * The current password is required. Without it, a session somebody walked
+   * away from — a shared family phone, a classroom machine — would be enough to
+   * lock the owner out of their own account.
+   *
+   * Rate limited like a login, because that is what it is: a form that says
+   * whether a password is right.
+   */
+  app.post("/api/auth/change-password", changePasswordLimiter, async (req, res) => {
+    try {
+      const validation = validateRequest(changePasswordSchema, req.body);
+      if (!validation.success) {
+        return res.json({ success: false, message: validation.error });
+      }
+      const { currentPassword, newPassword } = validation.data;
+
+      const who = await whoIsAsking(req);
+      if (!who) {
+        return res.status(401).json({ success: false, ...say("notLoggedIn") });
+      }
+
+      const current = await verifyPassword(currentPassword, who.password);
+      if (!current.ok) {
+        return res.json({ success: false, ...say("wrongCurrentPassword") });
+      }
+
+      // Refused rather than quietly accepted: somebody who has been told to
+      // change their password should know when they have not.
+      if (sameString(currentPassword, newPassword)) {
+        return res.json({ success: false, ...say("samePassword") });
+      }
+
+      await who.setPassword(newPassword);
+      // The whole point of the form having worked.
+      req.loginSucceeded = true;
+      res.json({ success: true, ...say("passwordChanged") });
+    } catch (error) {
+      console.error("Change password error:", error);
+      res.status(500).json({ success: false, ...say("serverError") });
+    }
+  });
 
   // Teacher login
   app.post("/api/auth/teacher/login", teacherLoginLimiter, async (req, res) => {

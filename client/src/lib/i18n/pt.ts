@@ -729,6 +729,20 @@ export const pt: Translation = {
     notQuite: "Não é bem assim.",
   },
 
+  password: {
+    change: "Mudar palavra-passe",
+    note: "Precisa da sua palavra-passe atual para a mudar — assim, um ecrã deixado aberto não pode ser usado para o deixar de fora da sua própria conta.",
+    current: "Palavra-passe atual",
+    next: "Nova palavra-passe",
+    again: "Escreva a nova outra vez",
+    rule: "Pelo menos 8 caracteres.",
+    save: "Mudar",
+    changed: "Palavra-passe alterada",
+    changedNote: "Use a nova da próxima vez que entrar.",
+    tooShort: "A sua nova palavra-passe tem de ter pelo menos 8 caracteres.",
+    doNotMatch: "Essas duas não coincidem.",
+  },
+
   errors: {
     couldNotLoad: (what: string) => `Não foi possível carregar ${what}`,
     expired: "A sua sessão expirou. Volte a entrar para continuar.",
@@ -1059,6 +1073,7 @@ export const pt: Translation = {
   // --- O que um formulário diz (shared/server-messages.ts) ---
   validation: {
     yourNameRequired: "O seu nome é obrigatório",
+    newPasswordTooShort: "A sua nova palavra-passe tem de ter pelo menos 8 caracteres",
     yourUsernameRequired: "O seu nome de utilizador é obrigatório",
     parentNameRequired: "O nome do encarregado de educação é obrigatório",
     emailRequired: "É preciso um correio eletrónico válido",
@@ -1069,6 +1084,11 @@ export const pt: Translation = {
 
   // --- O que o servidor responde (shared/server-messages.ts) ---
   server: {
+    // Mudar a sua palavra-passe
+    wrongCurrentPassword: "Essa não é a sua palavra-passe atual. Verifique-a e tente novamente.",
+    samePassword: "Essa é a palavra-passe que já tem. Escolha uma diferente.",
+    passwordChanged: "A sua palavra-passe foi alterada.",
+
     // Iniciar sessão
     notOnClassList: "Esse nome não está na lista da turma. Escreva o seu nome tal como o seu professor o registou.",
     wrongPassword: "Essa palavra-passe não está correta. Verifique-a e tente novamente.",

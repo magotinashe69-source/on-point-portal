@@ -709,6 +709,25 @@ export const parentLoginSchema = z.object({
 });
 export type ParentLogin = z.infer<typeof parentLoginSchema>;
 
+/**
+ * Changing your own password, from inside the app.
+ *
+ * The CURRENT password is required, and that is the point of the form rather
+ * than a formality: without it, a session someone walked away from — a shared
+ * family phone, a classroom machine — is enough to lock the owner out of their
+ * own account.
+ *
+ * Eight characters is longer than the six a pupil's first login asks for. It is
+ * a deliberate difference: a child choosing their first password at a desk with
+ * a teacher is a different moment from anyone changing one later, and the only
+ * one of the two we can raise the bar on without locking people out today.
+ */
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "passwordRequired"),
+  newPassword: z.string().min(8, "newPasswordTooShort"),
+});
+export type ChangePassword = z.infer<typeof changePasswordSchema>;
+
 // What a teacher fills in on a student's record to create that child's parent
 // account. The child is taken from the address of the request, not from here,
 // so a teacher cannot aim the new account at a different pupil by editing the

@@ -795,6 +795,21 @@ export const en = {
     notQuite: "Not quite.",
   },
 
+  /** Changing your own password, from inside the app. */
+  password: {
+    change: "Change password",
+    note: "You need your current password to change it — so a screen left open cannot be used to lock you out of your own account.",
+    current: "Current password",
+    next: "New password",
+    again: "Type the new one again",
+    rule: "At least 8 characters.",
+    save: "Change it",
+    changed: "Password changed",
+    changedNote: "Use the new one next time you sign in.",
+    tooShort: "Your new password must be at least 8 characters.",
+    doNotMatch: "Those two do not match.",
+  },
+
   errors: {
     couldNotLoad: (what: string) => `Could not load ${what}`,
     expired: "Your login has expired. Log in again to carry on.",
