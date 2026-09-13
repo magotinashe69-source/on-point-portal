@@ -16,6 +16,7 @@
     "check:certs": "tsx script/check-certificates.ts",
     "check:reports": "tsx script/check-report-cards.ts",
     "check:offline": "tsx script/check-offline.ts",
+    "check:security": "tsx script/check-security.ts",
     "check:language": "tsx script/check-language.ts",
     "backfill:feedback": "tsx script/backfill-feedback.ts",
     "check:offline:browser": "tsx script/check-offline-browser.ts",

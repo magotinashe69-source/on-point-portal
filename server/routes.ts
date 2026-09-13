@@ -1,6 +1,6 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { storage } from "./storage";
 import { registerObjectStorageRoutes } from "./local_object_storage";
 import {
@@ -351,6 +351,9 @@ export async function registerRoutes(
     req.session.teacherId = role.teacherId;
     req.session.studentId = role.studentId;
     req.session.parentId = role.parentId;
+    // Every successful login comes through here, which is why the rate
+    // limiters read this one flag rather than each guessing from the response.
+    req.loginSucceeded = true;
   }
 
   // Register object storage routes for file uploads
@@ -359,8 +362,58 @@ export async function registerRoutes(
   // Seed database on startup
   await storage.seedInitialData();
   
+  // Only a FAILED attempt spends the budget.
+  //
+  // Without this a limiter counts every request, so a teacher signing in and
+  // out through a morning would lock themselves out of their own portal. The
+  // usual way to say "only count failures" is to look at the status code, but a
+  // wrong password here is answered 200 with `success: false` — deliberately,
+  // so the browser can read the reason — and by that measure every attempt
+  // looks successful and the door would never shut. So the handler says which
+  // it was, at the one place every login passes through.
+  const onlyCountFailures = {
+    skipSuccessfulRequests: true,
+    requestWasSuccessful: (req: Request) => req.loginSucceeded === true,
+  };
+
+  // Guessing a password, one account at a time.
+  //
+  // Neither password login had any limit at all: a teacher's email or a pupil's
+  // name could be tried against for as long as somebody cared to, and the
+  // teacher account ships with a password anybody can read in the seed data.
+  //
+  // THE KEY IS THE ACCOUNT, NOT JUST THE ADDRESS, and that is the whole design.
+  // A class logs in from the school's one public address — thirty children in a
+  // computer room look like thirty attempts from a single IP, and a plain
+  // per-IP limit would lock out the back half of the register every lesson. So
+  // the budget belongs to the pair: this address trying THIS account. A pupil
+  // signing into their own name is unaffected by the pupil beside them; anyone
+  // hammering one account runs out after ten tries in five minutes.
+  //
+  // ipKeyGenerator is the library's own helper, and is used rather than req.ip
+  // because an IPv6 address must be masked to its prefix before it is a
+  // sensible key — otherwise an attacker with a /64 has an unlimited supply of
+  // "different" addresses.
+  function accountLimiter(identify: (body: any) => string) {
+    return rateLimit({
+      windowMs: 5 * 60 * 1000,
+      limit: 10,
+      standardHeaders: "draft-7",
+      legacyHeaders: false,
+      message: { success: false, ...say("tooManyAttempts") },
+      keyGenerator: (req) => {
+        const who = identify(req.body ?? {}).trim().toLowerCase();
+        return `${ipKeyGenerator(req.ip ?? "")}:${who}`;
+      },
+      ...onlyCountFailures,
+    });
+  }
+
+  const teacherLoginLimiter = accountLimiter((body) => String(body.email ?? ""));
+  const studentLoginLimiter = accountLimiter((body) => String(body.fullName ?? ""));
+
   // Teacher login
-  app.post("/api/auth/teacher/login", async (req, res) => {
+  app.post("/api/auth/teacher/login", teacherLoginLimiter, async (req, res) => {
     try {
       const validation = validateRequest(teacherLoginSchema, req.body);
       if (!validation.success) {
@@ -426,6 +479,7 @@ export async function registerRoutes(
     standardHeaders: "draft-7",
     legacyHeaders: false,
     message: { success: false, ...say("tooManyAttempts") },
+    ...onlyCountFailures,
   });
 
   /**
@@ -501,7 +555,7 @@ export async function registerRoutes(
   });
 
   // Student login (with master password support)
-  app.post("/api/auth/student/login", async (req, res) => {
+  app.post("/api/auth/student/login", studentLoginLimiter, async (req, res) => {
     try {
       const validation = validateRequest(studentLoginSchema, req.body);
       if (!validation.success) {
@@ -589,6 +643,7 @@ export async function registerRoutes(
     standardHeaders: "draft-7",
     legacyHeaders: false,
     message: { success: false, ...say("tooManyAttempts") },
+    ...onlyCountFailures,
   });
 
   app.post("/api/auth/parent/login", parentLoginLimiter, async (req, res) => {

@@ -19,6 +19,19 @@ declare module "http" {
   }
 }
 
+declare module "express-serve-static-core" {
+  interface Request {
+    /**
+     * True once a login on this request has succeeded.
+     *
+     * The login rate limiters read it to spend their budget on failures only.
+     * A wrong password is answered 200 here, so the status code cannot tell
+     * them apart — see onlyCountFailures in routes.ts.
+     */
+    loginSucceeded?: boolean;
+  }
+}
+
 // Session type augmentation
 declare module "express-session" {
   interface SessionData {
