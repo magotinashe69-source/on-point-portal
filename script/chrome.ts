@@ -211,7 +211,14 @@ export class Page {
     await this.waitForLoad();
   }
 
-  async waitForLoad(timeoutMs = 20000): Promise<void> {
+  /**
+   * Sixty seconds, not twenty, and the reason is the DEV server rather than the
+   * app. `npm run dev` restarts on every file change, and Vite then transforms
+   * the whole client on the first request — which on this app takes tens of
+   * seconds. A check about offline behaviour should not fail because a compiler
+   * was cold; a page that is genuinely hung still fails, just later.
+   */
+  async waitForLoad(timeoutMs = 60000): Promise<void> {
     await this.waitFor(`return document.readyState === "complete"`, "the page to finish loading", timeoutMs);
   }
 

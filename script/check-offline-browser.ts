@@ -191,6 +191,14 @@ async function main() {
     return Array.isArray(res.body) ? res.body : [];
   }
 
+  // Ask the dev server for the app once, before Chrome does.
+  //
+  // Vite compiles on the first request after a restart, and until it has, every
+  // navigation is slow enough to look like a hang. Doing it here means the
+  // waiting happens in one obvious place instead of surfacing as a mysterious
+  // timeout somewhere in the middle of the checks.
+  await warmUp();
+
   const browser = await Browser.launch();
   onCleanup("the browser", () => browser.close());
 
@@ -412,10 +420,29 @@ async function saveToDevice(page: Page): Promise<void> {
     // Before EVERY tap, not just the first. The button disables itself while a
     // save is in flight, so a retry that does not wait taps a disabled button
     // and reports that as the failure instead of whatever went wrong.
-    await page.waitFor(
-      `const b = document.querySelector('[data-testid="button-save-offline"]'); return !!b && !b.disabled;`,
-      "the save button to be ready",
-    );
+    // If it never becomes ready, say WHY rather than only that it did not.
+    // The button is disabled while a save is in flight, when the page thinks it
+    // is offline, and until the paper itself has arrived — and a bare timeout
+    // cannot tell you which of the three it was. This has been seen to fail
+    // intermittently; when it next does, the reason is in the failure.
+    try {
+      await page.waitFor(
+        `const b = document.querySelector('[data-testid="button-save-offline"]'); return !!b && !b.disabled;`,
+        "the save button to be ready",
+      );
+    } catch (waited) {
+      const why = await page.evaluate<string>(`
+        const b = document.querySelector('[data-testid="button-save-offline"]');
+        return JSON.stringify({
+          button: b ? { disabled: b.disabled, says: b.textContent.trim() } : "not on the page",
+          navigatorOnLine: navigator.onLine,
+          paperOnScreen: !!document.querySelector('[data-testid="button-submit"]'),
+          loadError: !!document.querySelector('[data-testid="assignment-load-error"]'),
+        });
+      `).catch(() => "(the page could not be asked)");
+      throw new Error(`${(waited as Error).message}
+  The page at that moment: ${why}`);
+    }
     await page.click("button-save-offline");
     try {
       await page.waitForTestId("text-saved-offline", 5000);
@@ -423,6 +450,29 @@ async function saveToDevice(page: Page): Promise<void> {
     } catch { /* the paper may have re-rendered under the tap; try again */ }
   }
   throw new Error(`Saving the paper to the device never took. The page says: ${(await page.bodyText()).slice(0, 300)}`);
+}
+
+/**
+ * Wait for the dev server to be ready to serve the app quickly.
+ *
+ * Asks for the page and the client entry until both come back, then once more
+ * to confirm it is warm rather than merely awake.
+ */
+async function warmUp(): Promise<void> {
+  const started = Date.now();
+  for (const path of ["/", "/src/main.tsx", "/"]) {
+    const deadline = Date.now() + 90000;
+    while (Date.now() < deadline) {
+      try {
+        const res = await fetch(BASE + path);
+        if (res.ok) { await res.text(); break; }
+      } catch { /* still starting */ }
+      await sleep(500);
+    }
+  }
+  const took = Date.now() - started;
+  if (took > 3000) console.log(`  (waited ${(took / 1000).toFixed(1)}s for the dev server to warm up)
+`);
 }
 
 /** Poll until true, or give up. Used where the app acts on its own. */
