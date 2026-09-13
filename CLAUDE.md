@@ -1547,8 +1547,73 @@ script/
   by the teacher when the account is created. Usernames are stored and compared
   in lower case. Rate limited, and every failure gives the same message so the
   form cannot be used to discover which usernames exist.
-- **Note:** passwords are currently stored as plain text for **all three roles** —
-  this should be improved (hashing) before any real production use.
+### Passwords
+
+Stored as an **scrypt hash**, never as the person typed them —
+`server/passwords.ts`, used by all three logins.
+
+scrypt because it is built into Node: no dependency to install, audit, or fail
+to build on a school laptop, the same reasoning as the hand-written store in
+`lib/offline-db.ts`. The stored value carries its own parameters
+(`scrypt$16384$8$1$<salt>$<hash>`), so the cost can be raised later without
+invalidating what is already stored — `verifyPassword()` reads the parameters
+out of each value rather than assuming today's.
+
+**Hashing happens in `storage.ts`, not in the routes.** `createTeacher`,
+`createStudent`, `createParent`, `updateParent` and the three
+`update*Password` methods each hash what they are given. Doing it at the
+storage layer rather than at each call site is what makes storing a plain
+password impossible for a route added later.
+
+**Nobody was locked out by the change, and this is the part to understand
+before touching it.** Every password already in the database was in plain text,
+and a hash cannot be made from a row nobody has the password for. So a stored
+value that is not in the format above is understood as legacy: compared as it
+always was, and **rewritten as a hash the moment its owner next signs in
+successfully** (`needsUpgrade` from `verifyPassword`). One account at a time, as
+people arrive.
+
+The consequence, which is worth saying out loud: **an account whose owner never
+signs in again keeps its plain password for ever.** There is no way around that
+short of resetting it. If the school wants the plain rows gone by a date, the
+remaining accounts have to be reset — `resetStudentPassword()` clears a pupil's,
+and they set a new one on their next sign-in.
+
+Both comparisons are timing-safe, including the legacy one: `===` stops at the
+first character that differs, and how long that takes is a measurement of how
+much of the password was right.
+
+### Guessing a password
+
+All four login routes are rate limited, and **the budget is keyed on the account,
+not just the address**. A school has one public address: thirty children in a
+computer room look like thirty attempts from one IP, and a plain per-IP limit
+would lock out the back half of the register every lesson. The key is the pair —
+this address trying THIS account.
+
+**Only a FAILED attempt spends the budget** (`onlyCountFailures` in
+`routes.ts`). A limiter counts every request by default, which would lock a
+teacher out for signing in and out through a morning. The usual fix — skip
+anything that answered under 400 — does not work here, because a wrong password
+is answered **200** with `success: false` so the browser can read the reason. So
+the handler marks the request at `setSessionRole()`, the one place every
+successful login already passes through.
+
+`ipKeyGenerator` is used rather than `req.ip` because an IPv6 address must be
+masked to its prefix first, or anybody with a /64 has an unlimited supply of
+"different" addresses.
+
+### Proving it — `npm run check:security`
+
+`script/check-security.ts`, and it grows with each fix. It exhausts one
+account's tries and then signs in against another from the same address (the
+property that keeps a class working); signs in correctly fourteen times over to
+prove that does not lock anybody out; checks a refusal never says which half was
+wrong; then reads the database directly — because what is WRITTEN DOWN is the
+whole point and no endpoint will show you that — to check a pupil's stored
+password is a hash and does not contain what they typed. Finally it plants a
+plain password the way an old row would look, signs in with it, and checks the
+row came back out as a hash. 24 checks.
 
 ### A login page must never call `logout()`
 

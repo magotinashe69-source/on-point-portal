@@ -1,4 +1,5 @@
 import { eq, and, inArray, or, isNull, desc, gte, lte } from "drizzle-orm";
+import { hashPassword } from "./passwords";
 // The database connection AND the table objects come from ./db, which picks
 // the right database (SQLite or PostgreSQL) at runtime.
 import {
@@ -67,6 +68,8 @@ export interface IStorage {
   createStudent(student: InsertStudent): Promise<Student>;
   updateStudent(id: number, data: Partial<InsertStudent>): Promise<Student>;
   updateStudentPassword(id: number, password: string): Promise<void>;
+  updateTeacherPassword(id: number, password: string): Promise<void>;
+  updateParentPassword(id: number, password: string): Promise<void>;
   resetStudentPassword(id: number): Promise<void>;
   deleteStudent(id: number): Promise<void>;
 
@@ -206,7 +209,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createTeacher(teacher: InsertTeacher): Promise<Teacher> {
-    const [newTeacher] = await db.insert(teachers).values(teacher).returning();
+    const [newTeacher] = await db
+      .insert(teachers)
+      .values({ ...teacher, password: await hashPassword(teacher.password) })
+      .returning();
     return newTeacher;
   }
 
@@ -250,12 +256,30 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createStudent(student: InsertStudent): Promise<Student> {
-    const [newStudent] = await db.insert(students).values(student).returning();
+    // A pupil is usually created with no password at all — they set it
+    // themselves the first time they sign in. One given here is still hashed.
+    const password = student.password ? await hashPassword(student.password) : student.password;
+    const [newStudent] = await db.insert(students).values({ ...student, password }).returning();
     return newStudent;
   }
 
+  /**
+   * Replace a password, given as the person typed it. Only a hash is stored.
+   *
+   * These three exist for two callers: somebody choosing a new password, and
+   * the login upgrading a legacy plain one the moment its owner proves they
+   * still know it.
+   */
+  async updateTeacherPassword(id: number, password: string): Promise<void> {
+    await db.update(teachers).set({ password: await hashPassword(password) }).where(eq(teachers.id, id));
+  }
+
+  async updateParentPassword(id: number, password: string): Promise<void> {
+    await db.update(parents).set({ password: await hashPassword(password) }).where(eq(parents.id, id));
+  }
+
   async updateStudentPassword(id: number, password: string): Promise<void> {
-    await db.update(students).set({ password }).where(eq(students.id, id));
+    await db.update(students).set({ password: await hashPassword(password) }).where(eq(students.id, id));
   }
 
   async resetStudentPassword(id: number): Promise<void> {
@@ -323,7 +347,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createParent(parent: InsertParent): Promise<Parent> {
-    const [newParent] = await db.insert(parents).values(parent).returning();
+    const [newParent] = await db
+      .insert(parents)
+      .values({ ...parent, password: await hashPassword(parent.password) })
+      .returning();
     return newParent;
   }
 
@@ -343,7 +370,7 @@ export class DatabaseStorage implements IStorage {
     };
     // A blank password means "keep the one they already have", so a teacher
     // fixing a name does not accidentally lock the parent out.
-    if (changes.password) fields.password = changes.password;
+    if (changes.password) fields.password = await hashPassword(changes.password);
 
     const [updated] = await db.update(parents).set(fields).where(eq(parents.id, id)).returning();
     return updated || undefined;

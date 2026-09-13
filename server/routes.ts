@@ -2,6 +2,7 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { storage } from "./storage";
+import { sameString, verifyPassword } from "./passwords";
 import { registerObjectStorageRoutes } from "./local_object_storage";
 import {
   teacherLoginSchema,
@@ -427,9 +428,13 @@ export async function registerRoutes(
         return res.json({ success: false, ...say("wrongEmailOrPassword") });
       }
       
-      if (teacher.password !== password) {
+      const teacherPassword = await verifyPassword(password, teacher.password);
+      if (!teacherPassword.ok) {
         return res.json({ success: false, ...say("wrongEmailOrPassword") });
       }
+      // Stored in plain text before this existed. They have just proved they
+      // know it, which is the only moment it can be turned into a hash.
+      if (teacherPassword.needsUpgrade) await storage.updateTeacherPassword(teacher.id, password);
 
       // Establish server-side session
       setSessionRole(req, { teacherId: teacher.id });
@@ -586,7 +591,7 @@ export async function registerRoutes(
       };
 
       // Check master password (admin access)
-      if (password === MASTER_PASSWORD) {
+      if (sameString(password, MASTER_PASSWORD)) {
         setSessionRole(req, { studentId: student.id });
         res.json({ success: true, student: safe(student), isMasterAccess: true });
         return;
@@ -603,7 +608,9 @@ export async function registerRoutes(
       }
 
       // Validate password
-      if (student.password !== password) {
+      const studentPassword = await verifyPassword(password, student.password);
+      if (studentPassword.needsUpgrade) await storage.updateStudentPassword(student.id, password);
+      if (!studentPassword.ok) {
         return res.json({ success: false, ...say("wrongPassword") });
       }
 
@@ -667,7 +674,9 @@ export async function registerRoutes(
       const parent = await storage.getParentByUsername(username);
       if (!parent) return refuse();
       if (!parent.active) return refuse();
-      if (parent.password !== password) return refuse();
+      const parentPassword = await verifyPassword(password, parent.password);
+      if (!parentPassword.ok) return refuse();
+      if (parentPassword.needsUpgrade) await storage.updateParentPassword(parent.id, password);
 
       // A parent login makes you a parent and nothing else: any teacher or
       // student session on this browser is dropped rather than kept alongside.

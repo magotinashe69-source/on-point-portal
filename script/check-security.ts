@@ -8,14 +8,21 @@
 //   * guessing a password is limited, PER ACCOUNT rather than per address, so a
 //     class logging in together is never mistaken for an attack;
 //   * a refusal never says which half was wrong, so the form cannot be used to
-//     find out who is on the register.
+//     find out who is on the register;
+//   * a password is never stored as the person typed it, and one stored that way
+//     before is turned into a hash the moment its owner next signs in.
 //
 // Everything here uses made-up accounts. That is not tidiness — the limiter's
 // budget is keyed on the name being tried, so using a real one would lock a
 // real teacher or pupil out for five minutes, and the check scripts that run
 // after this one sign in as the teacher.
 
-import { runCheck } from "./cleanup";
+import { onCleanup, runCheck } from "./cleanup";
+import { db, ensureSchema } from "../server/db";
+import { storage } from "../server/storage";
+import { isHashed } from "../server/passwords";
+import { students } from "@shared/schema";
+import { eq } from "drizzle-orm";
 
 const BASE = "http://localhost:5000";
 
@@ -139,6 +146,93 @@ async function main() {
   check(unknownTeacher.body?.code === "wrongEmailOrPassword",
     "an unknown teacher email says only that the pair do not match",
     String(unknownTeacher.body?.code));
+
+  // =======================================================================
+  section("What is actually in the database");
+  // =======================================================================
+  //
+  // Read straight out of the table rather than over HTTP. The whole point is
+  // what is WRITTEN DOWN, and no endpoint will ever show you that.
+
+  await ensureSchema();
+
+  const teacher = await storage.getTeacherByEmail("onpointeducationcentremoza@gmail.com");
+  check(isHashed(teacher?.password),
+    "the teacher's password is not sitting in the database as they type it",
+    String(teacher?.password).slice(0, 20));
+
+  const PASSWORD = `pupil-${stamp}`;
+  const pupil = await storage.createStudent({
+    studentId: `SEC-${stamp}`, fullName: `Security Child ${stamp}`,
+    gender: "Female", form: "Stage 3",
+  } as any);
+  onCleanup(`pupil ${pupil.id}`, () => storage.deleteStudent(pupil.id));
+
+  // A pupil sets their own password the first time they sign in.
+  const firstLogin = await post("/api/auth/student/login",
+    { fullName: pupil.fullName, password: PASSWORD });
+  check(firstLogin.body?.success === true, "a pupil's first sign-in sets their password");
+
+  const afterFirst = await storage.getStudent(pupil.id);
+  check(isHashed(afterFirst?.password),
+    "and what is written down is a hash, not the word they chose",
+    String(afterFirst?.password).slice(0, 20));
+  check(!String(afterFirst?.password).includes(PASSWORD),
+    "their actual password appears nowhere in the stored value");
+
+  const againHashed = await post("/api/auth/student/login",
+    { fullName: pupil.fullName, password: PASSWORD });
+  check(againHashed.body?.success === true, "and they can sign in again against that hash");
+
+  const wrongOne = await post("/api/auth/student/login",
+    { fullName: pupil.fullName, password: PASSWORD + "-no" });
+  check(wrongOne.body?.success === false, "while a wrong password is still refused");
+
+  // =======================================================================
+  section("A password stored before any of this existed");
+  // =======================================================================
+  //
+  // Every password in the school's database is in plain text today, and no
+  // amount of hashing changes a row nobody has the password for. So a legacy
+  // value has to keep working, and become a hash the moment its owner proves
+  // they know it — otherwise the school has to reset every child.
+  //
+  // Written straight to the table, because storage hashes anything it is given,
+  // which is the other half of the promise.
+
+  const LEGACY = `legacy-${stamp}`;
+  await db.update(students).set({ password: LEGACY }).where(eq(students.id, pupil.id));
+
+  const planted = await storage.getStudent(pupil.id);
+  check(!isHashed(planted?.password), "a plain password is planted, as an old row would be");
+
+  const legacyLogin = await post("/api/auth/student/login",
+    { fullName: pupil.fullName, password: LEGACY });
+  check(legacyLogin.body?.success === true,
+    "its owner is still let in — nobody is locked out by the change");
+
+  const upgraded = await storage.getStudent(pupil.id);
+  check(isHashed(upgraded?.password),
+    "and it has been turned into a hash on the way through",
+    String(upgraded?.password).slice(0, 20));
+
+  const legacyAgain = await post("/api/auth/student/login",
+    { fullName: pupil.fullName, password: LEGACY });
+  check(legacyAgain.body?.success === true, "the same password still works afterwards");
+
+  const legacyWrong = await post("/api/auth/student/login",
+    { fullName: pupil.fullName, password: "not-it" });
+  check(legacyWrong.body?.success === false, "and the wrong one does not");
+
+  // =======================================================================
+  section("A password never leaves the server");
+  // =======================================================================
+
+  const me = await post("/api/auth/student/login", { fullName: pupil.fullName, password: LEGACY });
+  check(me.body?.student && !("password" in me.body.student),
+    "signing in hands back the pupil without their password");
+  check(!JSON.stringify(me.body ?? {}).includes(LEGACY),
+    "and the password appears nowhere in the reply");
 }
 
 void runCheck(main, () => {
