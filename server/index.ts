@@ -7,6 +7,7 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { registerWellKnown } from "./well_known";
 import { createServer } from "http";
+import { randomBytes } from "node:crypto";
 import { pgPool, usePostgres, ensureSchema } from "./db";
 
 const app = express();
@@ -55,6 +56,28 @@ if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
   throw new Error("SESSION_SECRET environment variable must be set in production.");
 }
 
+/**
+ * The key login cookies are signed with.
+ *
+ * Production must set it, and the line above refuses to start without one.
+ * Development used to fall back to the fixed string "onpoint-dev-secret" — and
+ * a signing key published in the repository is not a signing key: anyone who
+ * can reach a dev server can mint a cookie that says they are the teacher.
+ *
+ * So development now gets a fresh random one each time the server starts. That
+ * costs nothing here, because in SQLite mode sessions are kept in memory and
+ * are already lost on every restart — and `npm run dev` restarts on every file
+ * change. Anyone signed in is signed out by a restart either way.
+ */
+function sessionSecret(): string {
+  const fromEnv = process.env.SESSION_SECRET;
+  if (fromEnv) return fromEnv;
+  const generated = randomBytes(32).toString("hex");
+  console.log("[session] No SESSION_SECRET set, so a new one was generated for this run.");
+  console.log("[session] Anyone signed in will be signed out when the server restarts.");
+  return generated;
+}
+
 // Pick where login sessions are stored:
 //   * PostgreSQL mode -> store sessions in the database (survives restarts).
 //   * SQLite mode     -> keep sessions in memory (simple, fine for local use).
@@ -82,7 +105,7 @@ const sessionStore = usePostgres
 app.use(
   session({
     store: sessionStore,
-    secret: process.env.SESSION_SECRET || "onpoint-dev-secret",
+    secret: sessionSecret(),
     resave: false,
     saveUninitialized: false,
     cookie: {

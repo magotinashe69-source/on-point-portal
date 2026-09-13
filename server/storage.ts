@@ -1,4 +1,5 @@
 import { eq, and, inArray, or, isNull, desc, gte, lte } from "drizzle-orm";
+import { randomBytes } from "node:crypto";
 import { hashPassword } from "./passwords";
 // The database connection AND the table objects come from ./db, which picks
 // the right database (SQLite or PostgreSQL) at runtime.
@@ -1144,6 +1145,40 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Seed initial data
+  /**
+   * The password a BRAND NEW database's teacher account starts with.
+   *
+   * It used to be the string "onpoint123", written here in the source — so
+   * every copy of this repository is the teacher's password, for a login whose
+   * email is also in here. Hashing it changed nothing: you do not need the hash
+   * if you can read what went into it.
+   *
+   * Now: whatever SEED_TEACHER_PASSWORD says. With nothing set, development
+   * keeps the old value, because it is a throwaway database and fifteen check
+   * scripts sign in with it; anywhere else gets a random one, printed once, for
+   * whoever is setting the school up to write down and then change.
+   *
+   * NOTE that this only ever runs on an EMPTY database. An account that already
+   * exists keeps the password it has — see script/set-teacher-password.ts for
+   * changing one that is already out there.
+   */
+  private seedTeacherPassword(): string {
+    const chosen = process.env.SEED_TEACHER_PASSWORD?.trim();
+    if (chosen) return chosen;
+
+    if (process.env.NODE_ENV !== "production") return "onpoint123";
+
+    const generated = randomBytes(12).toString("base64url");
+    console.log("=".repeat(66));
+    console.log("  A teacher account has been created for this new database.");
+    console.log(`    email:    onpointeducationcentremoza@gmail.com`);
+    console.log(`    password: ${generated}`);
+    console.log("  This is the only time it is shown. Change it with:");
+    console.log("    npm run set-teacher-password");
+    console.log("=".repeat(66));
+    return generated;
+  }
+
   async seedInitialData(): Promise<void> {
     // Check if teacher already exists - check both old and new email
     const existingTeacher = await this.getTeacherByEmail("onpointeducationcentremoza@gmail.com");
@@ -1165,7 +1200,7 @@ export class DatabaseStorage implements IStorage {
     const teacher = await this.createTeacher({
       fullName: "On Point Education Centre",
       email: "onpointeducationcentremoza@gmail.com",
-      password: "onpoint123",
+      password: this.seedTeacherPassword(),
     });
 
     // Example students used to seed a fresh database.

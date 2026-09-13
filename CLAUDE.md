@@ -1583,6 +1583,41 @@ Both comparisons are timing-safe, including the legacy one: `===` stops at the
 first character that differs, and how long that takes is a measurement of how
 much of the password was right.
 
+### The first teacher account, and changing it
+
+A brand new database seeds one teacher. That password used to be the string
+`onpoint123`, written in `storage.ts` — so every copy of this repository was the
+teacher's password, for a login whose email is in there too. **Hashing changed
+nothing about that**: you do not need the hash if you can read what went into it.
+
+It is `SEED_TEACHER_PASSWORD` now. Unset, development keeps the old throwaway
+value (it is a disposable database, and fifteen check scripts sign in with it);
+anywhere else gets a random one, printed once at startup.
+
+**That only affects an EMPTY database.** An account that already exists keeps
+the password it has — including any school already running on `onpoint123`. And
+there is no change-password screen in the app, so:
+
+```
+npm run set-teacher-password
+```
+
+`script/set-teacher-password.ts` asks twice, does not echo what is typed, and
+refuses both the published value and anything under ten characters. **Any
+database seeded before this should have it run against it.** A proper
+change-password screen is the obvious next thing; until it exists this is the
+only way to rotate a teacher's password.
+
+### The key that signs login cookies
+
+Production must set `SESSION_SECRET` — `server/index.ts` refuses to start
+without it. Development used to fall back to the fixed string
+`"onpoint-dev-secret"`, and a signing key published in the repository is not a
+key: anyone who can reach a dev server can mint a cookie saying they are the
+teacher. Development now generates a fresh random one per run, which costs
+nothing, because sessions in SQLite mode are held in memory and already end at
+every restart — and `npm run dev` restarts on every file change.
+
 ### Guessing a password
 
 All four login routes are rate limited, and **the budget is keyed on the account,
