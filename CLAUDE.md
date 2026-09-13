@@ -1595,8 +1595,10 @@ value (it is a disposable database, and fifteen check scripts sign in with it);
 anywhere else gets a random one, printed once at startup.
 
 **That only affects an EMPTY database.** An account that already exists keeps
-the password it has — including any school already running on `onpoint123`. And
-there is no change-password screen in the app, so:
+the password it has — including any school already running on `onpoint123`. The
+screen below is the ordinary way to change one; the command line is the way in
+when nobody can sign in to reach that screen — a forgotten teacher password, or
+a database seeded before any of this existed:
 
 ```
 npm run set-teacher-password
@@ -1604,9 +1606,40 @@ npm run set-teacher-password
 
 `script/set-teacher-password.ts` asks twice, does not echo what is typed, and
 refuses both the published value and anything under ten characters. **Any
-database seeded before this should have it run against it.** A proper
-change-password screen is the obvious next thing; until it exists this is the
-only way to rotate a teacher's password.
+database seeded before this should have it run against it.**
+
+### Changing your own password
+
+A button beside Logout on all three dashboards
+(`client/src/components/ChangePasswordDialog.tsx`), and **one** endpoint behind
+it — `POST /api/auth/change-password` — not three.
+
+One endpoint, because `setSessionRole()` gives a browser exactly one role, so
+"who is asking" is never ambiguous. `whoIsAsking(req)` reads it from the session
+and hands back that account's stored password and the way to set a new one. The
+consequence is the important part: **the account changed is always the one
+asking.** There is no id in the request to point somewhere else, the same
+property the parent routes get from carrying no id.
+
+**The current password is required, and that is the point of the form rather
+than a formality.** Without it, a session somebody walked away from — a shared
+family phone, a classroom machine at break — is enough to lock the owner out of
+their own account.
+
+Three more rules it follows:
+
+1. **Rate limited like a login**, because that is what it is: a form that says
+   whether a password is right. Keyed on the address and the signed-in account,
+   and only failures spend the budget (`onlyCountFailures`), so somebody
+   correcting a typo four times is not locked out of their own account.
+2. **The password they already have is refused**, not quietly accepted.
+   Somebody told to change their password should find out when they have not.
+3. **The dialog uses plain `fetch`, not `apiRequest()`.** That helper throws on
+   any non-2xx, which would turn "that is not your current password" into
+   "check your connection" — the same trap as the question bank's refusals.
+
+Nothing new hashes anything: `update*Password` in `storage.ts` already does,
+which is the whole reason hashing lives at the storage layer.
 
 ### The key that signs login cookies
 
@@ -1648,7 +1681,23 @@ wrong; then reads the database directly — because what is WRITTEN DOWN is the
 whole point and no endpoint will show you that — to check a pupil's stored
 password is a hash and does not contain what they typed. Finally it plants a
 plain password the way an old row would look, signs in with it, and checks the
-row came back out as a hash. 24 checks.
+row came back out as a hash.
+
+It then changes a password both ways round. Over HTTP: the wrong current
+password changes nothing, the one they already have is refused, a new one under
+eight characters is refused, nobody signed in changes nobody's password, and a
+real change makes the old password stop working and the new one start — with the
+stored row read straight out of the database to confirm it is a hash and does
+not contain what they typed.
+
+Then **in a real browser**, because an endpoint nobody can reach is not a way to
+change a password: sign in as the pupil, find the button on their own dashboard,
+open the form, get told the current password is wrong, get told the two new ones
+do not match, then get it right and watch the form close — and sign in
+afterwards with the password that was typed into the SCREEN. Each message is
+checked by its exact wording: the error box stays on screen between attempts, so
+"something is showing" would pass on the previous complaint. 43 checks, and it
+needs a server running (`npm run dev`).
 
 ### A login page must never call `logout()`
 

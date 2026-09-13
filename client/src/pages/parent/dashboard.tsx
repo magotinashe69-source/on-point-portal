@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
+import { ChangePasswordDialog } from "@/components/ChangePasswordDialog";
 import { useT } from "@/lib/i18n";
 import { QueryError } from "@/components/QueryError";
 import { subjectLabel, type WeeklyReport } from "@shared/weekly-report";
@@ -136,6 +137,7 @@ export default function ParentDashboard() {
           <div className="flex items-center gap-2">
             <LanguageToggle />
             <ThemeToggle />
+            <ChangePasswordDialog />
             <Button
               variant="ghost"
               size="sm"

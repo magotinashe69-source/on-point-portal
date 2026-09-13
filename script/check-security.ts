@@ -10,7 +10,8 @@
 //   * a refusal never says which half was wrong, so the form cannot be used to
 //     find out who is on the register;
 //   * a password is never stored as the person typed it, and one stored that way
-//     before is turned into a hash the moment its owner next signs in.
+//     before is turned into a hash the moment its owner next signs in;
+//   * somebody can change their own password, and only their own.
 //
 // Everything here uses made-up accounts. That is not tidiness — the limiter's
 // budget is keyed on the name being tried, so using a real one would lock a
@@ -18,6 +19,8 @@
 // after this one sign in as the teacher.
 
 import { onCleanup, runCheck } from "./cleanup";
+import { Browser } from "./chrome";
+import { en } from "../client/src/lib/i18n/en";
 import { db, ensureSchema } from "../server/db";
 import { storage } from "../server/storage";
 import { isHashed } from "../server/passwords";
@@ -36,16 +39,33 @@ function section(title: string) { console.log(`\n${title}`); }
 
 const stamp = Date.now().toString().slice(-6);
 
-async function post(path: string, body: unknown) {
+async function post(path: string, body: unknown, cookie?: string) {
   const res = await fetch(BASE + path, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(cookie ? { Cookie: cookie } : {}),
+    },
     body: JSON.stringify(body),
     redirect: "manual",
   });
   let json: any = null;
   try { json = JSON.parse(await res.text()); } catch { /* not JSON */ }
   return { status: res.status, body: json };
+}
+
+/** The same, but hands back the session cookie it was given. */
+async function postWithCookie(path: string, body: unknown) {
+  const res = await fetch(BASE + path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    redirect: "manual",
+  });
+  const cookie = (res.headers.get("set-cookie") ?? "").split(";")[0];
+  let json: any = null;
+  try { json = JSON.parse(await res.text()); } catch { /* not JSON */ }
+  return { res: { status: res.status, body: json }, cookie };
 }
 
 /** Try one account until the door shuts, or give up. */
@@ -241,14 +261,146 @@ async function main() {
   check(burned.body?.isMasterAccess !== true, "and grants no master access");
 
   // =======================================================================
+  section("Changing your own password");
+  // =======================================================================
+  //
+  // Until this existed there was no way to, from inside the app at all. One
+  // endpoint serves all three portals and works out who is asking from the
+  // session, so the account changed is always the one asking — there is no id
+  // in the request to point somewhere else.
+
+  const signedIn = await postWithCookie("/api/auth/student/login",
+    { fullName: pupil.fullName, password: LEGACY });
+  check(signedIn.res.body?.success === true, "a pupil signs in, ready to change their password");
+  const cookie = signedIn.cookie;
+
+  const NEW_PASSWORD = `changed-${stamp}-ok`;
+
+  const wrongCurrent = await post("/api/auth/change-password",
+    { currentPassword: "not-their-password", newPassword: NEW_PASSWORD }, cookie);
+  check(wrongCurrent.body?.code === "wrongCurrentPassword",
+    "the wrong current password changes nothing — a screen left open cannot lock them out",
+    String(wrongCurrent.body?.code));
+
+  const sameAgain = await post("/api/auth/change-password",
+    { currentPassword: LEGACY, newPassword: LEGACY }, cookie);
+  check(sameAgain.body?.code === "samePassword",
+    "and the one they already have is refused rather than quietly accepted",
+    String(sameAgain.body?.code));
+
+  const tooShort = await post("/api/auth/change-password",
+    { currentPassword: LEGACY, newPassword: "short" }, cookie);
+  check(tooShort.body?.success === false, "a new password under eight characters is refused");
+
+  const notSignedIn = await post("/api/auth/change-password",
+    { currentPassword: LEGACY, newPassword: NEW_PASSWORD });
+  check(notSignedIn.body?.code === "notLoggedIn",
+    "and nobody signed in changes nobody's password", String(notSignedIn.body?.code));
+
+  const changed = await post("/api/auth/change-password",
+    { currentPassword: LEGACY, newPassword: NEW_PASSWORD }, cookie);
+  check(changed.body?.success === true, "with the right current password it goes through",
+    JSON.stringify(changed.body?.code));
+
+  const oldOne = await post("/api/auth/student/login",
+    { fullName: pupil.fullName, password: LEGACY });
+  check(oldOne.body?.success === false, "the old password stops working");
+
+  const newOne = await post("/api/auth/student/login",
+    { fullName: pupil.fullName, password: NEW_PASSWORD });
+  check(newOne.body?.success === true, "and the new one works");
+
+  const storedNew = await storage.getStudent(pupil.id);
+  check(isHashed(storedNew?.password), "what was written down is a hash, like any other password");
+  check(!String(storedNew?.password).includes(NEW_PASSWORD),
+    "and does not contain what they typed");
+
+  // =======================================================================
   section("A password never leaves the server");
   // =======================================================================
 
-  const me = await post("/api/auth/student/login", { fullName: pupil.fullName, password: LEGACY });
+  const me = await post("/api/auth/student/login", { fullName: pupil.fullName, password: NEW_PASSWORD });
   check(me.body?.student && !("password" in me.body.student),
     "signing in hands back the pupil without their password");
-  check(!JSON.stringify(me.body ?? {}).includes(LEGACY),
+  check(!JSON.stringify(me.body ?? {}).includes(NEW_PASSWORD),
     "and the password appears nowhere in the reply");
+
+  // =======================================================================
+  section("The screen itself, in a real browser");
+  // =======================================================================
+  //
+  // The endpoint is proved above. This is the other half: that a person can
+  // actually REACH it — the button is on their own dashboard, the form opens,
+  // and what they type into it is what signs them in afterwards. An endpoint
+  // nobody can find is not a way to change a password.
+  //
+  // Each message is checked by its exact wording rather than by "something is
+  // showing". The error box stays on screen between attempts, so "not empty"
+  // would pass on the PREVIOUS complaint and prove nothing about this one.
+
+  const browser = await Browser.launch();
+  onCleanup("the browser", () => browser.close());
+  const page = await browser.newPage();
+
+  const TYPED = `typed-${stamp}-ok`;
+
+  await page.goto(`${BASE}/student/login`);
+  await page.waitForTestId("input-fullname");
+  await page.fill("input-fullname", pupil.fullName);
+  await page.fill("input-password", NEW_PASSWORD);
+  await page.click("button-login");
+  await page.waitFor(`return location.pathname === "/student/dashboard"`, "the dashboard to open");
+
+  check(await page.exists("button-change-password"),
+    "a pupil can find the button on their own dashboard, without being told an address");
+
+  await page.click("button-change-password");
+  await page.waitForTestId("dialog-change-password");
+  check(true, "and it opens the form");
+
+  // The wrong current password first: the screen has to SAY so. Failing
+  // silently, or closing as though it worked, is worse than not having a form.
+  await page.fill("input-current-password", "not-their-password");
+  await page.fill("input-new-password", TYPED);
+  await page.fill("input-again-password", TYPED);
+  await page.click("button-change-password-save");
+  await page.waitForTestId("text-change-password-problem");
+  await page.waitFor(
+    `return document.querySelector('[data-testid="text-change-password-problem"]')
+       ?.textContent?.includes(${JSON.stringify(en.server.wrongCurrentPassword)})`,
+    "the screen to say the current password is wrong",
+  );
+  check(true, "the wrong current password is said out loud, in the server's own words");
+
+  // Typing the new one differently the second time — the mistake people
+  // actually make. Caught on the page, so it costs no round trip.
+  await page.fill("input-current-password", NEW_PASSWORD);
+  await page.fill("input-again-password", `${TYPED}-different`);
+  await page.click("button-change-password-save");
+  await page.waitFor(
+    `return document.querySelector('[data-testid="text-change-password-problem"]')
+       ?.textContent?.includes(${JSON.stringify(en.password.doNotMatch)})`,
+    "the screen to say the two do not match",
+  );
+  check(true, "and so is typing the new one differently the second time");
+
+  // Now properly.
+  await page.fill("input-again-password", TYPED);
+  await page.click("button-change-password-save");
+  await page.waitFor(
+    `return !document.querySelector('[data-testid="dialog-change-password"]')`,
+    "the form to close once it worked",
+  );
+  check(true, "getting it right closes the form");
+
+  const afterScreen = await post("/api/auth/student/login",
+    { fullName: pupil.fullName, password: TYPED });
+  check(afterScreen.body?.success === true,
+    "and the password they typed on the SCREEN is the one that now signs them in");
+
+  const beforeScreen = await post("/api/auth/student/login",
+    { fullName: pupil.fullName, password: NEW_PASSWORD });
+  check(beforeScreen.body?.success === false, "while the one before it does not");
 }
 
 void runCheck(main, () => {
