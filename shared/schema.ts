@@ -741,4 +741,6 @@ export const updateParentAccountSchema = z.object({
 export type UpdateParentAccount = z.infer<typeof updateParentAccountSchema>;
 
 // Master password for admin access
-export const MASTER_PASSWORD = "onpoint_admin_2024";
+// The master password used to be a constant here, in the folder the BROWSER
+// imports from. It lives in the environment now, read on the server only —
+// see server/master-password.ts for why that line was three problems at once.

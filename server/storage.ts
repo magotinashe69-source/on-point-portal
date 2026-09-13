@@ -28,7 +28,6 @@ import {
   type QuestionBankRow,
   type CertificateRow, type InsertCertificateRow,
   type ReportSettingsRow, type ReportCommentRow, type InsertReportCommentRow,
-  MASTER_PASSWORD
 } from "@shared/schema";
 // The Question Bank's shapes and rules are pure, so they live in shared/.
 import {

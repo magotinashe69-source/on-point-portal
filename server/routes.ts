@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { storage } from "./storage";
 import { sameString, verifyPassword } from "./passwords";
+import { masterPassword } from "./master-password";
 import { registerObjectStorageRoutes } from "./local_object_storage";
 import {
   teacherLoginSchema,
@@ -10,7 +11,6 @@ import {
   parentLoginSchema,
   createParentAccountSchema,
   updateParentAccountSchema,
-  MASTER_PASSWORD
 } from "@shared/schema";
 import type { Assignment, Submission, Student } from "@shared/schema";
 import { say, validationText } from "@shared/server-messages";
@@ -590,8 +590,11 @@ export async function registerRoutes(
         return rest;
       };
 
-      // Check master password (admin access)
-      if (sameString(password, MASTER_PASSWORD)) {
+      // Signing in as this pupil with the master password, when the school has
+      // set one. There is no such password unless they have: see
+      // server/master-password.ts.
+      const master = masterPassword();
+      if (master && sameString(password, master)) {
         setSessionRole(req, { studentId: student.id });
         res.json({ success: true, student: safe(student), isMasterAccess: true });
         return;

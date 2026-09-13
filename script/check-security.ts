@@ -225,6 +225,22 @@ async function main() {
   check(legacyWrong.body?.success === false, "and the wrong one does not");
 
   // =======================================================================
+  section("The master password that used to be in the source");
+  // =======================================================================
+  //
+  // It was a constant in shared/schema.ts, unchanged since the first commit, so
+  // everyone who has ever had the repository has it — and it signs in as ANY
+  // pupil. It cannot be un-published, so it is refused outright rather than
+  // merely moved.
+
+  const burned = await post("/api/auth/student/login",
+    { fullName: pupil.fullName, password: "onpoint_admin_2024" });
+  check(burned.body?.success !== true,
+    "the old master password from the source code opens nobody's account",
+    JSON.stringify(burned.body?.code ?? burned.body));
+  check(burned.body?.isMasterAccess !== true, "and grants no master access");
+
+  // =======================================================================
   section("A password never leaves the server");
   // =======================================================================
 
