@@ -31,3 +31,6 @@ __pycache__/
 
 # --- PyCharm / IntelliJ IDE settings ---
 .idea/
+
+# --- A stale dump of the whole source, which carried published passwords ---
+FULL_SOURCE_CODE.txt
