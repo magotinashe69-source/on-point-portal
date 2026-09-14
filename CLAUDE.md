@@ -1696,8 +1696,116 @@ open the form, get told the current password is wrong, get told the two new ones
 do not match, then get it right and watch the form close — and sign in
 afterwards with the password that was typed into the SCREEN. Each message is
 checked by its exact wording: the error box stays on screen between attempts, so
-"something is showing" would pass on the previous complaint. 43 checks, and it
-needs a server running (`npm run dev`).
+"something is showing" would pass on the previous complaint.
+
+**It then reads the SOURCE and asserts every route names a guard** — and this is
+the check that exists because of how the upload hole happened. Every route in
+`routes.ts` was guarded, and had been for so long that "the routes are guarded"
+was taken as read; the uploads were registered on the same app from another file
+and had no check at all. Asking the running server cannot answer "could somebody
+add an unguarded route tomorrow", so this reads `routes.ts` **and**
+`local_object_storage.ts`, finds every `app.get/post/patch/put/delete`, and
+requires each one that is not a login to name a guard.
+
+Two things keep that check honest:
+
+- it asserts it **found** over ninety routes first, because a regex that matched
+  nothing would otherwise pass everything;
+- the `/api/dev` helpers are allowed no guard of their own only while the
+  **prefix gate is verified to exist and to require a teacher**. Whitelisting
+  the path instead would mean deleting that gate left five routes open and the
+  check still green.
+
+It was proved to fail: an unguarded route planted in `routes.ts` is reported by
+file and line, and the file restored afterwards.
+
+Finally the headers, and that the HTTPS redirect fires on a forwarded request
+but **not** on one that never went through a proxy — a health check must not
+bounce. 54 checks, and it needs a server running (`npm run dev`).
+
+### Uploaded files
+
+`server/local_object_storage.ts` registers routes on the same app as everything
+else, but it is **not** `routes.ts` — and that is exactly how it came to have no
+login check of any kind. Anybody at all could write files to the school's disk,
+of any size, and choose the `Content-Type` stored beside them, which
+`GET /objects/:id` echoed back verbatim.
+
+The echo is the dangerous half: upload an HTML file, call it `text/html`, and
+the school's own address serves your JavaScript. Cookies are `httpOnly` so a
+script cannot read them — but it is running **on the school's origin**, and the
+session cookie rides along on every request it makes from there. **An SVG counts
+as HTML for this purpose**, because it can carry `<script>`.
+
+Four rules now:
+
+1. **You must be signed in.** Uploading is for a teacher or a pupil; reading a
+   file back also allows a parent, who has a real reason to see a photo of their
+   own child's handwritten work. The guards are **passed in from `routes.ts`**
+   rather than written in that file, so there is one definition of them.
+2. **The stored content type is ours, not the caller's** — an allowlist of types
+   that cannot execute, applied on the way in *and* again on the way out, so a
+   file uploaded before this existed still cannot be served as something that
+   runs.
+3. **Nothing is served as HTML.** An unrecognised type downloads instead of
+   rendering, and `X-Content-Type-Options: nosniff` stops a browser guessing
+   from the bytes.
+4. **25MB cap**, counted as bytes arrive rather than trusting a `Content-Length`
+   the caller also writes. A full disk takes the whole portal down.
+
+**What this does NOT promise**, and it is worth being plain about: any signed-in
+person holding the address can read any file. Tying a file to one family the way
+the parent routes tie data to one child means recording which submission an
+upload belongs to — a schema change, and a bigger piece of work than this was.
+
+### Headers, and getting to HTTPS
+
+In `server/index.ts`, before the session and the routes, so they cover every
+answer — the API, the React page and an uploaded file alike. Written out rather
+than pulled in from helmet, for the same reason passwords use Node's own scrypt.
+
+Always: `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: same-origin` (a
+page address can name a pupil), and a `Permissions-Policy` turning off camera,
+microphone and location.
+
+**The redirect keys on `X-Forwarded-Proto` being present**, not on
+`NODE_ENV === "production"`. That header is set by the proxy the app runs behind;
+a request without one is not coming through it — it is a health check, or
+`npm run check:offline:pwa`, which serves a real production build over plain
+HTTP on port 5050. Redirecting those breaks them and protects nobody. HSTS is
+sent only once the connection really is secure.
+
+The blind spot that leaves, and the reason for the `[https]` warning: the cookie
+is `secure: "auto"` and the redirect keys on the same header, so a proxy that
+does not send it means **both** quietly do nothing. Production says so once, in
+the log, rather than looking fine. (`secure: "auto"` is deliberate over a forced
+`true`: if the header is missing, forcing it stops the cookie being sent at all
+and locks the whole school out.)
+
+**The CSP is production-only** — Vite's dev server needs inline script, `eval`
+and a websocket of its own, and a policy loose enough for that is worth nothing.
+Two entries are decisions rather than defaults:
+
+- `script-src 'self'` with **no** `'unsafe-inline'`. This only works because
+  `client/index.html` carries no inline script. Adding one would break
+  production and nothing else, which is the worst way to find out.
+- `style-src` **does** allow `'unsafe-inline'`: React sets inline styles and the
+  chart component injects a `<style>` tag. An injected stylesheet is a far
+  smaller problem than injected script.
+
+### What a user is told when something breaks
+
+The error handler used to answer with `err.message`, whatever it happened to be
+— a database error naming tables and columns, a file error naming server paths.
+In production the detail goes to the log and a plain, translated sentence goes
+to the screen. The test is **`err.expose`**, the http-errors convention for "this
+message was written to be read by the caller", rather than the status code, so a
+deliberate 4xx still reads properly.
+
+The request log used to write **the whole response body** on every `/api` call.
+Those bodies are children's names, their marks and their teacher's comments, and
+a log is copied about and kept long after the screen it was drawn on. Bodies are
+logged in development only.
 
 ### A login page must never call `logout()`
 

@@ -19,6 +19,7 @@
 // after this one sign in as the teacher.
 
 import { onCleanup, runCheck } from "./cleanup";
+import { readFileSync } from "node:fs";
 import { Browser } from "./chrome";
 import { en } from "../client/src/lib/i18n/en";
 import { db, ensureSchema } from "../server/db";
@@ -401,6 +402,122 @@ async function main() {
   const beforeScreen = await post("/api/auth/student/login",
     { fullName: pupil.fullName, password: NEW_PASSWORD });
   check(beforeScreen.body?.success === false, "while the one before it does not");
+
+  // =======================================================================
+  section("Every route is guarded — including the ones in other files");
+  // =======================================================================
+  //
+  // This is the check that exists because of how the upload hole happened.
+  //
+  // Every route in routes.ts goes through a guard, and that had been true for
+  // so long that "the routes are guarded" was taken as read. But uploads are
+  // registered on the same app from local_object_storage.ts, and that file had
+  // no login check of any kind — so anyone at all could write files to the
+  // school's disk and choose the content type served back from them.
+  //
+  // Reading the source rather than asking the server, because the question is
+  // "could somebody add an unguarded route tomorrow and nobody notice", and no
+  // amount of requests to today's server answers that.
+
+  const GUARDS = [
+    "requireTeacherOrStudent", "requireTeacherOrSelf", "requireTeacherAuth",
+    "requireTeacher", "requireParentSubmission", "requireParentChild",
+    "requireParent", "requirePrimaryStudent", "requireAnyLogin",
+    "canUpload", "canRead",
+  ];
+
+  const routeFiles = ["server/routes.ts", "server/local_object_storage.ts"];
+  const routesSource = readFileSync("server/routes.ts", "utf8");
+
+  // The dev helpers are covered by a gate on the whole /api/dev prefix rather
+  // than by a call in each body, so they are allowed to have no guard of their
+  // own — but ONLY while that gate is really there and really requires a
+  // teacher. Checked rather than assumed: whitelisting the path instead would
+  // mean deleting the gate left five routes open and this check still green.
+  const devGate =
+    /app\.use\(\s*"\/api\/dev"/.test(routesSource) &&
+    /app\.use\(\s*"\/api\/dev"[\s\S]{0,400}?requireTeacher\(/.test(routesSource);
+  check(devGate,
+    "the dev helpers are covered by one teacher-only gate on the whole /api/dev prefix");
+
+  const unguarded: string[] = [];
+  let routesSeen = 0;
+
+  for (const file of routeFiles) {
+    const lines = readFileSync(file, "utf8").split(/\r?\n/);
+    const starts: { line: number; what: string }[] = [];
+    lines.forEach((text, i) => {
+      const m = text.match(/^\s*app\.(get|post|patch|put|delete)\(\s*["'/]/);
+      if (m) starts.push({ line: i, what: `${file}:${i + 1} ${text.trim().slice(0, 70)}` });
+    });
+
+    starts.forEach((start, idx) => {
+      const end = idx + 1 < starts.length ? starts[idx + 1].line : lines.length;
+      const body = lines.slice(start.line, end).join("\n");
+      routesSeen++;
+
+      // The login routes must answer somebody who is not logged in — that is
+      // what they are for. Everything else must name a guard.
+      const firstLine = body.split("\n")[0];
+      const isLogin = /["']\/api\/auth\//.test(firstLine);
+      if (isLogin) return;
+
+      // Covered by the prefix gate checked above, not by a call of its own.
+      if (devGate && /["']\/api\/dev\//.test(firstLine)) return;
+
+      if (!GUARDS.some((g) => body.includes(g + "("))) unguarded.push(start.what);
+    });
+  }
+
+  check(routesSeen > 90,
+    `all ${routesSeen} routes were found and read (a regex that matched nothing would pass everything)`,
+    String(routesSeen));
+
+  check(unguarded.length === 0,
+    "every route that is not a login names a guard",
+    unguarded.length ? `NOT GUARDED:\n      ${unguarded.join("\n      ")}` : "");
+
+  // And the same thing asked of the running server, for the routes that were
+  // actually open. A source check and a live check fail in different ways.
+  const anonUpload = await post("/api/uploads/request-url", {});
+  check(anonUpload.status === 401,
+    "a stranger cannot ask for somewhere to upload a file", `got ${anonUpload.status}`);
+
+  const anonObject = await fetch(`${BASE}/objects/anything`, { redirect: "manual" });
+  check(anonObject.status === 401,
+    "and cannot read an uploaded file", `got ${anonObject.status}`);
+
+  // =======================================================================
+  section("The headers every answer carries");
+  // =======================================================================
+  //
+  // nosniff is the one with teeth here: it is what stops a browser guessing a
+  // type from the bytes and rendering as HTML a file the server has just said
+  // is not HTML. The Content-Security-Policy is deliberately production-only —
+  // Vite's dev server needs inline script and eval — so it is not checked here.
+
+  const headers = (await fetch(`${BASE}/`, { redirect: "manual" })).headers;
+  check(headers.get("x-content-type-options") === "nosniff",
+    "a browser is told never to guess a file's type from its bytes");
+  check(headers.get("x-frame-options") === "DENY",
+    "and never to let another site frame the school's pages");
+  check((headers.get("referrer-policy") ?? "").includes("same-origin"),
+    "the address of a page — which can name a pupil — is not leaked off-site");
+
+  // The redirect to HTTPS keys on the proxy's own header, so that a health
+  // check or the production PWA test, which arrive without one, still work.
+  const forwarded = await fetch(`${BASE}/api/auth/teacher/me`, {
+    headers: { "X-Forwarded-Proto": "http" },
+    redirect: "manual",
+  });
+  check(forwarded.status === 301,
+    "a request that reached the proxy over plain http is sent to https");
+  check((forwarded.headers.get("location") ?? "").startsWith("https://"),
+    "and sent somewhere that actually is https", forwarded.headers.get("location") ?? "");
+
+  const direct = await fetch(`${BASE}/api/auth/teacher/me`, { redirect: "manual" });
+  check(direct.status !== 301,
+    "while one that never went through a proxy is answered normally — a health check must not bounce");
 }
 
 void runCheck(main, () => {

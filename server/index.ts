@@ -123,8 +123,39 @@ const sessionStore = usePostgres
  * which serves a real production build over plain HTTP on port 5050. Redirecting
  * those would break them while protecting nobody.
  */
+/**
+ * Said once, if production is serving traffic that never came through a proxy.
+ *
+ * This is the blind spot in everything below. The session cookie is `secure:
+ * "auto"`, which means "secure when the connection is", and the redirect below
+ * keys on the proxy's header — so if a deployment's proxy does not send
+ * X-Forwarded-Proto, BOTH quietly do nothing: the cookie goes out without
+ * Secure and nothing sends anybody to HTTPS. Everything still works, which is
+ * the problem.
+ *
+ * Warning rather than refusing to serve: a school being unreachable is worse
+ * than a school being warned, and this can just as easily be a health check
+ * that legitimately arrives without the header.
+ */
+let warnedAboutProxy = false;
+
 app.use((req, res, next) => {
   const forwarded = req.headers["x-forwarded-proto"];
+
+  if (
+    process.env.NODE_ENV === "production" &&
+    !warnedAboutProxy &&
+    forwarded === undefined &&
+    !req.secure
+  ) {
+    warnedAboutProxy = true;
+    console.warn(
+      "[https] A request arrived over plain http with no X-Forwarded-Proto header. " +
+      "If that is how real visitors reach this server, login cookies are NOT being " +
+      "marked Secure and nothing is redirecting anyone to https. Check the proxy.",
+    );
+  }
+
   if (typeof forwarded === "string" && forwarded.split(",")[0].trim() === "http") {
     return res.redirect(301, `https://${req.headers.host}${req.originalUrl}`);
   }
