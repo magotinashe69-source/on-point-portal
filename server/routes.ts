@@ -358,8 +358,17 @@ export async function registerRoutes(
     req.loginSucceeded = true;
   }
 
-  // Register object storage routes for file uploads
-  registerObjectStorageRoutes(app);
+  // Register object storage routes for file uploads.
+  //
+  // The guards are handed IN rather than written in that file, so there is one
+  // definition of "a signed-in teacher or pupil" in this app rather than two
+  // that can drift apart. Uploading is for a teacher or a pupil; reading a file
+  // back also allows a parent, who has a real reason to see the photo of their
+  // own child's handwritten work.
+  registerObjectStorageRoutes(app, {
+    canUpload: requireTeacherOrStudent,
+    canRead: requireAnyLogin,
+  });
   
   // Seed database on startup
   await storage.seedInitialData();
@@ -1622,6 +1631,34 @@ export async function registerRoutes(
     const teacherId = req.session?.teacherId;
     if (!teacherId) return false;
     return Boolean(await storage.getTeacher(teacherId));
+  }
+
+  /**
+   * Anybody signed in at all — a teacher, a pupil, or a parent.
+   *
+   * This is the widest guard in the app, and it exists for exactly one thing:
+   * an uploaded FILE. A photo of a child's handwritten work is looked at by
+   * their teacher, by the child, and by their parent, and the file itself
+   * carries nothing that says which child it belongs to.
+   *
+   * Being honest about what this does and does not promise: it stops the file
+   * being readable by the whole internet, which is what it was before. It does
+   * NOT tie a file to one family the way the parent routes tie data to one
+   * child — any signed-in person holding the address can read it. Closing that
+   * properly means recording which submission an upload belongs to, which is a
+   * schema change and a bigger piece of work than this one.
+   */
+  async function requireAnyLogin(req: Request, res: Response): Promise<boolean> {
+    if (typeof req.session?.parentId === "number") {
+      if (await storage.getParent(req.session.parentId)) return true;
+    }
+    if (typeof req.session?.studentId === "number") {
+      const student = await storage.getStudent(req.session.studentId);
+      if (student && student.active) return true;
+    }
+    if (await isTeacherLoggedIn(req)) return true;
+    res.status(401).json({ success: false, ...say("notLoggedIn") });
+    return false;
   }
 
   // A draft is only visible to a logged-in teacher.
