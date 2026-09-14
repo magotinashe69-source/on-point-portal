@@ -9,6 +9,8 @@ import { LanguageProvider } from "@/lib/i18n";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/landing";
 import ComingSoon from "@/pages/coming-soon";
+import PrivacyPolicy from "@/pages/privacy";
+import TermsOfService from "@/pages/terms";
 import TeacherLogin from "@/pages/teacher/login";
 import TeacherDashboard from "@/pages/teacher/dashboard";
 import CreateAssignment from "@/pages/teacher/create-assignment";
@@ -50,6 +52,10 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Landing} />
+      {/* The Privacy Policy and Terms of Service. Public on purpose: somebody
+          deciding whether to sign in has to be able to read them first. */}
+      <Route path="/privacy" component={PrivacyPolicy} />
+      <Route path="/terms" component={TermsOfService} />
       {/* Placeholder pages for features that are not built yet. */}
       <Route path="/games">{() => <ComingSoon title="Games" message="Boss Battles and Quiz Battles are not ready yet." />}</Route>
       <Route path="/rewards">{() => <ComingSoon title="Rewards" message="Treasures and ranks are not ready yet." />}</Route>
