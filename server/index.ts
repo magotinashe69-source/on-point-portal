@@ -102,6 +102,98 @@ const sessionStore = usePostgres
   ? new (connectPgSimple(session))({ pool: pgPool as any, createTableIfMissing: false })
   : new (memorystore(session))({ checkPeriod: 24 * 60 * 60 * 1000 }); // clear expired daily
 
+// ─── Transport security and response headers ────────────────────────────────
+//
+// Written out rather than pulled in from helmet, for the same reason passwords
+// use Node's own scrypt: it is a dozen lines, every one of them readable, and
+// it is one less dependency to install, audit and have `npm audit` complain
+// about on a school laptop.
+//
+// These run BEFORE the session and the routes, so they cover every answer the
+// server gives — the API, the React page, and an uploaded file alike.
+
+/**
+ * Send people to HTTPS, and tell their browser to stop asking.
+ *
+ * Deliberately keyed on X-Forwarded-Proto being PRESENT and saying http, not
+ * on `NODE_ENV === "production"` alone. The header is set by the proxy the app
+ * runs behind in production; a request that arrives without one is not coming
+ * through that proxy at all — it is a health check, or `npm run check:offline:pwa`,
+ * which serves a real production build over plain HTTP on port 5050. Redirecting
+ * those would break them while protecting nobody.
+ */
+app.use((req, res, next) => {
+  const forwarded = req.headers["x-forwarded-proto"];
+  if (typeof forwarded === "string" && forwarded.split(",")[0].trim() === "http") {
+    return res.redirect(301, `https://${req.headers.host}${req.originalUrl}`);
+  }
+
+  // Only worth sending once the connection is actually secure — and only then
+  // is it safe: a browser that is told this over http has no way to check it.
+  if (req.secure) {
+    res.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  }
+
+  // A browser must not guess a type from the bytes. This is the other half of
+  // the uploaded-file fix: it is what stops a file we have declared is not
+  // HTML being rendered as HTML anyway.
+  res.set("X-Content-Type-Options", "nosniff");
+  // Nothing here should ever be framed by another site.
+  res.set("X-Frame-Options", "DENY");
+  // Do not leak the address of a page — which can name a pupil or a submission
+  // id — to anything the page links out to.
+  res.set("Referrer-Policy", "same-origin");
+  // The app asks for no camera, microphone or location, so say so.
+  res.set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), interest-cohort=()");
+
+  next();
+});
+
+/**
+ * The Content Security Policy — production only.
+ *
+ * Not in development because Vite's dev server needs inline scripts, `eval` for
+ * hot reloading, and a websocket to a port of its own. A policy loose enough
+ * for that would be loose enough to be worth nothing, and the thing it protects
+ * against is a stranger reaching the school's real address, not localhost.
+ *
+ * Two entries are worth explaining rather than being taken on trust:
+ *
+ *  - `script-src 'self'` with NO 'unsafe-inline'. This is the one that matters,
+ *    and it is only possible because client/index.html has no inline script —
+ *    just a module tag. Adding one would silently break the app in production
+ *    only, which is the worst place to find out, so don't.
+ *  - `style-src` DOES allow 'unsafe-inline', because React sets inline styles
+ *    and the chart component injects a <style> tag. An injected stylesheet is a
+ *    far smaller problem than injected script, and removing it would mean
+ *    rewriting how the UI is styled.
+ *
+ * The Google Fonts pair is there because index.html loads the school's
+ * typefaces from them; drop the <link> and these can go.
+ */
+if (process.env.NODE_ENV === "production") {
+  const CSP = [
+    "default-src 'self'",
+    "base-uri 'self'",
+    "object-src 'none'",
+    "frame-ancestors 'none'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' data: https://fonts.gstatic.com",
+    "img-src 'self' data: blob:",
+    "media-src 'self' blob:",
+    "worker-src 'self'",
+    "manifest-src 'self'",
+    "connect-src 'self'",
+    "form-action 'self'",
+  ].join("; ");
+
+  app.use((_req, res, next) => {
+    res.set("Content-Security-Policy", CSP);
+    next();
+  });
+}
+
 app.use(
   session({
     store: sessionStore,
