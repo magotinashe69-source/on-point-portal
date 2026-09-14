@@ -182,7 +182,7 @@ async function main() {
   // on the account the browser is about to use.
   const child = new Session();
   must((await child.post("/api/auth/student/login", {
-    fullName: pupil.fullName, password: CHILD_PASSWORD,
+    fullName: pupil.fullName, password: pupil.firstLoginCode, newPassword: CHILD_PASSWORD,
   })).body?.success || null, "the pupil's login");
 
   /** What the SCHOOL has, asked over HTTP — never through the browser. */

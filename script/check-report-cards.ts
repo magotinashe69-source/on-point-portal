@@ -129,7 +129,7 @@ async function main() {
     if (!sessions[tag]) {
       sessions[tag] = new Session();
       await sessions[tag].post("/api/auth/student/login", {
-        fullName: kids[tag].fullName, password: "reportpw123",
+        fullName: kids[tag].fullName, password: kids[tag].firstLoginCode, newPassword: "reportpw123",
       });
     }
     await sessions[tag].post("/api/submissions", {

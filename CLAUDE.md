@@ -1414,11 +1414,11 @@ supplies the words** — so a refusal names WHAT HAPPENED and the browser looks
 that name up:
 
 ```
-{ success: false, code: "notOnClassList", message: "That name is not on the class list. …" }
+{ success: false, code: "studentNotFound", message: "Student not found" }
 ```
 
 * `shared/server-messages.ts` — `SERVER_TEXT`, every sentence the server can
-  say, with a name. `say("notOnClassList")` returns the pair above, and is
+  say, with a name. `say("studentNotFound")` returns the pair above, and is
   spread into the reply: `res.status(404).json({ success: false, ...say("studentNotFound") })`.
 * `t.server` — the same names, in the reader's language. `SERVER_TEXT` is spread
   into `en.ts`, so English has one source and `npm run check` demands the
@@ -1540,13 +1540,67 @@ script/
   creates a real server-side session (cookie-based). Protected teacher routes
   require this session.
 - **Student login** (`POST /api/auth/student/login`): student enters their **name**
-  (full name or first name, case-insensitive) plus a password. On first login the
-  password they type becomes their saved password. A master password also grants
-  admin access.
+  (full name, or a first name no other active pupil shares — case-insensitive)
+  plus a password. A pupil with **no password yet** signs in with the one-time
+  code their teacher was shown, and chooses their password in the same step. A
+  master password also grants admin access.
 - **Parent login** (`POST /api/auth/parent/login`): username + password, both set
   by the teacher when the account is created. Usernames are stored and compared
   in lower case. Rate limited, and every failure gives the same message so the
   form cannot be used to discover which usernames exist.
+
+### A pupil's first sign-in — the one-time code
+
+A pupil starts with no password. Signing in used to SET one to whatever was
+typed, so anybody who knew a child's name — and got there before the child did —
+owned that child's account, and could lock the child out of it.
+
+Now adding a pupil (`POST /api/students`) or pressing reset
+(`POST /api/students/:id/reset-password`) issues an eight-character code, shown
+to the teacher **once**, in a dialog on the register, and never again:
+
+- **Stored as a hash** in `students.first_login_code`, with `hashPassword()`,
+  so reading the database does not hand the codes over. It is stripped from
+  every reply that carries a pupil, exactly like the password.
+- **Only valid while the pupil has no password.** Choosing one clears it —
+  `updateStudentPassword()` does that, so it holds for every way a password
+  gets set — which makes a code single-use. A reset issues a new code, and the
+  old one stops working.
+- **Typed forgivingly.** `normaliseFirstLoginCode()` ignores case, dashes and
+  spaces, and `newFirstLoginCode()` leaves out 0/O and 1/I/L, because a child
+  copies it off a slip of paper.
+- **Nobody is signed in on the code alone.** The right code without a
+  `newPassword` answers `choosePassword: true` and creates no session; the
+  login page then shows two more boxes, and the second request sets the
+  password and signs in.
+
+**Pupils who already had no password when this landed** cannot sign in by name
+until a teacher resets them to get a code. Card login and the master password
+are unaffected.
+
+### One answer for every failed pupil sign-in
+
+An unknown name, a pupil who has left, a wrong password and a missing or wrong
+code all get `nameOrPasswordWrong`. The form used to say "not on the class
+list" for a stranger's name but "wrong password" for a real one, which let
+anybody find out which children are enrolled.
+
+### A first name two pupils share opens neither account
+
+`getStudentByName()` takes a full name outright, and a first name alone only
+when exactly **one active** pupil has it. It used to take whichever came first
+in the table, so with two Tendais one child could land in the other's account —
+or set that child's first password. Two pupils with an identical full name match
+neither, and sign in by card.
+
+### A login always starts a new session
+
+`setSessionRole()` calls `req.session.regenerate()` before writing the role, so
+every login is given a new session id. Without it an id learned before a login
+was still good after it: on a shared classroom computer a pupil copies their
+cookie, the teacher signs in at the same browser, and the copied id is now a
+teacher's session. That is why it is `async`, and every login `await`s it.
+
 ### Passwords
 
 Stored as an **scrypt hash**, never as the person typed them —
@@ -1576,8 +1630,9 @@ people arrive.
 The consequence, which is worth saying out loud: **an account whose owner never
 signs in again keeps its plain password for ever.** There is no way around that
 short of resetting it. If the school wants the plain rows gone by a date, the
-remaining accounts have to be reset — `resetStudentPassword()` clears a pupil's,
-and they set a new one on their next sign-in.
+remaining accounts have to be reset — `resetStudentPassword()` clears a pupil's
+and issues a one-time code, and they choose a new password when they sign in
+with it.
 
 Both comparisons are timing-safe, including the legacy one: `===` stops at the
 first character that differs, and how long that takes is a measurement of how
@@ -1719,9 +1774,21 @@ Two things keep that check honest:
 It was proved to fail: an unguarded route planted in `routes.ts` is reported by
 file and line, and the file restored afterwards.
 
+It proves the first sign-in: a name alone claims nothing and is answered like a
+stranger's; the code is stored as a hash; the right code asks for a password
+without signing anybody in; it is accepted however it is typed; it works once;
+and a reset replaces it. It proves a shared first name opens neither account,
+that the register a teacher's screen loads carries no codes and no hashes, that
+a login hands out a new session id and the old one stops working, and that an
+upload cannot be written twice, or to an address the server never issued. And
+in a real browser: the teacher presses reset and reads the code off the
+register, and a child types it into the login page, is told in words when the
+password they choose is too short or typed differently twice, and lands on
+their dashboard signed in with what they chose.
+
 Finally the headers, and that the HTTPS redirect fires on a forwarded request
 but **not** on one that never went through a proxy — a health check must not
-bounce. 54 checks, and it needs a server running (`npm run dev`).
+bounce. 93 checks, and it needs a server running (`npm run dev`).
 
 ### Uploaded files
 
@@ -1737,7 +1804,7 @@ script cannot read them — but it is running **on the school's origin**, and th
 session cookie rides along on every request it makes from there. **An SVG counts
 as HTML for this purpose**, because it can carry `<script>`.
 
-Four rules now:
+Five rules now:
 
 1. **You must be signed in.** Uploading is for a teacher or a pupil; reading a
    file back also allows a parent, who has a real reason to see a photo of their
@@ -1752,6 +1819,11 @@ Four rules now:
    from the bytes.
 4. **25MB cap**, counted as bytes arrive rather than trusting a `Content-Length`
    the caller also writes. A full disk takes the whole portal down.
+5. **An upload is written once.** The file is opened with `wx` — create it, or
+   fail if it is already there — and only an address shaped like the ids step 1
+   hands out is accepted. Before, any signed-in pupil holding the address of
+   another child's photographed work could write their own bytes over it. An
+   upload that stops part way removes only the file that same request created.
 
 **What this does NOT promise**, and it is worth being plain about: any signed-in
 person holding the address can read any file. Tying a file to one family the way

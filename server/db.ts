@@ -220,6 +220,9 @@ const STUDENTS_ADDED_COLUMNS: { name: string; type: string }[] = [
   // Card login needs a way to stop a card working. Defaults true so every
   // pupil already on the register keeps working exactly as before.
   { name: "active", type: "BOOLEAN NOT NULL DEFAULT true" },
+  // The hashed one-time code for a first sign-in. Nullable, no default:
+  // nobody has one until a teacher adds or resets them.
+  { name: "first_login_code", type: "TEXT" },
 ];
 
 // Columns added to submissions after it first shipped, for offline hand-in.

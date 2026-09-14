@@ -29,8 +29,8 @@ export const SERVER_TEXT = {
   passwordChanged: "Your password has been changed.",
 
   // --- Signing in ---
-  notOnClassList: "That name is not on the class list. Enter your name exactly as your teacher registered it.",
-  wrongPassword: "That password is not correct. Check it and try again.",
+  nameOrPasswordWrong: "That name and password do not match. Check both and try again. First time signing in? Type the code your teacher gave you as your password.",
+  chooseYourPassword: "That code is right. Now choose your own password.",
   wrongEmailOrPassword: "That email and password do not match. Check both and try again.",
   wrongUsernameOrPassword: "That username and password do not match. Check both and try again.",
   tooManyAttempts: "Too many attempts. Wait a few minutes and try again.",
@@ -140,7 +140,7 @@ export const SERVER_TEXT = {
 
   // --- Things that went right ---
   deadlineExtended: "Deadline extended successfully",
-  passwordReset: "Password reset. Student will set a new password on next login.",
+  passwordReset: "Password reset. Give the pupil the code shown: they sign in with it and choose a new password.",
   streakFreezeUsed: "Your streak freeze kept your streak going.",
 
   // --- When we are at fault ---

@@ -93,7 +93,7 @@ async function main() {
   }
 
   const pupil = new Session();
-  const pupilLogin = await pupil.post("/api/auth/student/login", { fullName: child.fullName, password: "gamepw123" });
+  const pupilLogin = await pupil.post("/api/auth/student/login", { fullName: child.fullName, password: child.firstLoginCode, newPassword: "gamepw123" });
   check(pupilLogin.body?.success === true, "the pupil can log in");
 
   // Playing a round is now what records it. The server marks and saves each
@@ -415,7 +415,7 @@ async function main() {
   })).body?.student;
   if (formChild) onCleanup(`pupil ${formChild.studentId}`, () => teacher.delete(`/api/students/${formChild.id}`));
   const formPupil = new Session();
-  await formPupil.post("/api/auth/student/login", { fullName: formChild.fullName, password: "formpw123" });
+  await formPupil.post("/api/auth/student/login", { fullName: formChild.fullName, password: formChild.firstLoginCode, newPassword: "formpw123" });
   const formPlays = await formPupil.get(`/api/students/${formChild.id}/plays`);
   const formBlast = await formPupil.post(`/api/students/${formChild.id}/blaster/start`);
   const formPenalty = await formPupil.get(`/api/students/${formChild.id}/penalty/subjects`);

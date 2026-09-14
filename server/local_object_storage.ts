@@ -56,6 +56,15 @@ const UPLOAD_DIR = path.resolve(process.cwd(), "uploads");
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 
 /**
+ * The shape of an upload address, as step 1 hands them out (a random UUID).
+ *
+ * Checked on the way in so that the id is never anything else: not "../x", not
+ * a name somebody made up, and not "<id>.type" — which is where a file's
+ * content type is kept, and would otherwise be writable as if it were a file.
+ */
+const UPLOAD_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
  * Types that a browser cannot be tricked into executing.
  *
  * Deliberately a list of what IS allowed rather than a list of what is banned:
@@ -132,9 +141,28 @@ export function registerObjectStorageRoutes(
   app.put("/api/uploads/local/:id", async (req: Request, res: Response) => {
     if (!(await guards.canUpload(req, res))) return;
 
-    const id = path.basename(String(req.params.id)); // basename blocks sneaky paths like "../"
+    // Only an address step 1 could have handed out. Anything else is refused
+    // outright rather than tidied into a filename.
+    const id = String(req.params.id);
+    if (!UPLOAD_ID.test(id)) {
+      return res.status(400).json({ success: false, error: "That is not an upload address." });
+    }
     const filePath = path.join(UPLOAD_DIR, id);
-    const writeStream = fs.createWriteStream(filePath);
+
+    // "wx" means: create the file, and FAIL if it is already there.
+    //
+    // Without it this route wrote over whatever was stored at that address. Any
+    // signed-in pupil holding the address of somebody else's upload — a photo
+    // of another child's handwritten work, a teacher's lesson recording — could
+    // replace it with their own bytes. An upload is written once, never again.
+    const writeStream = fs.createWriteStream(filePath, { flags: "wx" });
+
+    // Whether THIS request created the file, and whether it got to the end.
+    // Only a file this request created and did not finish is ever removed —
+    // never one that was already there.
+    let created = false;
+    let finished = false;
+    writeStream.on("open", () => { created = true; });
 
     // Count the bytes as they arrive rather than trusting a Content-Length
     // header, which the caller also writes and can simply understate.
@@ -147,18 +175,29 @@ export function registerObjectStorageRoutes(
         tooBig = true;
         req.unpipe(writeStream);
         writeStream.destroy();
-        fs.rm(filePath, { force: true }, () => {
-          if (!res.headersSent) {
-            res.status(413).json({ success: false, error: "That file is too big." });
-          }
-        });
+        if (!res.headersSent) {
+          res.status(413).json({ success: false, error: "That file is too big." });
+        }
         req.destroy();
       }
+    });
+
+    // The connection dropped part way through. Stop writing, so the half a file
+    // is cleared away below and the browser's retry to the same address works.
+    req.on("close", () => {
+      if (!req.complete && !finished) writeStream.destroy();
+    });
+
+    // A file this request created but did not finish — too big, or cut off —
+    // is not an upload, so it does not stay on the disk.
+    writeStream.on("close", () => {
+      if (created && !finished) fs.rm(filePath, { force: true }, () => {});
     });
 
     req.pipe(writeStream);
 
     writeStream.on("finish", () => {
+      finished = true;
       if (tooBig) return;
       const claimed = String(req.headers["content-type"] || "application/octet-stream");
       // Store what we are prepared to serve, not what we were told.
@@ -166,8 +205,15 @@ export function registerObjectStorageRoutes(
       res.json({ success: true });
     });
 
-    writeStream.on("error", (err) => {
+    writeStream.on("error", (err: NodeJS.ErrnoException) => {
       if (tooBig) return; // destroying the stream ourselves is not a failure
+      if (err.code === "EEXIST") {
+        // Something is already stored here. It is left exactly as it is.
+        if (!res.headersSent) {
+          res.status(409).json({ success: false, error: "Something has already been uploaded to that address." });
+        }
+        return;
+      }
       console.error("Upload write error:", err);
       if (!res.headersSent) {
         res.status(500).json({ error: "Failed to save file" });

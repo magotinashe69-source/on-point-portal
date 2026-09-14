@@ -106,7 +106,7 @@ async function main() {
 
   const pupil = new Session();
   const pupilLogin = await pupil.post("/api/auth/student/login", {
-    fullName: child.fullName, password: "keypw1234",
+    fullName: child.fullName, password: child.firstLoginCode, newPassword: "keypw1234",
   });
   check(pupilLogin.body?.success === true, "the pupil can log in", JSON.stringify(pupilLogin.body).slice(0, 120));
 

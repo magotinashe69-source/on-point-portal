@@ -11,7 +11,13 @@
 //     find out who is on the register;
 //   * a password is never stored as the person typed it, and one stored that way
 //     before is turned into a hash the moment its owner next signs in;
-//   * somebody can change their own password, and only their own.
+//   * somebody can change their own password, and only their own;
+//   * a new pupil's account cannot be claimed by typing their name: the first
+//     sign-in needs the one-time code their teacher was given;
+//   * a first name two pupils share opens neither account;
+//   * a login always starts a new session, so an id learned before it is
+//     worth nothing after it;
+//   * an upload is written once, and never over somebody else's.
 //
 // Everything here uses made-up accounts. That is not tidiness — the limiter's
 // budget is keyed on the name being tried, so using a real one would lock a
@@ -19,7 +25,8 @@
 // after this one sign in as the teacher.
 
 import { onCleanup, runCheck } from "./cleanup";
-import { readFileSync } from "node:fs";
+import { readFileSync, rmSync } from "node:fs";
+import { join } from "node:path";
 import { Browser } from "./chrome";
 import { en } from "../client/src/lib/i18n/en";
 import { db, ensureSchema } from "../server/db";
@@ -159,7 +166,7 @@ async function main() {
   const unknownName = await post("/api/auth/student/login",
     { fullName: `Definitely Not Enrolled ${stamp}`, password: "x1234567" });
   check(unknownName.body?.success === false, "an unknown name is refused");
-  check(unknownName.body?.code === "notOnClassList",
+  check(unknownName.body?.code === "nameOrPasswordWrong",
     "with the same answer a real pupil's wrong password gets", String(unknownName.body?.code));
 
   const unknownTeacher = await post("/api/auth/teacher/login",
@@ -189,10 +196,56 @@ async function main() {
   } as any);
   onCleanup(`pupil ${pupil.id}`, () => storage.deleteStudent(pupil.id));
 
-  // A pupil sets their own password the first time they sign in.
-  const firstLogin = await post("/api/auth/student/login",
+  // =======================================================================
+  section("A new pupil's account cannot be claimed by typing their name");
+  // =======================================================================
+  //
+  // A pupil starts with no password. Signing in by name used to SET one to
+  // whatever was typed — so anybody who knew a child's name, and got there
+  // before the child did, owned that child's account. The first sign-in now
+  // needs the one-time code the teacher was shown.
+
+  const nameOnly = await post("/api/auth/student/login",
     { fullName: pupil.fullName, password: PASSWORD });
-  check(firstLogin.body?.success === true, "a pupil's first sign-in sets their password");
+  check(nameOnly.body?.success !== true,
+    "knowing a new pupil's name is not enough to get into their account");
+  check(nameOnly.body?.code === "nameOrPasswordWrong",
+    "and it is answered exactly as a name that is not on the register", String(nameOnly.body?.code));
+  check((await storage.getStudent(pupil.id))?.password == null,
+    "nothing was written to the child's account");
+
+  const CODE = await storage.resetStudentPassword(pupil.id);
+  const withCode = await storage.getStudent(pupil.id);
+  check(isHashed(withCode?.firstLoginCode), "the teacher's code is stored as a hash, like a password");
+  check(!String(withCode?.firstLoginCode).includes(CODE.replace("-", "")),
+    "and the code itself appears nowhere in what is stored");
+
+  const codeOnly = await postWithCookie("/api/auth/student/login",
+    { fullName: pupil.fullName, password: CODE });
+  check(codeOnly.res.body?.choosePassword === true,
+    "the right code asks the pupil to choose their own password", JSON.stringify(codeOnly.res.body));
+  check(codeOnly.res.body?.success !== true && codeOnly.cookie === "",
+    "without signing anybody in until they have");
+
+  const wrongCode = await post("/api/auth/student/login",
+    { fullName: pupil.fullName, password: "ABCD-EFGH", newPassword: PASSWORD });
+  check(wrongCode.body?.success !== true && wrongCode.body?.code === "nameOrPasswordWrong",
+    "a wrong code is refused, with that same answer", String(wrongCode.body?.code));
+
+  // Typed the way children type it — lower case, a space for the dash — with
+  // the password they want sent in the same step.
+  const firstLogin = await post("/api/auth/student/login",
+    { fullName: pupil.fullName, password: CODE.toLowerCase().replace("-", " "), newPassword: PASSWORD });
+  check(firstLogin.body?.success === true,
+    "with the code, however it is typed, the pupil signs in and sets their own password",
+    JSON.stringify(firstLogin.body?.code));
+
+  const codeAgain = await post("/api/auth/student/login",
+    { fullName: pupil.fullName, password: CODE, newPassword: `taken-over-${stamp}` });
+  check(codeAgain.body?.success !== true,
+    "the code works once — it cannot be used again to take the account off them");
+  check((await storage.getStudent(pupil.id))?.firstLoginCode == null,
+    "choosing a password cleared the code from the account");
 
   const afterFirst = await storage.getStudent(pupil.id);
   check(isHashed(afterFirst?.password),
@@ -208,6 +261,9 @@ async function main() {
   const wrongOne = await post("/api/auth/student/login",
     { fullName: pupil.fullName, password: PASSWORD + "-no" });
   check(wrongOne.body?.success === false, "while a wrong password is still refused");
+  check(wrongOne.body?.code === "nameOrPasswordWrong",
+    "with the same answer a name not on the register gets — the form cannot tell a stranger who is enrolled",
+    String(wrongOne.body?.code));
 
   // =======================================================================
   section("A password stored before any of this existed");
@@ -518,6 +574,232 @@ async function main() {
   const direct = await fetch(`${BASE}/api/auth/teacher/me`, { redirect: "manual" });
   check(direct.status !== 301,
     "while one that never went through a proxy is answered normally — a health check must not bounce");
+  // =======================================================================
+  section("Two pupils with the same first name");
+  // =======================================================================
+  //
+  // A first name on its own used to open whichever pupil came first in the
+  // table. With two in a class, one child could land in the other's account —
+  // or set that child's first password.
+
+  const twinFirst = `Twinname${stamp}`;
+  const twinA = await storage.createStudent({
+    studentId: `SECA-${stamp}`, fullName: `${twinFirst} Alpha`, gender: "Male", form: "Stage 3",
+  } as any);
+  onCleanup(`pupil ${twinA.id}`, () => storage.deleteStudent(twinA.id));
+  const twinB = await storage.createStudent({
+    studentId: `SECB-${stamp}`, fullName: `${twinFirst} Beta`, gender: "Female", form: "Stage 3",
+  } as any);
+  onCleanup(`pupil ${twinB.id}`, () => storage.deleteStudent(twinB.id));
+  const twinCode = await storage.resetStudentPassword(twinA.id);
+
+  const byShared = await post("/api/auth/student/login",
+    { fullName: twinFirst, password: twinCode, newPassword: `twin-${stamp}-pw` });
+  check(byShared.body?.success !== true, "a first name two pupils share opens neither account");
+  check((await storage.getStudent(twinA.id))?.password == null &&
+        (await storage.getStudent(twinB.id))?.password == null,
+    "and sets neither child's password");
+
+  const byFull = await post("/api/auth/student/login",
+    { fullName: twinA.fullName, password: twinCode, newPassword: `twin-${stamp}-pw` });
+  check(byFull.body?.success === true, "the full name still signs the right child in",
+    JSON.stringify(byFull.body?.code));
+
+  const solo = await storage.createStudent({
+    studentId: `SECS-${stamp}`, fullName: `Soloname${stamp} Gamma`, gender: "Male", form: "Stage 3",
+  } as any);
+  onCleanup(`pupil ${solo.id}`, () => storage.deleteStudent(solo.id));
+  const soloCode = await storage.resetStudentPassword(solo.id);
+  const byUnique = await post("/api/auth/student/login",
+    { fullName: `soloname${stamp}`, password: soloCode, newPassword: `solo-${stamp}-pw` });
+  check(byUnique.body?.success === true,
+    "while a first name nobody else has still works on its own", JSON.stringify(byUnique.body?.code));
+
+  // =======================================================================
+  section("A code is shown to the teacher once, and sent nowhere else");
+  // =======================================================================
+
+  const teacherIn = await postWithCookie("/api/auth/teacher/login", TEACHER);
+  check(teacherIn.res.body?.success === true, "the teacher signs in");
+
+  const addedName = `Added By Teacher ${stamp}`;
+  const added = await post("/api/students", {
+    studentId: `SECT-${stamp}`, fullName: addedName, gender: "Female", form: "Stage 4",
+  }, teacherIn.cookie);
+  const addedId = added.body?.student?.id;
+  if (addedId) onCleanup(`pupil ${addedId}`, () => storage.deleteStudent(addedId));
+  const addedCode = String(added.body?.student?.firstLoginCode ?? "");
+  check(/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(addedCode),
+    "adding a pupil hands the teacher that pupil's first sign-in code", addedCode);
+
+  const reset = await post(`/api/students/${addedId}/reset-password`, {}, teacherIn.cookie);
+  const resetCode = String(reset.body?.firstLoginCode ?? "");
+  check(/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(resetCode) && resetCode !== addedCode,
+    "resetting a pupil hands the teacher a NEW code", resetCode);
+
+  const staleCode = await post("/api/auth/student/login",
+    { fullName: addedName, password: addedCode, newPassword: `stale-${stamp}-pw` });
+  check(staleCode.body?.success !== true, "and the code from before the reset no longer works");
+
+  const register = await fetch(`${BASE}/api/students`, { headers: { Cookie: teacherIn.cookie } });
+  const registerText = await register.text();
+  check(register.status === 200 && !registerText.includes("firstLoginCode") && !registerText.includes("scrypt$"),
+    "the register the teacher's screen loads carries no codes and no hashes", `status ${register.status}`);
+
+  // =======================================================================
+  section("A login always starts a new session");
+  // =======================================================================
+  //
+  // Writing the new role onto the session a browser already had meant an id
+  // learned BEFORE a login was still good AFTER it. On a shared classroom
+  // computer: a pupil signs in and copies their cookie, the teacher signs in at
+  // the same browser, and the copied id is now a teacher's session.
+
+  const pupilFirst = await postWithCookie("/api/auth/student/login",
+    { fullName: pupil.fullName, password: TYPED });
+  check(pupilFirst.res.body?.success === true && pupilFirst.cookie !== "",
+    "a pupil signs in on a shared computer");
+
+  const teacherAfter = await fetch(`${BASE}/api/auth/teacher/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: pupilFirst.cookie },
+    body: JSON.stringify(TEACHER),
+    redirect: "manual",
+  });
+  const teacherAfterCookie = (teacherAfter.headers.get("set-cookie") ?? "").split(";")[0];
+  check(teacherAfterCookie !== "" && teacherAfterCookie !== pupilFirst.cookie,
+    "the teacher signing in at that browser is given a NEW session id");
+
+  const copiedAsTeacher = await fetch(`${BASE}/api/auth/teacher/me`, { headers: { Cookie: pupilFirst.cookie } });
+  check(copiedAsTeacher.status === 401,
+    "so the pupil's copied id is not a teacher's session", `got ${copiedAsTeacher.status}`);
+  const copiedAsPupil = await fetch(`${BASE}/api/auth/student/me`, { headers: { Cookie: pupilFirst.cookie } });
+  check(copiedAsPupil.status === 401,
+    "and is no longer anybody's session at all", `got ${copiedAsPupil.status}`);
+  const teacherWorks = await fetch(`${BASE}/api/auth/teacher/me`, { headers: { Cookie: teacherAfterCookie } });
+  check(teacherWorks.status === 200, "while the teacher's new session works", `got ${teacherWorks.status}`);
+
+  // =======================================================================
+  section("An upload is written once, and never over somebody else's");
+  // =======================================================================
+  //
+  // The upload route used to write over whatever was at an address. Any
+  // signed-in pupil holding the address of another child's photographed work
+  // could replace it with their own bytes.
+
+  const uploader = await postWithCookie("/api/auth/student/login",
+    { fullName: pupil.fullName, password: TYPED });
+  const slot = await post("/api/uploads/request-url",
+    { name: "work.png", size: 5, contentType: "image/png" }, uploader.cookie);
+  const uploadURL = String(slot.body?.uploadURL ?? "");
+  const fileId = uploadURL.split("/").pop() ?? "";
+  check(/^[0-9a-f-]{36}$/i.test(fileId), "a pupil is handed somewhere to upload their work", uploadURL);
+  onCleanup(`upload ${fileId}`, async () => {
+    for (const name of [fileId, `${fileId}.type`]) rmSync(join("uploads", name), { force: true });
+  });
+
+  const putBytes = (url: string, bytes: string) => fetch(`${BASE}${url}`, {
+    method: "PUT",
+    headers: { "Content-Type": "image/png", Cookie: uploader.cookie },
+    body: bytes,
+  });
+
+  const firstPut = await putBytes(uploadURL, "FIRST");
+  check(firstPut.status === 200, "the upload is saved", `got ${firstPut.status}`);
+
+  const secondPut = await putBytes(uploadURL, "SECOND");
+  check(secondPut.status === 409, "uploading to that address again is refused", `got ${secondPut.status}`);
+
+  const readBack = await fetch(`${BASE}${slot.body?.objectPath}`, { headers: { Cookie: uploader.cookie } });
+  check((await readBack.text()) === "FIRST", "and the file already there is exactly as it was");
+
+  const madeUp = await putBytes("/api/uploads/local/not-an-address-we-gave-out", "X");
+  check(madeUp.status === 400, "an address the server never handed out is refused", `got ${madeUp.status}`);
+
+  await putBytes(`/api/uploads/local/${fileId}.type`, "text/html");
+  check(readFileSync(join("uploads", `${fileId}.type`), "utf8") === "image/png",
+    "and the note of a file's type cannot be written over as though it were a file");
+  // =======================================================================
+  section("The first sign-in and the teacher's code, on the screen");
+  // =======================================================================
+  //
+  // The endpoints are proved above. This is the half a person meets: the
+  // teacher can actually SEE the code, and a child can type it into the login
+  // page, choose a password and get in. A code nobody can read, or a login
+  // page with nowhere to choose a password, would lock every new pupil out.
+
+  const screenName = `Screen Child ${stamp}`;
+  const screenPupil = await storage.createStudent({
+    studentId: `SECW-${stamp}`, fullName: screenName, gender: "Female", form: "Stage 3",
+  } as any);
+  onCleanup(`pupil ${screenPupil.id}`, () => storage.deleteStudent(screenPupil.id));
+
+  // --- The teacher resets the pupil and reads the code off the register ---
+  const screens = await browser.newPage();
+  await screens.goto(`${BASE}/teacher/login`);
+  await screens.waitForTestId("input-email");
+  await screens.fill("input-email", TEACHER.email);
+  await screens.fill("input-password", TEACHER.password);
+  await screens.click("button-login");
+  await screens.waitFor(`return location.pathname === "/teacher/dashboard"`, "the teacher dashboard to open");
+
+  await screens.goto(`${BASE}/teacher/students`);
+  await screens.waitForTestId(`button-reset-${screenPupil.id}`);
+  await screens.click(`button-reset-${screenPupil.id}`);
+  await screens.waitForTestId("dialog-first-login-codes");
+  const shownCode = (await screens.textOf("text-first-login-code")).trim();
+  check(/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(shownCode),
+    "pressing reset on the register shows the teacher the pupil's code", shownCode);
+
+  await screens.click("button-first-login-codes-done");
+  await screens.waitFor(`return !document.querySelector('[data-testid="dialog-first-login-codes"]')`,
+    "the code dialog to close");
+  check(true, "and the teacher can close it once it is written down");
+
+  // --- The child types their name and that code ---
+  // Forget whoever this browser remembers first, or the login page sends us
+  // straight past itself to a dashboard.
+  await screens.waitFor(`localStorage.clear(); return true`, "the browser to forget its logins");
+  await screens.goto(`${BASE}/student/login`);
+  await screens.waitForTestId("input-fullname");
+  await screens.fill("input-fullname", screenName);
+  await screens.fill("input-password", shownCode.toLowerCase());
+  await screens.click("button-login");
+  await screens.waitForTestId("section-choose-password");
+  check(true, "a child who types their name and the code is asked to choose a password");
+
+  await screens.fill("input-choose-password", "short");
+  await screens.fill("input-choose-password-again", "short");
+  await screens.click("button-login");
+  await screens.waitFor(
+    `return document.querySelector('[data-testid="text-choose-password-problem"]')
+       ?.textContent?.includes(${JSON.stringify(en.password.tooShort)})`,
+    "the screen to say the password is too short",
+  );
+  check(true, "a password under eight characters is caught on the screen, in words");
+
+  const CHOSEN = `chosen-${stamp}-pw`;
+  await screens.fill("input-choose-password", CHOSEN);
+  await screens.fill("input-choose-password-again", `${CHOSEN}-different`);
+  await screens.click("button-login");
+  await screens.waitFor(
+    `return document.querySelector('[data-testid="text-choose-password-problem"]')
+       ?.textContent?.includes(${JSON.stringify(en.password.doNotMatch)})`,
+    "the screen to say the two do not match",
+  );
+  check(true, "and so is typing it differently the second time");
+
+  await screens.fill("input-choose-password-again", CHOSEN);
+  await screens.click("button-login");
+  await screens.waitFor(`return location.pathname === "/student/dashboard"`, "the child's dashboard to open");
+  check(true, "getting it right signs the child in and opens their dashboard");
+
+  const chosenWorks = await post("/api/auth/student/login", { fullName: screenName, password: CHOSEN });
+  check(chosenWorks.body?.success === true,
+    "and the password chosen on the SCREEN is the one that now signs them in");
+  const codeAfter = await post("/api/auth/student/login",
+    { fullName: screenName, password: shownCode, newPassword: `again-${stamp}-pw` });
+  check(codeAfter.body?.success !== true, "while the code from the screen no longer opens anything");
 }
 
 void runCheck(main, () => {

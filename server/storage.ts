@@ -1,6 +1,6 @@
 import { eq, and, inArray, or, isNull, desc, gte, lte } from "drizzle-orm";
 import { randomBytes } from "node:crypto";
-import { hashPassword } from "./passwords";
+import { hashPassword, newFirstLoginCode, normaliseFirstLoginCode } from "./passwords";
 // The database connection AND the table objects come from ./db, which picks
 // the right database (SQLite or PostgreSQL) at runtime.
 import {
@@ -70,7 +70,7 @@ export interface IStorage {
   updateStudentPassword(id: number, password: string): Promise<void>;
   updateTeacherPassword(id: number, password: string): Promise<void>;
   updateParentPassword(id: number, password: string): Promise<void>;
-  resetStudentPassword(id: number): Promise<void>;
+  resetStudentPassword(id: number): Promise<string>;
   deleteStudent(id: number): Promise<void>;
 
   // Parents
@@ -238,13 +238,21 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getStudentByName(name: string): Promise<Student | undefined> {
-    // Case-insensitive search for student by full name
+    // Case-insensitive. A full name wins outright. A first name on its own is
+    // accepted only when exactly ONE active pupil has it: with two Tendais,
+    // "tendai" used to open whichever came first in the table — the wrong
+    // child's account, or worse, set that child's first password. Two pupils
+    // with the same FULL name match neither, and sign in by card instead.
+    const wanted = name.trim().toLowerCase();
     const allStudents = await db.select().from(students);
-    const student = allStudents.find(s => 
-      s.fullName.toLowerCase() === name.toLowerCase() ||
-      s.fullName.toLowerCase().split(' ')[0] === name.toLowerCase() // Allow first name only
+
+    const byFullName = allStudents.filter(s => s.fullName.trim().toLowerCase() === wanted);
+    if (byFullName.length > 0) return byFullName.length === 1 ? byFullName[0] : undefined;
+
+    const byFirstName = allStudents.filter(s =>
+      s.active && s.fullName.trim().toLowerCase().split(" ")[0] === wanted
     );
-    return student || undefined;
+    return byFirstName.length === 1 ? byFirstName[0] : undefined;
   }
 
   async getAllStudents(): Promise<Student[]> {
@@ -279,11 +287,23 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateStudentPassword(id: number, password: string): Promise<void> {
-    await db.update(students).set({ password: await hashPassword(password) }).where(eq(students.id, id));
+    // A real password ends the first sign-in code, so a code only ever works once.
+    await db.update(students)
+      .set({ password: await hashPassword(password), firstLoginCode: null })
+      .where(eq(students.id, id));
   }
 
-  async resetStudentPassword(id: number): Promise<void> {
-    await db.update(students).set({ password: null }).where(eq(students.id, id));
+  /**
+   * Clear a pupil's password and issue the one-time code for their next first
+   * sign-in. The code is returned ONCE, for the teacher to hand over; only its
+   * hash is kept, and any code issued before this one stops working.
+   */
+  async resetStudentPassword(id: number): Promise<string> {
+    const code = newFirstLoginCode();
+    await db.update(students)
+      .set({ password: null, firstLoginCode: await hashPassword(normaliseFirstLoginCode(code)) })
+      .where(eq(students.id, id));
+    return code;
   }
 
   async updateStudent(id: number, data: Partial<InsertStudent>): Promise<Student> {
