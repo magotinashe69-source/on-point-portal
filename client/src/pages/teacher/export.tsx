@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { QueryError } from "@/components/QueryError";
 import { useAuth } from "@/lib/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -104,12 +105,12 @@ export default function TeacherExport() {
     return false;
   })();
 
-  const { data: preview, isLoading: previewLoading } = useQuery<PreviewData>({
+  const { data: preview, isLoading: previewLoading, isError: previewFailed, error: previewError, refetch: refetchPreview } = useQuery<PreviewData>({
     queryKey: ["/api/export/preview", exportType, selectedTerm, selectedForm, selectedSubject, selectedAssignmentId],
     queryFn: async () => {
       const res = await fetch(`/api/export/preview?${buildQueryParams()}`);
       if (res.status === 401) { handle401(); throw new Error("401"); }
-      if (!res.ok) throw new Error(`${res.status}`);
+      if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`);
       return res.json();
     },
     enabled: !!teacher && previewReady,
@@ -120,7 +121,7 @@ export default function TeacherExport() {
     queryFn: async () => {
       const res = await fetch("/api/export/logs");
       if (res.status === 401) { handle401(); throw new Error("401"); }
-      if (!res.ok) throw new Error(`${res.status}`);
+      if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`);
       return res.json();
     },
     enabled: !!teacher,
@@ -374,6 +375,9 @@ export default function TeacherExport() {
                 <Loader2 className="h-4 w-4 animate-spin" />
                 <span className="text-sm">{t.exportData.calculating}</span>
               </div>
+            ) : previewFailed && !sessionExpired ? (
+              // Not "nothing matches" — the count could not be asked for at all.
+              <QueryError error={previewError} what={t.errors.thing.thePreview} onRetry={() => refetchPreview()} data-testid="export-preview-error" />
             ) : preview ? (
               <div className="space-y-4">
                 <div className="grid gap-3 sm:grid-cols-3">

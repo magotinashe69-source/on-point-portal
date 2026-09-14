@@ -635,6 +635,10 @@ export const en = {
 
   /** The public front page, before anyone signs in. */
   landing: {
+    // The browser-tab title and the search-result description for the front
+    // page. landing.tsx sets them for that page only.
+    pageTitle: "On Point Education Centre — Homework & Learning Portal",
+    metaDescription: "Homework, marks and feedback for pupils of On Point Education Centre. Pupils hand in homework and see their marks, and parents follow their child's progress.",
     home: "Home",
     subjects: "Subjects",
     games: "Games",
@@ -813,6 +817,13 @@ export const en = {
     doNotMatch: "Those two do not match.",
   },
 
+  /** The page for an address that does not exist. */
+  notFoundPage: {
+    title: "We could not find that page",
+    note: "The address may have a typing mistake in it, or the page may have moved.",
+    home: "Back to the main page",
+  },
+
   errors: {
     couldNotLoad: (what: string) => `Could not load ${what}`,
     expired: "Your login has expired. Log in again to carry on.",
@@ -842,6 +853,15 @@ export const en = {
       childDetails: "your child's details",
       childGamePlays: "your child's game plays",
       restOfChildInfo: "the rest of your child's information",
+      yourCertificates: "your certificates",
+      yourCertificate: "this certificate",
+      yourTreasures: "your treasures",
+      yourGameSubjects: "your subjects",
+      thisSubmission: "this piece of work",
+      theHandIns: "the hand-ins",
+      thePreview: "the preview",
+      theQuestionBank: "the question bank",
+      theGradeBoundaries: "the grade boundaries",
     },
   },
 

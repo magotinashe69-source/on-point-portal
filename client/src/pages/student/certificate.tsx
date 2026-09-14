@@ -12,6 +12,7 @@
 import { useEffect } from "react";
 import { useLocation, Link, useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { QueryError } from "@/components/QueryError";
 import { useAuth } from "@/lib/auth";
 import { CertificateSheet } from "@/components/CertificateSheet";
 import { type Certificate } from "@shared/certificates";
@@ -31,7 +32,7 @@ export default function CertificatePage() {
     if (!student) setLocation("/student/login");
   }, [student, setLocation]);
 
-  const { data, isLoading } = useQuery<{
+  const { data, isLoading, isError, error, refetch } = useQuery<{
     success: boolean;
     certificate: Certificate;
     student: { fullName: string; form: string };
@@ -68,7 +69,13 @@ export default function CertificatePage() {
         </div>
       )}
 
-      {!isLoading && !certificate && (
+      {isError && (
+        <div className="cert-noprint">
+          <QueryError error={error} what={t.errors.thing.yourCertificate} role="student" variant="page" onRetry={() => refetch()} data-testid="certificate-load-error" />
+        </div>
+      )}
+
+      {!isLoading && !isError && !certificate && (
         <p className="cert-noprint text-center text-sm text-muted-foreground py-16" data-testid="text-no-certificate">
           That certificate could not be found.
         </p>

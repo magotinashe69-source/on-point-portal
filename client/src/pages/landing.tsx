@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import logoPath from "@assets/logo.webp";
 import { useT } from "@/lib/i18n";
@@ -81,6 +81,22 @@ export default function Landing() {
   const t = useT();
   // Tiny bit of state: whether the mobile menu is open. Kept simple.
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // The title and description a stranger's browser tab — or a search result —
+  // shows for the front page. Set here, for this page only, so they follow the
+  // language toggle; whatever was there before is put back when the visitor
+  // moves on into the app.
+  useEffect(() => {
+    const meta = document.querySelector<HTMLMetaElement>('meta[name="description"]');
+    const previousTitle = document.title;
+    const previousDescription = meta?.getAttribute("content") ?? null;
+    document.title = t.landing.pageTitle;
+    meta?.setAttribute("content", t.landing.metaDescription);
+    return () => {
+      document.title = previousTitle;
+      if (meta && previousDescription !== null) meta.setAttribute("content", previousDescription);
+    };
+  }, [t]);
 
   return (
     // Explicit light background so the page stays bright even in dark theme.
@@ -199,7 +215,7 @@ export default function Landing() {
 
               Files in client/public are served from the site root, so this
               needs no import. The image is a portrait phone screenshot
-              (725x1280), so it keeps its own shape rather than being cropped
+              (640x1130, compressed for slow connections), so it keeps its own shape rather than being cropped
               into a landscape box: w-full lets it shrink on a narrow screen,
               h-auto keeps the ratio, and max-w-xs stops it towering over the
               text column on a desktop. width/height are the real pixel
@@ -214,8 +230,8 @@ export default function Landing() {
               src="/assignment.jpeg"
               alt={t.landing.screenshotAlt}
               className="w-full h-auto max-w-xs rounded-lg border border-white/25"
-              width={725}
-              height={1280}
+              width={640}
+              height={1130}
               loading="eager"
               decoding="async"
               data-testid="hero-image"

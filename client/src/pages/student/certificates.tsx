@@ -10,6 +10,7 @@
 import { useEffect } from "react";
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { QueryError } from "@/components/QueryError";
 import { useAuth } from "@/lib/auth";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Card, CardContent } from "@/components/ui/card";
@@ -39,7 +40,7 @@ export default function CertificatesPage() {
     if (!student) setLocation("/student/login");
   }, [student, setLocation]);
 
-  const { data, isLoading } = useQuery<{ success: boolean; certificates: Certificate[] }>({
+  const { data, isLoading, isError, error, refetch } = useQuery<{ success: boolean; certificates: Certificate[] }>({
     queryKey: ["/api/students", student?.id, "certificates"],
     enabled: !!student,
   });
@@ -77,9 +78,14 @@ export default function CertificatesPage() {
           </div>
         )}
 
+        {/* A failed load must never read as "no certificates yet". */}
+        {isError && (
+          <QueryError error={error} what={t.errors.thing.yourCertificates} role="student" onRetry={() => refetch()} data-testid="certificates-load-error" />
+        )}
+
         {/* Nothing yet is an invitation, not an empty screen — the same rule the
             skills map follows. A child with no certificates has not failed. */}
-        {!isLoading && list.length === 0 && (
+        {!isLoading && !isError && list.length === 0 && (
           <Card data-testid="card-no-certificates">
             <CardContent className="py-10 text-center space-y-2">
               <Sparkles className="h-8 w-8 mx-auto text-primary" />

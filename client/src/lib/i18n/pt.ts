@@ -581,6 +581,8 @@ export const pt: Translation = {
 
 
   landing: {
+    pageTitle: "On Point Education Centre — Portal de Trabalhos de Casa e Aprendizagem",
+    metaDescription: "Trabalhos de casa, notas e comentários para os alunos do On Point Education Centre. Os alunos entregam os trabalhos e veem as suas notas, e os encarregados de educação acompanham o progresso do seu educando.",
     home: "Início",
     subjects: "Disciplinas",
     games: "Jogos",
@@ -746,6 +748,12 @@ export const pt: Translation = {
     doNotMatch: "Essas duas não coincidem.",
   },
 
+  notFoundPage: {
+    title: "Não encontrámos essa página",
+    note: "O endereço pode ter um erro de escrita, ou a página pode ter mudado de lugar.",
+    home: "Voltar à página principal",
+  },
+
   errors: {
     couldNotLoad: (what: string) => `Não foi possível carregar ${what}`,
     expired: "A sua sessão expirou. Volte a entrar para continuar.",
@@ -775,6 +783,15 @@ export const pt: Translation = {
       childDetails: "os dados do seu educando",
       childGamePlays: "as jogadas do seu educando",
       restOfChildInfo: "o resto da informação do seu educando",
+      yourCertificates: "os seus certificados",
+      yourCertificate: "este certificado",
+      yourTreasures: "os seus tesouros",
+      yourGameSubjects: "as suas disciplinas",
+      thisSubmission: "este trabalho",
+      theHandIns: "as entregas",
+      thePreview: "a pré-visualização",
+      theQuestionBank: "o banco de perguntas",
+      theGradeBoundaries: "os limites das notas",
     },
   },
 

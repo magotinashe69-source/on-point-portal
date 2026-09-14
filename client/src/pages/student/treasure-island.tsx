@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { QueryError } from "@/components/QueryError";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { XpLevelBar } from "@/components/XpLevelBar";
@@ -239,7 +240,7 @@ export default function TreasureIsland() {
     }
   }, [student, setLocation]);
 
-  const { data, isLoading } = useQuery<{ success: boolean; rewards: StudentReward[] }>({
+  const { data, isLoading, isError, error, refetch } = useQuery<{ success: boolean; rewards: StudentReward[] }>({
     queryKey: ["/api/students/" + student?.id + "/rewards"],
     enabled: !!student && isPrimaryForm(student.form),
   });
@@ -297,7 +298,9 @@ export default function TreasureIsland() {
           progressPercent={statsData?.stats.xp?.progressPercent ?? 0}
         />
 
-        {/* Progress towards collecting the whole set. */}
+        {/* Progress towards collecting the whole set. Not shown when the chests
+            could not be loaded: "0 collected" would be untrue. */}
+        {!isError && (
         <Card className="mb-6">
           <CardContent className="py-5">
             <div className="flex items-center justify-between mb-2">
@@ -309,11 +312,14 @@ export default function TreasureIsland() {
             <Progress value={percent} className="h-3" />
           </CardContent>
         </Card>
+        )}
 
         {isLoading ? (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
+        ) : isError ? (
+          <QueryError error={error} what={t.errors.thing.yourTreasures} role="student" onRetry={() => refetch()} data-testid="treasure-load-error" />
         ) : (
           <>
             {/* The island map — the winding trail with all 12 treasure spots. */}
