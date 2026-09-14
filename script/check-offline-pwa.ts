@@ -224,7 +224,7 @@ async function main() {
 
   const child = new Session();
   must((await child.post("/api/auth/student/login", {
-    fullName: pupil.fullName, password: CHILD_PASSWORD,
+    fullName: pupil.fullName, password: pupil.firstLoginCode, newPassword: CHILD_PASSWORD,
   })).body?.success || null, "the pupil's login");
 
   async function submissionsAtSchool(): Promise<any[]> {

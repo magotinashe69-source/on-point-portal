@@ -334,6 +334,15 @@ export default function Landing() {
               Teacher Login
             </Link>
           </div>
+          <div className="flex items-center justify-center gap-4 mt-3">
+            <Link href="/privacy" className="text-xs text-black/50 hover:underline" data-testid="link-privacy-policy">
+              Privacy Policy
+            </Link>
+            <span className="text-black/20">|</span>
+            <Link href="/terms" className="text-xs text-black/50 hover:underline" data-testid="link-terms-of-service">
+              Terms of Service
+            </Link>
+          </div>
         </div>
       </footer>
     </div>

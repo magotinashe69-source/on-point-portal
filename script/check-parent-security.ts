@@ -478,7 +478,7 @@ async function main() {
 
     const pupil = new Session("pupil");
     await pupil.post("/api/auth/student/login", {
-      fullName: gamesChild.fullName, password: "playspw123",
+      fullName: gamesChild.fullName, password: gamesChild.firstLoginCode, newPassword: "playspw123",
     });
     await pupil.post("/api/submissions", {
       assignmentId: paper.id, studentId: gamesChild.id,

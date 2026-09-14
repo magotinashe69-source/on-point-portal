@@ -202,7 +202,7 @@ async function main() {
     JSON.stringify(Object.entries(created).map(([k, v]) => `${k}:${!!v}`)));
 
   const pupil = new Session();
-  await pupil.post("/api/auth/student/login", { fullName: child.fullName, password: "masterypw1" });
+  await pupil.post("/api/auth/student/login", { fullName: child.fullName, password: child.firstLoginCode, newPassword: "masterypw1" });
 
   for (const m of made) {
     const a = created[m.key];
@@ -275,7 +275,7 @@ async function main() {
   if (fresh) {
     onCleanup(`pupil ${fresh.studentId}`, () => teacher.delete(`/api/students/${fresh.id}`));
     const freshPupil = new Session();
-    await freshPupil.post("/api/auth/student/login", { fullName: fresh.fullName, password: "masterypw2" });
+    await freshPupil.post("/api/auth/student/login", { fullName: fresh.fullName, password: fresh.firstLoginCode, newPassword: "masterypw2" });
     const emptyRes = await freshPupil.get(`/api/students/${fresh.id}/mastery`);
     check(emptyRes.body?.success === true, "a pupil who has done nothing still gets an answer");
     check(emptyRes.body?.mastery?.hasEnough === false,
@@ -296,7 +296,7 @@ async function main() {
   if (other) {
     onCleanup(`pupil ${other.studentId}`, () => teacher.delete(`/api/students/${other.id}`));
     const otherPupil = new Session();
-    await otherPupil.post("/api/auth/student/login", { fullName: other.fullName, password: "masterypw3" });
+    await otherPupil.post("/api/auth/student/login", { fullName: other.fullName, password: other.firstLoginCode, newPassword: "masterypw3" });
     const peek = await otherPupil.get(`/api/students/${child.id}/mastery`);
     check(peek.status === 403 || peek.status === 401,
       "one pupil cannot read another pupil's map", `got ${peek.status}`);
@@ -356,7 +356,7 @@ async function main() {
 
     const sessionFor = async (kid: any, password: string) => {
       const sess = new Session();
-      await sess.post("/api/auth/student/login", { fullName: kid.fullName, password });
+      await sess.post("/api/auth/student/login", { fullName: kid.fullName, password: kid.firstLoginCode, newPassword: password });
       return sess;
     };
     const aSess = await sessionFor(kidA, "classpw1");

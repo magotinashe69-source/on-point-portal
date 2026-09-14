@@ -26,7 +26,7 @@ import { onCleanup, runCheck } from "./cleanup";
 
 const BASE = "http://localhost:5000";
 const TEACHER = { email: "onpointeducationcentremoza@gmail.com", password: "onpoint123" };
-const CHILD_PASSWORD = "lang123";
+const CHILD_PASSWORD = "lang12345";
 
 let passed = 0;
 let failed = 0;
@@ -189,7 +189,7 @@ async function main() {
   // First login sets the pupil's password.
   const child = new Session();
   must((await child.post("/api/auth/student/login", {
-    fullName: pupil.fullName, password: CHILD_PASSWORD,
+    fullName: pupil.fullName, password: pupil.firstLoginCode, newPassword: CHILD_PASSWORD,
   })).body?.success || null, "the pupil's login");
 
   const browser = await Browser.launch();
@@ -449,10 +449,10 @@ async function main() {
     password: "whatever123",
   });
   check(refused.body?.success === false, "the server refuses a name that is not on the register");
-  check(refused.body?.code === "notOnClassList",
+  check(refused.body?.code === "nameOrPasswordWrong",
     "and names what happened, rather than only saying it",
     `code ${refused.body?.code}`);
-  check(refused.body?.message === en.server.notOnClassList,
+  check(refused.body?.message === en.server.nameOrPasswordWrong,
     "the English sentence still travels beside it, for anything that is not our app",
     refused.body?.message);
 
@@ -465,13 +465,13 @@ async function main() {
   await page.click("button-login");
 
   const refusalShown = await waitUntil(
-    async () => (await page.bodyText()).includes(pt.server.notOnClassList),
+    async () => (await page.bodyText()).includes(pt.server.nameOrPasswordWrong),
     15000,
   );
   const afterRefusal = await page.bodyText();
   check(refusalShown, "and a family reading Portuguese is refused in Portuguese",
-    `looked for "${pt.server.notOnClassList}"`);
-  check(!afterRefusal.includes(en.server.notOnClassList),
+    `looked for "${pt.server.nameOrPasswordWrong}"`);
+  check(!afterRefusal.includes(en.server.nameOrPasswordWrong),
     "with the English sentence nowhere on the screen");
 
   // A form's own complaint takes the same route: the schema carries the name of

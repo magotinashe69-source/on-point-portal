@@ -2,7 +2,7 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { storage } from "./storage";
-import { sameString, verifyPassword } from "./passwords";
+import { sameString, verifyPassword, isHashed, normaliseFirstLoginCode } from "./passwords";
 import { masterPassword } from "./master-password";
 import { registerObjectStorageRoutes } from "./local_object_storage";
 import {
@@ -346,10 +346,20 @@ export async function registerRoutes(
   // the other two, so a browser can never hold a parent identity and a student
   // or teacher identity side by side — which is what "a parent gets only a
   // parent session, never student or teacher access" means in practice.
-  function setSessionRole(
+  //
+  // A login also gets a brand NEW session id, rather than writing the new role
+  // onto whatever session the browser already had. Without that, a session id
+  // somebody learned BEFORE the login is still good AFTER it: on a shared
+  // classroom computer a pupil signs in, copies their cookie and walks away,
+  // the teacher signs in at the same browser — and the copied id is now a
+  // teacher's session.
+  async function setSessionRole(
     req: Request,
     role: { teacherId?: number; studentId?: number; parentId?: number },
   ) {
+    await new Promise<void>((resolve, reject) =>
+      req.session.regenerate((err) => (err ? reject(err) : resolve())),
+    );
     req.session.teacherId = role.teacherId;
     req.session.studentId = role.studentId;
     req.session.parentId = role.parentId;
@@ -358,8 +368,17 @@ export async function registerRoutes(
     req.loginSucceeded = true;
   }
 
-  // Register object storage routes for file uploads
-  registerObjectStorageRoutes(app);
+  // Register object storage routes for file uploads.
+  //
+  // The guards are handed IN rather than written in that file, so there is one
+  // definition of "a signed-in teacher or pupil" in this app rather than two
+  // that can drift apart. Uploading is for a teacher or a pupil; reading a file
+  // back also allows a parent, who has a real reason to see the photo of their
+  // own child's handwritten work.
+  registerObjectStorageRoutes(app, {
+    canUpload: requireTeacherOrStudent,
+    canRead: requireAnyLogin,
+  });
   
   // Seed database on startup
   await storage.seedInitialData();
@@ -545,7 +564,7 @@ export async function registerRoutes(
       if (teacherPassword.needsUpgrade) await storage.updateTeacherPassword(teacher.id, password);
 
       // Establish server-side session
-      setSessionRole(req, { teacherId: teacher.id });
+      await setSessionRole(req, { teacherId: teacher.id });
       
       const { password: _, ...safeTeacher } = teacher;
       res.json({ success: true, teacher: safeTeacher });
@@ -633,9 +652,9 @@ export async function registerRoutes(
 
       // A scan makes you the pupil and nothing else. Any teacher session on
       // this browser is dropped rather than carried alongside.
-      setSessionRole(req, { studentId: student.id });
+      await setSessionRole(req, { studentId: student.id });
 
-      const { password: _pw, ...safeStudentRow } = student;
+      const { password: _pw, firstLoginCode: _code, ...safeStudentRow } = student;
       res.json({ success: true, student: safeStudentRow });
     } catch (error) {
       console.error("Scan login error:", error);
@@ -655,7 +674,7 @@ export async function registerRoutes(
     if (!student) {
       return res.status(401).json({ success: false, ...say("notLoggedIn") });
     }
-    const { password: _pw, ...safeStudentRow } = student;
+    const { password: _pw, firstLoginCode: _code, ...safeStudentRow } = student;
     res.json({ success: true, student: safeStudentRow });
   });
 
@@ -677,24 +696,31 @@ export async function registerRoutes(
       
       const { fullName, password } = validation.data;
       
+      // ONE answer for every way this can fail: a name not on the register, a
+      // pupil who has left, a wrong password, a missing or wrong first sign-in
+      // code. It used to say "not on the class list" for a stranger's name but
+      // "wrong password" for a real one — so the form told anybody which
+      // children are enrolled here.
+      const refuse = () => res.json({ success: false, ...say("nameOrPasswordWrong") });
+
       const student = await storage.getStudentByName(fullName);
       
       if (!student) {
-        return res.json({ success: false, ...say("notOnClassList") });
+        return refuse();
       }
 
       // Deactivating a pupil has to close every way in, not just the card.
       // Same wording as an unknown name, so the form cannot be used to work
       // out who is on the register.
       if (!student.active) {
-        return res.json({ success: false, ...say("notOnClassList") });
+        return refuse();
       }
       
       // Never send the stored password back to the client (matches the
       // teacher handler, which strips it too).
       const safe = (s: typeof student | undefined) => {
         if (!s) return s;
-        const { password: _pw, ...rest } = s;
+        const { password: _pw, firstLoginCode: _code, ...rest } = s;
         return rest;
       };
 
@@ -703,17 +729,34 @@ export async function registerRoutes(
       // server/master-password.ts.
       const master = masterPassword();
       if (master && sameString(password, master)) {
-        setSessionRole(req, { studentId: student.id });
+        await setSessionRole(req, { studentId: student.id });
         res.json({ success: true, student: safe(student), isMasterAccess: true });
         return;
       }
 
-      // Check if student has set a password yet
+      // No password yet: the first sign-in.
+      //
+      // This used to SET the password to whatever was typed, so anybody who
+      // knew a child's name, and got there before the child, owned the account.
+      // Now it needs the one-time code the teacher was shown when the pupil was
+      // added or reset, and the pupil chooses their own password in the same
+      // step. Choosing it clears the code, so a code works once.
       if (!student.password) {
-        // First time login - set the password
-        await storage.updateStudentPassword(student.id, password);
+        const codeOk =
+          isHashed(student.firstLoginCode) &&
+          (await verifyPassword(normaliseFirstLoginCode(password), student.firstLoginCode)).ok;
+        if (!codeOk) return refuse();
+
+        const { newPassword } = validation.data;
+        if (!newPassword) {
+          // The code is right: ask for the password they want. Nobody is
+          // signed in until the account has a password of its own.
+          return res.json({ success: false, choosePassword: true, ...say("chooseYourPassword") });
+        }
+
+        await storage.updateStudentPassword(student.id, newPassword);
         const updatedStudent = await storage.getStudent(student.id);
-        setSessionRole(req, { studentId: student.id });
+        await setSessionRole(req, { studentId: student.id });
         res.json({ success: true, student: safe(updatedStudent), isFirstLogin: true });
         return;
       }
@@ -722,10 +765,10 @@ export async function registerRoutes(
       const studentPassword = await verifyPassword(password, student.password);
       if (studentPassword.needsUpgrade) await storage.updateStudentPassword(student.id, password);
       if (!studentPassword.ok) {
-        return res.json({ success: false, ...say("wrongPassword") });
+        return refuse();
       }
 
-      setSessionRole(req, { studentId: student.id });
+      await setSessionRole(req, { studentId: student.id });
       res.json({ success: true, student: safe(student) });
     } catch (error) {
       console.error("Student login error:", error);
@@ -791,7 +834,7 @@ export async function registerRoutes(
 
       // A parent login makes you a parent and nothing else: any teacher or
       // student session on this browser is dropped rather than kept alongside.
-      setSessionRole(req, { parentId: parent.id });
+      await setSessionRole(req, { parentId: parent.id });
 
       res.json({ success: true, parent: safeParent(parent) });
     } catch (error) {
@@ -1344,9 +1387,9 @@ export async function registerRoutes(
   // -------------------------------------------------------------------------
 
   /** A stored password must never leave the server, whoever is asking. */
-  function safeStudent<T extends Record<string, any>>(s: T): Omit<T, "password"> {
-    const { password: _pw, ...rest } = s;
-    return rest as Omit<T, "password">;
+  function safeStudent<T extends Record<string, any>>(s: T): Omit<T, "password" | "firstLoginCode"> {
+    const { password: _pw, firstLoginCode: _code, ...rest } = s;
+    return rest as Omit<T, "password" | "firstLoginCode">;
   }
   const safeStudents = <T extends Record<string, any>>(list: T[]) => list.map(safeStudent);
 
@@ -1518,7 +1561,11 @@ export async function registerRoutes(
         qrCode,
         role: validation.data.role || "student",
       });
-      res.json({ success: true, student: safeStudent(student) });
+      // A new pupil has no password, so they get the one-time code for their
+      // first sign-in. It travels with the pupil it belongs to, to the teacher
+      // who added them, this once.
+      const firstLoginCode = await storage.resetStudentPassword(student.id);
+      res.json({ success: true, student: { ...safeStudent(student), firstLoginCode } });
     } catch (error) {
       console.error("Create student error:", error);
       res.status(500).json({ success: false, ...say("serverError") });
@@ -1604,8 +1651,11 @@ export async function registerRoutes(
         return res.status(404).json({ success: false, ...say("studentNotFound") });
       }
       
-      await storage.resetStudentPassword(id);
-      res.json({ success: true, ...say("passwordReset") });
+      // A reset issues a fresh one-time code: the pupil signs in with their name
+      // and that code, then chooses a new password. The teacher sees the code
+      // now and never again — only its hash is kept.
+      const firstLoginCode = await storage.resetStudentPassword(id);
+      res.json({ success: true, ...say("passwordReset"), firstLoginCode });
     } catch (error) {
       console.error("Reset password error:", error);
       res.status(500).json({ success: false, ...say("serverError") });
@@ -1622,6 +1672,34 @@ export async function registerRoutes(
     const teacherId = req.session?.teacherId;
     if (!teacherId) return false;
     return Boolean(await storage.getTeacher(teacherId));
+  }
+
+  /**
+   * Anybody signed in at all — a teacher, a pupil, or a parent.
+   *
+   * This is the widest guard in the app, and it exists for exactly one thing:
+   * an uploaded FILE. A photo of a child's handwritten work is looked at by
+   * their teacher, by the child, and by their parent, and the file itself
+   * carries nothing that says which child it belongs to.
+   *
+   * Being honest about what this does and does not promise: it stops the file
+   * being readable by the whole internet, which is what it was before. It does
+   * NOT tie a file to one family the way the parent routes tie data to one
+   * child — any signed-in person holding the address can read it. Closing that
+   * properly means recording which submission an upload belongs to, which is a
+   * schema change and a bigger piece of work than this one.
+   */
+  async function requireAnyLogin(req: Request, res: Response): Promise<boolean> {
+    if (typeof req.session?.parentId === "number") {
+      if (await storage.getParent(req.session.parentId)) return true;
+    }
+    if (typeof req.session?.studentId === "number") {
+      const student = await storage.getStudent(req.session.studentId);
+      if (student && student.active) return true;
+    }
+    if (await isTeacherLoggedIn(req)) return true;
+    res.status(401).json({ success: false, ...say("notLoggedIn") });
+    return false;
   }
 
   // A draft is only visible to a logged-in teacher.

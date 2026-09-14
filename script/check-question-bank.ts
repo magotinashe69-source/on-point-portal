@@ -573,7 +573,7 @@ async function main() {
         if (learner) {
           const pupil = new Session();
           await pupil.post("/api/auth/student/login", {
-            fullName: learner.fullName, password: "bankpw123",
+            fullName: learner.fullName, password: learner.firstLoginCode, newPassword: "bankpw123",
           });
           const handIn = await pupil.post("/api/submissions", {
             assignmentId: paper.id, studentId: learner.id,

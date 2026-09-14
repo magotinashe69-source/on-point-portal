@@ -30,7 +30,7 @@
  * assuming today's.
  */
 
-import { createHash, randomBytes, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes, randomInt, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 
 /**
@@ -143,4 +143,39 @@ export function sameString(a: string, b: string): boolean {
   const left = createHash("sha256").update(a, "utf8").digest();
   const right = createHash("sha256").update(b, "utf8").digest();
   return timingSafeEqual(left, right);
+}
+
+/**
+ * The one-time code for a pupil's first sign-in.
+ *
+ * A pupil starts with no password. Signing in by name used to set one to
+ * whatever was typed, so anybody who knew a child's name owned their account
+ * until the child got there first. Now the teacher is shown this code when the
+ * pupil is added or reset, and the first sign-in needs it.
+ *
+ * Eight characters with the look-alikes taken out (no 0/O, no 1/I/L), because
+ * a child copies it off a slip of paper. That is 31^8, about 850 billion codes,
+ * against a login limit of ten tries per name every five minutes.
+ *
+ * Stored hashed with hashPassword(), exactly like a password, so reading the
+ * database does not hand the codes over either.
+ */
+const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+const CODE_LENGTH = 8;
+
+/** A new code, shown as ABCD-EFGH so it is easy to read out and copy. */
+export function newFirstLoginCode(): string {
+  let code = "";
+  for (let i = 0; i < CODE_LENGTH; i++) {
+    code += CODE_ALPHABET[randomInt(CODE_ALPHABET.length)];
+  }
+  return code.slice(0, 4) + "-" + code.slice(4);
+}
+
+/**
+ * What a typed code is compared as: capitals, with the dash and any spaces
+ * taken out. A child who types "abcd efgh" has typed the code.
+ */
+export function normaliseFirstLoginCode(typed: string): string {
+  return typed.toUpperCase().replace(/[^A-Z0-9]/g, "");
 }

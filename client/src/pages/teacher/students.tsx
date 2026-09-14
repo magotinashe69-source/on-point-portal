@@ -123,6 +123,9 @@ export default function StudentManagement() {
   const [pasteForm, setPasteForm] = useState<"Stage 3" | "Stage 4" | "Stage 5" | "Stage 6" | "Form 1" | "Form 2">("Form 1");
   const [pasteGender, setPasteGender] = useState<"Male" | "Female">("Male");
   const [pasteBusy, setPasteBusy] = useState(false);
+  // First sign-in codes just issued, to show the teacher once. The server keeps
+  // only a hash, so once this dialog closes nobody can read them again.
+  const [issuedCodes, setIssuedCodes] = useState<{ fullName: string; code: string }[]>([]);
 
 
   useEffect(() => {
@@ -211,6 +214,9 @@ export default function StudentManagement() {
       if (data.success) {
         queryClient.invalidateQueries({ queryKey: ["/api/students"] });
         toast({ title: t.register.studentAdded });
+        if (data.student?.firstLoginCode) {
+          setIssuedCodes([{ fullName: data.student.fullName, code: data.student.firstLoginCode }]);
+        }
         setIsAddDialogOpen(false);
         setNewStudent({ studentId: "", qrCode: "", fullName: "", gender: "Male", form: "Form 1" });
       } else {
@@ -252,10 +258,14 @@ export default function StudentManagement() {
       const response = await apiRequest("POST", `/api/students/${id}/reset-password`);
       return response.json();
     },
-    onSuccess: (data) => {
+    onSuccess: (data, id) => {
       if (data.success) {
         queryClient.invalidateQueries({ queryKey: ["/api/students"] });
         toast({ title: t.register.passwordReset, description: t.register.passwordResetNote });
+        if (data.firstLoginCode) {
+          const fullName = students.find(s => s.id === id)?.fullName ?? "";
+          setIssuedCodes([{ fullName, code: data.firstLoginCode }]);
+        }
       } else {
         toast({ title: t.register.passwordNotReset, description: serverMessage(t, data), variant: "destructive" });
       }
@@ -333,6 +343,7 @@ export default function StudentManagement() {
     const ids = nextIdsForBatch(pasteForm, rows.length);
     let added = 0;
     const failed: string[] = [];
+    const codes: { fullName: string; code: string }[] = [];
 
     for (let i = 0; i < rows.length; i++) {
       try {
@@ -343,7 +354,12 @@ export default function StudentManagement() {
           form: pasteForm,
         });
         const data = await response.json();
-        if (data.success) added++;
+        if (data.success) {
+          added++;
+          if (data.student?.firstLoginCode) {
+            codes.push({ fullName: rows[i].fullName, code: data.student.firstLoginCode });
+          }
+        }
         else failed.push(rows[i].fullName);
       } catch {
         failed.push(rows[i].fullName);
@@ -364,6 +380,7 @@ export default function StudentManagement() {
       ].filter(Boolean).join(" ") || "Everyone on the list was added.",
       variant: failed.length > 0 ? "destructive" : undefined,
     });
+    if (codes.length > 0) setIssuedCodes(codes);
   };
 
   // The account already linked to the child whose dialog is open, if any.
@@ -1113,6 +1130,34 @@ export default function StudentManagement() {
               >
                 {updateMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 Save Changes
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        {/* First sign-in codes. Shown once: the server keeps only a hash, so
+            closing this is the last time anybody can read them. */}
+        <Dialog open={issuedCodes.length > 0} onOpenChange={(open) => { if (!open) setIssuedCodes([]); }}>
+          <DialogContent data-testid="dialog-first-login-codes">
+            <DialogHeader>
+              <DialogTitle>{t.register.firstLoginCodeTitle}</DialogTitle>
+              <DialogDescription>{t.register.firstLoginCodesNote}</DialogDescription>
+            </DialogHeader>
+            <ul className="space-y-2 max-h-[60vh] overflow-y-auto">
+              {issuedCodes.map((item) => (
+                <li
+                  key={item.fullName + item.code}
+                  className="flex items-center justify-between gap-4 rounded-md border px-3 py-2"
+                >
+                  <span>{item.fullName}</span>
+                  <span className="font-mono text-lg tracking-wider select-all" data-testid="text-first-login-code">
+                    {item.code}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <DialogFooter>
+              <Button onClick={() => setIssuedCodes([])} data-testid="button-first-login-codes-done">
+                {t.register.firstLoginCodeDone}
               </Button>
             </DialogFooter>
           </DialogContent>

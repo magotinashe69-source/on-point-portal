@@ -34,6 +34,7 @@ export const students = sqliteTable("students", {
   gender: text("gender").notNull(),
   form: text("form").notNull(),
   password: text("password"), // set by the student on first login
+  firstLoginCode: text("first_login_code"), // one-time code for a first sign-in, hashed
   role: text("role").notNull().default("student"),
   active: integer("active", { mode: "boolean" }).notNull().default(true),
   createdAt: timestamp("created_at").notNull().$defaultFn(() => new Date()),
@@ -378,6 +379,7 @@ CREATE TABLE IF NOT EXISTS students (
   gender TEXT NOT NULL,
   form TEXT NOT NULL,
   password TEXT,
+  first_login_code TEXT,
   role TEXT NOT NULL DEFAULT 'student',
   active INTEGER NOT NULL DEFAULT 1,
   created_at INTEGER NOT NULL

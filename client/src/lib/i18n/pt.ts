@@ -90,8 +90,11 @@ export const pt: Translation = {
     studentNotUpdated: "O aluno não foi atualizado",
     studentRemoved: "Aluno removido",
     passwordReset: "Palavra-passe reposta",
-    passwordResetNote: "O aluno define uma nova palavra-passe da próxima vez que entrar.",
+    passwordResetNote: "Dê ao aluno o código mostrado. O aluno entra com esse código e escolhe uma nova palavra-passe.",
     passwordNotReset: "A palavra-passe não foi reposta",
+    firstLoginCodeTitle: "Códigos de primeira entrada",
+    firstLoginCodesNote: "Dê a cada aluno o seu próprio código. O aluno entra com o nome e o código e depois escolhe a sua própria palavra-passe. Os códigos só são mostrados agora e cada um funciona uma vez.",
+    firstLoginCodeDone: "Já os anotei",
 
     weeklyReport: "Relatório semanal",
     weekOf: (week: string) => `Semana de ${week}. Copie e envie ao encarregado de educação.`,
@@ -823,8 +826,10 @@ export const pt: Translation = {
       passwordPlaceholder: "Introduza a sua palavra-passe",
       scanCard: "Digitalizar cartão QR para entrar",
       cardNotRecognised: "Cartão não reconhecido. Peça ao seu professor para o verificar.",
-      firstTime: "É a primeira vez? Introduza o seu nome tal como está registado e crie uma palavra-passe.",
+      firstTime: "É a primeira vez? Introduza o seu nome e escreva, como palavra-passe, o código que o seu professor lhe deu. Depois escolha a sua própria palavra-passe.",
       passwordSet: "A sua palavra-passe ficou definida. Use-a da próxima vez que entrar.",
+      choosePasswordTitle: "Escolha a sua palavra-passe",
+      choosePasswordNote: "O seu código está certo. Agora escolha a palavra-passe que vai usar daqui em diante.",
       welcome: (firstName: string) => `Bem-vindo, ${firstName}`,
       welcomeBack: (fullName: string) => `Bem-vindo de volta, ${fullName}!`,
       invalidCredentials: "Dados de acesso incorretos",
@@ -1090,8 +1095,8 @@ export const pt: Translation = {
     passwordChanged: "A sua palavra-passe foi alterada.",
 
     // Iniciar sessão
-    notOnClassList: "Esse nome não está na lista da turma. Escreva o seu nome tal como o seu professor o registou.",
-    wrongPassword: "Essa palavra-passe não está correta. Verifique-a e tente novamente.",
+    nameOrPasswordWrong: "Esse nome e essa palavra-passe não correspondem. Verifique os dois e tente novamente. É a primeira vez que entra? Escreva, como palavra-passe, o código que o seu professor lhe deu.",
+    chooseYourPassword: "O código está certo. Agora escolha a sua própria palavra-passe.",
     wrongEmailOrPassword: "Esse correio eletrónico e essa palavra-passe não correspondem. Verifique os dois e tente novamente.",
     wrongUsernameOrPassword: "Esse nome de utilizador e essa palavra-passe não correspondem. Verifique os dois e tente novamente.",
     tooManyAttempts: "Demasiadas tentativas. Espere alguns minutos e tente novamente.",
@@ -1201,7 +1206,7 @@ export const pt: Translation = {
 
     // Coisas que correram bem
     deadlineExtended: "Prazo alargado com sucesso",
-    passwordReset: "Palavra-passe reposta. O aluno define uma nova da próxima vez que entrar.",
+    passwordReset: "Palavra-passe reposta. Dê ao aluno o código mostrado: o aluno entra com ele e escolhe uma nova palavra-passe.",
     streakFreezeUsed: "O teu congelamento manteve a tua sequência.",
 
     // Quando a culpa é nossa

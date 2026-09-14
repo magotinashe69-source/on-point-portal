@@ -74,7 +74,7 @@ async function main() {
   onCleanup(`pupil ${child.studentId}`, () => teacher.delete(`/api/students/${child.id}`));
 
   const pupil = new Session();
-  await pupil.post("/api/auth/student/login", { fullName: child.fullName, password: "certpw1234" });
+  await pupil.post("/api/auth/student/login", { fullName: child.fullName, password: child.firstLoginCode, newPassword: "certpw1234" });
 
   // =======================================================================
   section("Perfect Score");
@@ -221,7 +221,7 @@ async function main() {
   if (other) {
     onCleanup(`pupil ${other.studentId}`, () => teacher.delete(`/api/students/${other.id}`));
     const otherPupil = new Session();
-    await otherPupil.post("/api/auth/student/login", { fullName: other.fullName, password: "certpw5678" });
+    await otherPupil.post("/api/auth/student/login", { fullName: other.fullName, password: other.firstLoginCode, newPassword: "certpw5678" });
     const peek = await otherPupil.get(`/api/students/${child.id}/certificates`);
     check(peek.status === 403 || peek.status === 401,
       "one pupil cannot read another pupil's certificates", `got ${peek.status}`);

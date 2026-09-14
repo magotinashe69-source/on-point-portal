@@ -288,7 +288,7 @@ async function main() {
 
   const child = new Session();
   const childLogin = await child.post("/api/auth/student/login", {
-    fullName: pupil.fullName, password: "offline123",
+    fullName: pupil.fullName, password: pupil.firstLoginCode, newPassword: "offline123",
   });
   check(childLogin.body?.success === true, "the pupil can sign in");
 
@@ -413,7 +413,7 @@ async function main() {
 
   // A device id is not a password.
   const thief = new Session();
-  await thief.post("/api/auth/student/login", { fullName: other.fullName, password: "offline123" });
+  await thief.post("/api/auth/student/login", { fullName: other.fullName, password: other.firstLoginCode, newPassword: "offline123" });
   const stealAttempt = await thief.post("/api/submissions", {
     assignmentId: paper.id, studentId: other.id, answers,
     clientSubmissionId: deviceId, completedAt: finishedAt,
