@@ -9,6 +9,7 @@ import { registerWellKnown } from "./well_known";
 import { createServer } from "http";
 import { randomBytes } from "node:crypto";
 import { pgPool, usePostgres, ensureSchema } from "./db";
+import { say } from "@shared/server-messages";
 
 const app = express();
 app.set("trust proxy", 1);
@@ -245,7 +246,16 @@ app.use((req, res, next) => {
     const duration = Date.now() - start;
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
+
+      // The BODY of the answer is logged in development only.
+      //
+      // It is genuinely useful while working, and it is the wrong thing to
+      // write down on a running school: these bodies are children's names,
+      // their marks and their teacher's comments, and a log is copied about,
+      // shipped to whatever collects it, and kept long after the screen it was
+      // drawn on. The line above — method, path, status, duration — is what a
+      // production log actually needs.
+      if (capturedJsonResponse && process.env.NODE_ENV !== "production") {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
 
@@ -266,17 +276,38 @@ app.use((req, res, next) => {
   // is never swallowed by the catch-all that returns the React page.
   registerWellKnown(app);
 
+  // The last line of defence: anything a route threw without catching.
+  //
+  // It used to answer with `err.message`, whatever that happened to be. A
+  // thrown database error names tables and columns; a file error names paths on
+  // the server; a driver error can carry a fragment of the query. None of that
+  // is any use to a teacher, and all of it is useful to somebody probing the
+  // app — so in production the details go to the log and a plain sentence goes
+  // to the screen.
+  //
+  // `err.expose` is the http-errors convention: true when a message was written
+  // deliberately to be read by whoever made the request (a 400 saying which
+  // field is wrong), false for anything that merely escaped. Using the flag
+  // rather than guessing from the status code means a route that raises a
+  // deliberate, translated 4xx still reads properly.
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
 
+    // The full error, always, wherever the server's logs go.
     console.error("Internal Server Error:", err);
 
     if (res.headersSent) {
       return next(err);
     }
 
-    return res.status(status).json({ message });
+    const inProduction = process.env.NODE_ENV === "production";
+    const safeToShow = !inProduction || err.expose === true;
+
+    if (safeToShow && err.message) {
+      return res.status(status).json({ success: false, message: err.message });
+    }
+    // say() so this reads in the family's language like every other refusal.
+    return res.status(status).json({ success: false, ...say("serverError") });
   });
 
   // importantly only setup vite in development and after
