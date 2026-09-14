@@ -15,6 +15,8 @@ import { useAuth } from "@/lib/auth";
 import { QrBackfillDialog } from "@/components/QrBackfillDialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { QueryError } from "@/components/QueryError";
+import { AdminOnly } from "@/components/AdminOnly";
+import { staffRoleOf } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ArrowLeft, PlusCircle, Pencil, Trash2, KeyRound, Loader2, Users, ClipboardPaste, QrCode, UserPlus, MessageSquare, Copy, Check } from "lucide-react";
@@ -387,6 +389,10 @@ export default function StudentManagement() {
   const existingParent = parentForStudent ? parentFor(parentForStudent.id) : undefined;
 
   if (!teacher) return null;
+  // The whole screen is for administrators. The server refuses every change made
+  // from it to anybody else; this only spares a teacher who typed the address a
+  // screen full of buttons that would all be refused.
+  if (staffRoleOf(teacher) !== "teacher_admin") return <AdminOnly />;
 
   return (
     <div className="min-h-screen bg-background">

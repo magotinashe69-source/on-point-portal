@@ -38,6 +38,16 @@ export const SERVER_TEXT = {
   notLoggedIn: "You are not logged in. Log in and try again.",
   notLoggedInTeacher: "You are not logged in as a teacher. Log in and try again.",
   notLoggedInParent: "You are not logged in as a parent. Log in and try again.",
+  awaitingApproval: "Your account is awaiting approval by the school. You can sign in once an administrator has approved it.",
+  teacherRequestRejected: "The school has not approved this account. If you think that is a mistake, speak to the school office.",
+  teacherEmailTaken: "There is already an account with that email. Sign in instead, or speak to the school office.",
+
+  // --- Staff ---
+  adminOnly: "Only the school's administrators can do that.",
+  staffNotFound: "That staff account was not found.",
+  cannotRejectAdmin: "An administrator's account cannot be rejected.",
+  approveBeforeClasses: "Approve the teacher before giving them classes.",
+  notAClass: "Choose classes from the school's own list.",
 
   // --- Cards ---
   cardNotRecognised: "Card not recognised. Ask your teacher to check it.",

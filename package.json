@@ -17,6 +17,7 @@
     "check:reports": "tsx script/check-report-cards.ts",
     "check:offline": "tsx script/check-offline.ts",
     "check:security": "tsx script/check-security.ts",
+    "check:staff": "tsx script/check-staff.ts",
     "check:language": "tsx script/check-language.ts",
     "backfill:feedback": "tsx script/backfill-feedback.ts",
     "backup:db": "tsx script/backup-db.ts",

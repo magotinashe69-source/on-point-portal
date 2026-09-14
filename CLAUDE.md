@@ -35,6 +35,72 @@ There are **three roles**:
 
 (An admin/master-password override also exists for teacher-level access.)
 
+### Staff roles — administrators and teachers
+
+Two kinds of staff account, and every rule here is enforced on the **server**:
+
+| | `teacher_admin` | `teacher` |
+|---|---|---|
+| Question Bank, assignments, submissions, marks, **marking**, announcements, reports, exports | yes | yes |
+| Add, edit or remove pupils; reset a pupil's sign-in | yes | **no — 403** |
+| QR cards: link or edit one, look a pupil up by card, or even be sent a card code | yes | **no** |
+| Parent accounts: list, create, edit, delete | yes | **no — 403** |
+| Approve or reject staff, assign classes (`/teacher/staff`) | yes | **no — 403** |
+
+- **`requireTeacherAdmin`** in `server/routes.ts` guards every management route
+  and every `/api/staff` route: 401 for nobody signed in, 403 with `adminOnly`
+  for a teacher who is. All the other teacher guards now accept only an
+  **approved** account, read fresh on every request (`signedInTeacher`), so an
+  account that is rejected stops working on its very next request.
+- **Asking to join** — `POST /api/auth/teacher/register` (rate limited per
+  address) creates a `teacher` account with `approval_status = "pending"`. The
+  login refuses it with `awaitingApproval` (or `teacherRequestRejected`) — but
+  only once the password has been checked, so the form cannot be used to find out
+  who has asked to join — and creates no session.
+- **Classes** — `assigned_classes` on the teacher's own row, set on the Staff
+  screen. Organisational for now: nothing is restricted by class yet.
+- **A card code is a credential.** `GET /api/students` and `/api/students/:id`
+  leave `qrCode` out for a teacher who is not an administrator
+  (`cardsForAdminsOnly`). Names and classes are still sent, because assignments,
+  the Grade Book and the reports need them.
+- **An administrator cannot be rejected** from the Staff screen, so the school
+  cannot lock itself out.
+- **The screens** — the dashboard hides Manage Students and Staff from a teacher,
+  and `/teacher/students` and `/teacher/staff` show `<AdminOnly />` when the
+  address is typed. That is tidiness; the server is the lock.
+
+**The migration has no default, on purpose.** `staff_role`, `approval_status`
+and `assigned_classes` were added nullable with no default. Every account that
+existed before reads NULL, and `staffRoleOf()` / `approvalOf()` in
+`shared/schema.ts` read NULL as an approved `teacher_admin` — so the school's
+accounts kept their access without a single row being rewritten. A column
+default would have been written into those rows too (by the `ALTER`, or by
+`db:push` on deploy), and a default of `"teacher"` would have quietly demoted
+the head teacher.
+
+The price of that, and the rule to keep: **every insert must say what kind of
+account it is.** `storage.createTeacher()` requires `staffRole` and
+`approvalStatus` and throws without them. Any value other than exactly
+`"teacher_admin"` or `"approved"` is read the safe way — as a regular teacher,
+and as pending — never as more access.
+
+### Proving it — `npm run check:staff`
+
+`script/check-staff.ts`, against a running server, straight from the database,
+and in a real browser. A teacher asks to join and is proved pending, hashed,
+told it awaits approval, unable to sign in and given nothing — and a wrong
+password is refused the ordinary way. An administrator approves it and gives it
+classes. The approved teacher adds a bank question, creates and edits an
+assignment, reads submissions and marks, marks work and sends a message that the
+pupil's parent then reads — and is refused fourteen management requests with
+403, with the pupil, the parent and its own classes read back unchanged, and is
+never sent a card code. The source is read to assert every management route
+names `requireTeacherAdmin`. The administrator marks and manages. Then in a real
+browser: register, be told it is waiting, the administrator approves it and
+ticks a class, the teacher's dashboard hides the management cards, and typing
+their addresses shows "administrators only". Finally the account is rejected and
+its live session is refused on the next request. 99 checks.
+
 ### The parent safety rule
 
 A parent must never reach another child's data, however they edit the address
@@ -1538,7 +1604,8 @@ script/
 
 - **Teacher login** (`POST /api/auth/teacher/login`): checks email + password, then
   creates a real server-side session (cookie-based). Protected teacher routes
-  require this session.
+  require this session. An account awaiting approval, or rejected, is refused
+  before any session exists — see "Staff roles".
 - **Student login** (`POST /api/auth/student/login`): student enters their **name**
   (full name, or a first name no other active pupil shares — case-insensitive)
   plus a password. A pupil with **no password yet** signs in with the one-time

@@ -22,6 +22,9 @@ export const teachers = sqliteTable("teachers", {
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
   role: text("role").notNull().default("teacher"),
+  staffRole: text("staff_role"),           // NULL = from before staff roles: an administrator
+  approvalStatus: text("approval_status"), // NULL = from before approval: approved
+  assignedClasses: text("assigned_classes", { mode: "json" }).$type<string[]>(),
   createdAt: timestamp("created_at").notNull().$defaultFn(() => new Date()),
 });
 
@@ -368,6 +371,9 @@ CREATE TABLE IF NOT EXISTS teachers (
   email TEXT NOT NULL UNIQUE,
   password TEXT NOT NULL,
   role TEXT NOT NULL DEFAULT 'teacher',
+  staff_role TEXT,
+  approval_status TEXT,
+  assigned_classes TEXT,
   created_at INTEGER NOT NULL
 );
 

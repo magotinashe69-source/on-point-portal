@@ -225,6 +225,18 @@ const STUDENTS_ADDED_COLUMNS: { name: string; type: string }[] = [
   { name: "first_login_code", type: "TEXT" },
 ];
 
+// Columns added to teachers for staff roles. All three are nullable with NO
+// default, and that IS the migration: every account that already exists reads
+// NULL, which staffRoleOf() and approvalOf() in shared/schema.ts treat as an
+// approved administrator — exactly the access it had. A default would be
+// written into those rows too (by this ALTER, or by `db:push` on deploy), and
+// a default of "teacher" would quietly demote the head teacher.
+const TEACHERS_ADDED_COLUMNS: { name: string; type: string }[] = [
+  { name: "staff_role", type: "TEXT" },
+  { name: "approval_status", type: "TEXT" },
+  { name: "assigned_classes", type: "JSONB" },
+];
+
 // Columns added to submissions after it first shipped, for offline hand-in.
 // Both are nullable on purpose: every submission already in the database was
 // handed in with a connection, so it has neither a device id nor an arrival
@@ -269,6 +281,9 @@ if (usePostgres) {
     }
     for (const col of STUDENTS_ADDED_COLUMNS) {
       await pgPoolInstance!.query(`ALTER TABLE students ADD COLUMN IF NOT EXISTS ${col.name} ${col.type}`);
+    }
+    for (const col of TEACHERS_ADDED_COLUMNS) {
+      await pgPoolInstance!.query(`ALTER TABLE teachers ADD COLUMN IF NOT EXISTS ${col.name} ${col.type}`);
     }
     for (const col of SUBMISSIONS_ADDED_COLUMNS) {
       await pgPoolInstance!.query(`ALTER TABLE submissions ADD COLUMN IF NOT EXISTS ${col.name} ${col.type}`);
@@ -319,6 +334,12 @@ if (usePostgres) {
       // SQLite stores booleans as 0/1, so swap the PostgreSQL wording here.
       const type = col.type.replace("BOOLEAN", "INTEGER").replace("true", "1").replace("false", "0");
       try { await client.execute(`ALTER TABLE assignments ADD COLUMN ${col.name} ${type}`); }
+      catch { /* column already present */ }
+    }
+    for (const col of TEACHERS_ADDED_COLUMNS) {
+      // SQLite has no JSONB — the list is held as TEXT, as the other JSON columns are.
+      const type = col.type.replace("JSONB", "TEXT");
+      try { await client.execute(`ALTER TABLE teachers ADD COLUMN ${col.name} ${type}`); }
       catch { /* column already present */ }
     }
     for (const col of STUDENTS_ADDED_COLUMNS) {

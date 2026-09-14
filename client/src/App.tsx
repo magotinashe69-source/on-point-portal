@@ -12,6 +12,8 @@ import ComingSoon from "@/pages/coming-soon";
 import PrivacyPolicy from "@/pages/privacy";
 import TermsOfService from "@/pages/terms";
 import TeacherLogin from "@/pages/teacher/login";
+import TeacherRegister from "@/pages/teacher/register";
+import StaffPage from "@/pages/teacher/staff";
 import TeacherDashboard from "@/pages/teacher/dashboard";
 import CreateAssignment from "@/pages/teacher/create-assignment";
 import AssignmentDetail from "@/pages/teacher/assignment-detail";
@@ -60,6 +62,8 @@ function Router() {
       <Route path="/games">{() => <ComingSoon title="Games" message="Boss Battles and Quiz Battles are not ready yet." />}</Route>
       <Route path="/rewards">{() => <ComingSoon title="Rewards" message="Treasures and ranks are not ready yet." />}</Route>
       <Route path="/teacher/login" component={TeacherLogin} />
+      <Route path="/teacher/register" component={TeacherRegister} />
+      <Route path="/teacher/staff" component={StaffPage} />
       <Route path="/teacher/dashboard" component={TeacherDashboard} />
       <Route path="/teacher/assignments/new" component={CreateAssignment} />
       <Route path="/teacher/assignments/:id/edit" component={CreateAssignment} />

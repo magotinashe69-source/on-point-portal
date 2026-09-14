@@ -7,13 +7,17 @@ import { masterPassword } from "./master-password";
 import { registerObjectStorageRoutes } from "./local_object_storage";
 import {
   teacherLoginSchema,
+  teacherRegisterSchema,
+  formEnum,
+  staffRoleOf,
+  approvalOf,
   studentLoginSchema,
   parentLoginSchema,
   changePasswordSchema,
   createParentAccountSchema,
   updateParentAccountSchema,
 } from "@shared/schema";
-import type { Assignment, Submission, Student } from "@shared/schema";
+import type { Assignment, Submission, Student, Teacher, StaffMember } from "@shared/schema";
 import { say, validationText } from "@shared/server-messages";
 import { isPrimaryForm } from "@shared/schema";
 import { isFullyAutoMarked, markSubmission, markAnswer, buildFeedback, feedbackFor, isAutoMarkable } from "@shared/auto-marking";
@@ -541,6 +545,50 @@ export async function registerRoutes(
   });
 
   // Teacher login
+  // Asking to join as a teacher.
+  //
+  // Anybody can ask, which is exactly why the account this creates can do
+  // NOTHING: it is a regular "teacher" (never an administrator), it is
+  // "pending", and the login refuses a pending account before any session
+  // exists. An administrator approves it on the Staff screen. Limited per
+  // address, so the form cannot be used to flood the staff list.
+  const teacherRegisterLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    limit: 10,
+    standardHeaders: "draft-7",
+    legacyHeaders: false,
+    message: { success: false, ...say("tooManyAttempts") },
+    keyGenerator: (req) => ipKeyGenerator(req.ip ?? ""),
+  });
+
+  app.post("/api/auth/teacher/register", teacherRegisterLimiter, async (req, res) => {
+    try {
+      const validation = validateRequest(teacherRegisterSchema, req.body);
+      if (!validation.success) {
+        return res.json({ success: false, message: validation.error });
+      }
+      const email = validation.data.email.trim().toLowerCase();
+
+      if (await storage.getTeacherByEmail(email)) {
+        return res.json({ success: false, ...say("teacherEmailTaken") });
+      }
+
+      await storage.createTeacher({
+        fullName: validation.data.fullName.trim(),
+        email,
+        password: validation.data.password,
+        staffRole: "teacher",
+        approvalStatus: "pending",
+      });
+
+      // Deliberately no setSessionRole(): asking to join signs nobody in.
+      res.json({ success: true, ...say("awaitingApproval") });
+    } catch (error) {
+      console.error("Teacher register error:", error);
+      res.status(500).json({ success: false, ...say("serverError") });
+    }
+  });
+
   app.post("/api/auth/teacher/login", teacherLoginLimiter, async (req, res) => {
     try {
       const validation = validateRequest(teacherLoginSchema, req.body);
@@ -549,7 +597,11 @@ export async function registerRoutes(
       }
       
       const { email, password } = validation.data;
-      const teacher = await storage.getTeacherByEmail(email);
+      // Exactly as typed first, so an account stored with capitals still works;
+      // then in lower case, which is how a self-registered account is stored.
+      const teacher =
+        (await storage.getTeacherByEmail(email)) ??
+        (await storage.getTeacherByEmail(email.trim().toLowerCase()));
       
       if (!teacher) {
         return res.json({ success: false, ...say("wrongEmailOrPassword") });
@@ -563,11 +615,21 @@ export async function registerRoutes(
       // know it, which is the only moment it can be turned into a hash.
       if (teacherPassword.needsUpgrade) await storage.updateTeacherPassword(teacher.id, password);
 
+      // Only now, with the password proved right, is it safe to say why they
+      // cannot come in. Saying it before checking the password would let anybody
+      // find out which emails have asked to join. No session for either answer.
+      const approval = approvalOf(teacher);
+      if (approval !== "approved") {
+        return res.json({
+          success: false,
+          ...say(approval === "rejected" ? "teacherRequestRejected" : "awaitingApproval"),
+        });
+      }
+
       // Establish server-side session
       await setSessionRole(req, { teacherId: teacher.id });
-      
-      const { password: _, ...safeTeacher } = teacher;
-      res.json({ success: true, teacher: safeTeacher });
+
+      res.json({ success: true, teacher: publicTeacher(teacher) });
     } catch (error) {
       console.error("Teacher login error:", error);
       res.status(500).json({ success: false, ...say("serverError") });
@@ -584,12 +646,12 @@ export async function registerRoutes(
     if (!teacherId) {
       return res.status(401).json({ success: false, ...say("notLoggedIn") });
     }
-    const teacher = await storage.getTeacher(teacherId);
+    // An account that is no longer approved is no longer signed in.
+    const teacher = await signedInTeacher(req);
     if (!teacher) {
       return res.status(401).json({ success: false, ...say("notLoggedIn") });
     }
-    const { password: _, ...safeTeacher } = teacher;
-    res.json({ success: true, teacher: safeTeacher });
+    res.json({ success: true, teacher: publicTeacher(teacher) });
   });
 
   // Teacher logout — destroys the server-side session
@@ -1234,7 +1296,7 @@ export async function registerRoutes(
   // have one. Teacher only, and passwords are stripped.
   app.get("/api/parents", async (req, res) => {
     try {
-      if (!(await requireTeacher(req, res))) return;
+      if (!(await requireTeacherAdmin(req, res))) return; // administrators only — see requireTeacherAdmin
       const all = await storage.getAllParents();
       res.json(all.map(safeParent));
     } catch (error) {
@@ -1249,7 +1311,7 @@ export async function registerRoutes(
   // A parent never picks their own child, and cannot change it afterwards.
   app.post("/api/students/:id/parent", async (req, res) => {
     try {
-      if (!(await requireTeacher(req, res))) return;
+      if (!(await requireTeacherAdmin(req, res))) return; // administrators only — see requireTeacherAdmin
 
       const studentId = parseInt(req.params.id);
       if (!Number.isInteger(studentId)) {
@@ -1312,7 +1374,7 @@ export async function registerRoutes(
   // on. Re-linking is done by removing the account and adding a new one.
   app.patch("/api/parents/:id", async (req, res) => {
     try {
-      if (!(await requireTeacher(req, res))) return;
+      if (!(await requireTeacherAdmin(req, res))) return; // administrators only — see requireTeacherAdmin
 
       const id = parseInt(req.params.id);
       if (!Number.isInteger(id)) {
@@ -1361,7 +1423,7 @@ export async function registerRoutes(
   // new one. Teacher only. The pupil and their work are untouched.
   app.delete("/api/parents/:id", async (req, res) => {
     try {
-      if (!(await requireTeacher(req, res))) return;
+      if (!(await requireTeacherAdmin(req, res))) return; // administrators only — see requireTeacherAdmin
 
       const id = parseInt(req.params.id);
       const parent = await storage.getParent(id);
@@ -1445,6 +1507,105 @@ export async function registerRoutes(
     return false;
   }
 
+  // ─── Staff: approving teachers and giving them classes ─────────────────────
+  //
+  // Administrators only, every one of them. A regular teacher asking for any of
+  // these — from a button or by typing the address — is refused with 403.
+
+  app.get("/api/staff", async (req, res) => {
+    try {
+      if (!(await requireTeacherAdmin(req, res))) return;
+      const staff = (await storage.getAllTeachers()).map(publicTeacher);
+      // Waiting first: that is what an administrator comes to this screen for.
+      const order = { pending: 0, approved: 1, rejected: 2 } as const;
+      staff.sort((a, b) =>
+        order[a.approvalStatus] - order[b.approvalStatus] || a.fullName.localeCompare(b.fullName));
+      res.json({ success: true, staff });
+    } catch (error) {
+      console.error("Staff list error:", error);
+      res.status(500).json({ success: false, ...say("serverError") });
+    }
+  });
+
+  /** The staff account named in the address, or null with a 404 already sent. */
+  async function staffTarget(req: Request, res: Response): Promise<Teacher | null> {
+    const id = parseInt(String(req.params.id));
+    const target = Number.isInteger(id) ? await storage.getTeacher(id) : undefined;
+    if (!target) {
+      res.status(404).json({ success: false, ...say("staffNotFound") });
+      return null;
+    }
+    return target;
+  }
+
+  app.post("/api/staff/:id/approve", async (req, res) => {
+    try {
+      if (!(await requireTeacherAdmin(req, res))) return;
+      const target = await staffTarget(req, res);
+      if (!target) return;
+      const updated = await storage.updateTeacherStaffDetails(target.id, { approvalStatus: "approved" });
+      res.json({ success: true, teacher: publicTeacher(updated ?? target) });
+    } catch (error) {
+      console.error("Approve teacher error:", error);
+      res.status(500).json({ success: false, ...say("serverError") });
+    }
+  });
+
+  app.post("/api/staff/:id/reject", async (req, res) => {
+    try {
+      if (!(await requireTeacherAdmin(req, res))) return;
+      const target = await staffTarget(req, res);
+      if (!target) return;
+      // Rejecting is for a teacher's request. An administrator's account —
+      // including the one doing the rejecting — is never locked out from here,
+      // so the school cannot end up with nobody able to approve anybody.
+      if (staffRoleOf(target) === "teacher_admin") {
+        return res.status(400).json({ success: false, ...say("cannotRejectAdmin") });
+      }
+      const updated = await storage.updateTeacherStaffDetails(target.id, { approvalStatus: "rejected" });
+      res.json({ success: true, teacher: publicTeacher(updated ?? target) });
+    } catch (error) {
+      console.error("Reject teacher error:", error);
+      res.status(500).json({ success: false, ...say("serverError") });
+    }
+  });
+
+  app.put("/api/staff/:id/classes", async (req, res) => {
+    try {
+      if (!(await requireTeacherAdmin(req, res))) return;
+      const target = await staffTarget(req, res);
+      if (!target) return;
+      if (approvalOf(target) !== "approved") {
+        return res.status(400).json({ success: false, ...say("approveBeforeClasses") });
+      }
+      const parsed = z.array(formEnum).max(formEnum.options.length * 2).safeParse(req.body?.classes);
+      if (!parsed.success) {
+        return res.status(400).json({ success: false, ...say("notAClass") });
+      }
+      // Stored in the school's own order, once each, whatever order they were ticked in.
+      const classes = formEnum.options.filter((c) => parsed.data.includes(c));
+      const updated = await storage.updateTeacherStaffDetails(target.id, { assignedClasses: classes });
+      res.json({ success: true, teacher: publicTeacher(updated ?? target) });
+    } catch (error) {
+      console.error("Assign classes error:", error);
+      res.status(500).json({ success: false, ...say("serverError") });
+    }
+  });
+
+  /**
+   * A pupil's card code signs that pupil in, so it is a credential rather than a
+   * detail: only an administrator is sent it. A regular teacher still gets every
+   * pupil's name, class and number — assignments, the Grade Book and the reports
+   * need those — just not the code printed on the card. A pupil reading their own
+   * record is not a teacher, and nothing changes for them.
+   */
+  async function cardsForAdminsOnly<T extends { qrCode?: string | null }>(req: Request, rows: T[]): Promise<T[]> {
+    if (typeof req.session?.teacherId !== "number") return rows;
+    const teacher = await signedInTeacher(req);
+    if (teacher && staffRoleOf(teacher) === "teacher_admin") return rows;
+    return rows.map(({ qrCode: _card, ...rest }) => rest as unknown as T);
+  }
+
   app.get("/api/students", async (req, res) => {
     try {
       if (!(await requireTeacher(req, res))) return;
@@ -1452,10 +1613,10 @@ export async function registerRoutes(
       const form = req.query.form as string | undefined;
       if (form) {
         const students = await storage.getStudentsByForm(form);
-        res.json(safeStudents(students));
+        res.json(await cardsForAdminsOnly(req, safeStudents(students)));
       } else {
         const students = await storage.getAllStudents();
-        res.json(safeStudents(students));
+        res.json(await cardsForAdminsOnly(req, safeStudents(students)));
       }
     } catch (error) {
       res.status(500).json({ success: false, ...say("serverError") });
@@ -1473,7 +1634,7 @@ export async function registerRoutes(
   // Declared above /api/students/:id so "by-code" is never read as an id.
   app.get("/api/students/by-code/:code", async (req, res) => {
     try {
-      if (!(await requireTeacherAuth(req, res))) return;
+      if (!(await requireTeacherAdmin(req, res))) return; // administrators only — see requireTeacherAdmin
 
       const code = (req.params.code || "").trim();
       if (!code) {
@@ -1505,7 +1666,7 @@ export async function registerRoutes(
       if (!student) {
         return res.status(404).json({ success: false, ...say("studentNotFound") });
       }
-      res.json(safeStudent(student));
+      res.json((await cardsForAdminsOnly(req, [safeStudent(student)]))[0]);
     } catch (error) {
       res.status(500).json({ success: false, ...say("serverError") });
     }
@@ -1532,7 +1693,7 @@ export async function registerRoutes(
 
   app.post("/api/students", async (req, res) => {
     try {
-      if (!(await requireTeacher(req, res))) return;
+      if (!(await requireTeacherAdmin(req, res))) return; // administrators only — see requireTeacherAdmin
 
       const validation = validateRequest(createStudentSchema, req.body);
       if (!validation.success) {
@@ -1575,7 +1736,7 @@ export async function registerRoutes(
   // Update student
   app.put("/api/students/:id", async (req, res) => {
     try {
-      if (!(await requireTeacher(req, res))) return;
+      if (!(await requireTeacherAdmin(req, res))) return; // administrators only — see requireTeacherAdmin
 
       const id = parseInt(req.params.id);
       const student = await storage.getStudent(id);
@@ -1624,7 +1785,7 @@ export async function registerRoutes(
   // Delete student
   app.delete("/api/students/:id", async (req, res) => {
     try {
-      if (!(await requireTeacher(req, res))) return;
+      if (!(await requireTeacherAdmin(req, res))) return; // administrators only — see requireTeacherAdmin
 
       const id = parseInt(req.params.id);
       const student = await storage.getStudent(id);
@@ -1643,7 +1804,7 @@ export async function registerRoutes(
   // Reset student password (teacher can reset)
   app.post("/api/students/:id/reset-password", async (req, res) => {
     try {
-      if (!(await requireTeacher(req, res))) return;
+      if (!(await requireTeacherAdmin(req, res))) return; // administrators only — see requireTeacherAdmin
 
       const id = parseInt(req.params.id);
       const student = await storage.getStudent(id);
@@ -1668,10 +1829,57 @@ export async function registerRoutes(
   // this only answers the question — it never sends back an error. Used where a
   // page is open to students but teachers are allowed to see extra things
   // (drafts), so a student simply gets the normal, draft-free result.
-  async function isTeacherLoggedIn(req: Request): Promise<boolean> {
+  /**
+   * The signed-in teacher — but only if their account is APPROVED.
+   *
+   * Read fresh on every request rather than trusted from the session, so an
+   * account that is rejected or removed stops working on its very next request
+   * instead of when its cookie happens to expire. A pending account never has a
+   * session in the first place (the login refuses it), so this is the second
+   * lock on the same door.
+   */
+  async function signedInTeacher(req: Request): Promise<Teacher | null> {
     const teacherId = req.session?.teacherId;
-    if (!teacherId) return false;
-    return Boolean(await storage.getTeacher(teacherId));
+    if (!teacherId) return null;
+    const teacher = await storage.getTeacher(teacherId);
+    if (!teacher || approvalOf(teacher) !== "approved") return null;
+    return teacher;
+  }
+
+  async function isTeacherLoggedIn(req: Request): Promise<boolean> {
+    return (await signedInTeacher(req)) !== null;
+  }
+
+  /**
+   * Administrators only (teacher_admin): managing pupils, their QR cards and
+   * their parents' accounts, and approving other staff.
+   *
+   * 401 for nobody signed in; 403 for a teacher who IS signed in but is not an
+   * administrator. Refused here, on the server — whatever the browser shows, and
+   * whatever address was typed.
+   */
+  async function requireTeacherAdmin(req: Request, res: Response): Promise<boolean> {
+    const teacher = await signedInTeacher(req);
+    if (!teacher) {
+      res.status(401).json({ success: false, ...say("notLoggedInTeacher"), redirect: "/teacher/login" });
+      return false;
+    }
+    if (staffRoleOf(teacher) !== "teacher_admin") {
+      res.status(403).json({ success: false, ...say("adminOnly") });
+      return false;
+    }
+    return true;
+  }
+
+  /** A staff account as the browser may see it: no password, role and status worked out. */
+  function publicTeacher(teacher: Teacher): StaffMember {
+    const { password: _pw, staffRole: _role, approvalStatus: _status, assignedClasses, ...rest } = teacher;
+    return {
+      ...rest,
+      staffRole: staffRoleOf(teacher),
+      approvalStatus: approvalOf(teacher),
+      assignedClasses: assignedClasses ?? [],
+    };
   }
 
   /**
@@ -4457,7 +4665,8 @@ export async function registerRoutes(
       res.status(401).json({ success: false, ...say("notLoggedInTeacher"), redirect: "/teacher/login" });
       return null;
     }
-    const teacher = await storage.getTeacher(teacherId);
+    // Approved accounts only, like every other teacher guard.
+    const teacher = await signedInTeacher(req);
     if (!teacher) {
       res.status(401).json({ success: false, ...say("notLoggedIn"), redirect: "/teacher/login" });
       return null;

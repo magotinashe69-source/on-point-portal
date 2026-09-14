@@ -817,6 +817,43 @@ export const en = {
     doNotMatch: "Those two do not match.",
   },
 
+  /** Staff: asking to join as a teacher, and the administrators' Staff screen. */
+  staff: {
+    registerTitle: "Register as a teacher",
+    registerNote: "The school checks every request. You can sign in once an administrator has approved yours.",
+    fullName: "Full name",
+    fullNamePlaceholder: "Your full name",
+    email: "Work email",
+    password: "Choose a password",
+    passwordAgain: "Type the password again",
+    passwordRule: "At least 8 characters.",
+    send: "Send my request",
+    awaitingTitle: "Awaiting approval",
+    backToLogin: "Back to the teacher login",
+
+    adminOnlyTitle: "For administrators only",
+    adminOnlyNote: "Only the school's administrators can use this screen. Speak to the head teacher if something here needs changing.",
+
+    title: "Staff",
+    subtitle: "Approve teachers who have asked to join, and give them their classes.",
+    waiting: "Waiting for approval",
+    noneWaiting: "Nobody is waiting for approval.",
+    requested: (date: string) => `Asked to join on ${date}`,
+    approve: "Approve",
+    reject: "Reject",
+    approvedToast: (name: string) => `${name} can now sign in.`,
+    rejectedToast: (name: string) => `${name}'s request was rejected.`,
+    accounts: "Staff accounts",
+    administrator: "Administrator",
+    teacher: "Teacher",
+    classes: "Classes",
+    classesNote: "For organising staff. Every teacher can still see all pupils' work.",
+    saveClasses: "Save classes",
+    classesSaved: (name: string) => `Classes saved for ${name}.`,
+    rejected: "Rejected requests",
+    couldNotSave: "That did not save. Check your connection and try again.",
+  },
+
   /** The page for an address that does not exist. */
   notFoundPage: {
     title: "We could not find that page",
@@ -862,6 +899,7 @@ export const en = {
       thePreview: "the preview",
       theQuestionBank: "the question bank",
       theGradeBoundaries: "the grade boundaries",
+      theStaffList: "the staff list",
     },
   },
 
@@ -934,6 +972,8 @@ export const en = {
       passwordPlaceholder: "Enter your password",
       tryAgain: "Check your email and password, then try again.",
       loggedInAs: (fullName: string) => `Logged in as ${fullName}`,
+      newHere: "New at the school?",
+      registerLink: "Register as a teacher",
     },
 
     parent: {
@@ -1012,6 +1052,8 @@ export const en = {
     lessonsNote: "Upload or record lessons for students",
     students: "Manage Students",
     studentsNote: "Add, edit, or remove students",
+    staff: "Staff",
+    staffNote: "Approve teachers and assign their classes",
     reports: "Reports & Analytics",
     reportsNote: "View charts and track progress",
     gradeBook: "Grade Book",

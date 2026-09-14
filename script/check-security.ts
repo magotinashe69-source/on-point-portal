@@ -478,7 +478,7 @@ async function main() {
   const GUARDS = [
     "requireTeacherOrStudent", "requireTeacherOrSelf", "requireTeacherAuth",
     "requireTeacher", "requireParentSubmission", "requireParentChild",
-    "requireParent", "requirePrimaryStudent", "requireAnyLogin",
+    "requireParent", "requirePrimaryStudent", "requireAnyLogin", "requireTeacherAdmin",
     "canUpload", "canRead",
   ];
 
