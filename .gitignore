@@ -12,6 +12,9 @@ vite.config.ts.*
 # --- Uploaded files (saved locally at runtime) ---
 uploads/
 
+# --- Database backups (children's names, marks, password hashes) ---
+backups/
+
 # --- Local databases ---
 data/
 *.db

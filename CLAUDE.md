@@ -1742,6 +1742,58 @@ and fails if any of them calls `logout()` again.
 - The same TypeScript types are used for both databases (from `shared/schema.ts`);
   `shared/schema.sqlite.ts` holds the matching SQLite table definitions.
 
+### Taking a backup — `npm run backup:db`
+
+A copy of the hosted PostgreSQL database, as a file on this computer.
+
+```
+npm run backup:db
+npm run backup:db -- --out "D:\school-backups"
+```
+
+It shells out to **`pg_dump`** rather than writing the dump itself. Producing a
+correct, restorable dump of a live database — sequences, foreign keys, the order
+rows have to go back in — is the job of the tool Postgres ships, and a
+hand-rolled one would be worse in ways nobody notices until the day they restore
+it. `pg_dump` is found on the `PATH` or in `C:\Program Files\PostgreSQL\<n>\bin`,
+newest first; if it is missing the script says how to install it.
+
+**The verify is the point, not the dump.** `pg_dump` exits 0 having written an
+empty file if it was pointed at an empty database, so "it ran" proves nothing.
+The script counts the rows in every table **first**, takes the dump, then reads
+it back with `pg_restore --list` and checks that every table which had rows is
+actually inside it. If `pg_restore` cannot be run, it says the backup is
+**unchecked** and exits non-zero rather than letting a skipped check look like a
+passed one. A failed `pg_dump` deletes its own half-written file, so there is
+never something that looks like a backup and is not.
+
+**The tables it expects are read from the schema**, not typed into the script —
+`is(value, PgTable)` over `shared/schema.ts`. A table added later is covered
+without anybody remembering, the same reason the subjects live in one list.
+
+Four smaller things it handles, each a real trap:
+
+1. **The pooled address is swapped for the direct one.** Neon's dashboard offers
+   the `-pooler` host first and `pg_dump` does not work reliably through a
+   connection pooler. It says when it has done this.
+2. **`sslmode=require` is added** when missing — the host refuses a plain
+   connection and the failure reads like a network problem.
+3. **The password never reaches a command line.** It goes to `pg_dump` in
+   `PGPASSWORD`, so it is not in the process list, and it is never printed.
+4. **It will not write where git could pick it up.** A dump holds every child's
+   name, their marks and the parents' password hashes. The default is
+   `backups/`, which is in `.gitignore`; a destination inside the repo that is
+   **not** ignored is refused.
+
+**It opens its own connection rather than importing `server/db.ts`** — on
+purpose. `getDb()` runs `ensureSchema()`, which issues `ALTER TABLE ... ADD
+COLUMN IF NOT EXISTS`. A backup must not change the thing it is backing up.
+
+**Two things it deliberately does not cover.** Photos of handwritten work are
+files on the server's disk (`server/local_object_storage.ts`), not rows — copy
+that folder separately. And the script is only as good as a restore you have
+actually tried: restore into a Neon branch once and sign in against it.
+
 ## Installable app / Android packaging
 
 The app is a **PWA** (installable web app) and is set up to be wrapped as an

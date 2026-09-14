@@ -19,6 +19,7 @@
     "check:security": "tsx script/check-security.ts",
     "check:language": "tsx script/check-language.ts",
     "backfill:feedback": "tsx script/backfill-feedback.ts",
+    "backup:db": "tsx script/backup-db.ts",
     "set-teacher-password": "tsx script/set-teacher-password.ts",
     "check:offline:browser": "tsx script/check-offline-browser.ts",
     "check:offline:pwa": "tsx script/check-offline-pwa.ts",
