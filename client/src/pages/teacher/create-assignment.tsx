@@ -4,6 +4,7 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery } from "@tanstack/react-query";
+import { QueryError } from "@/components/QueryError";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -191,7 +192,7 @@ export default function CreateAssignment() {
 
   // In edit mode, load the assignment (to pre-fill) and its submissions (for the
   // "already handed in" notice and the per-question re-mark actions).
-  const { data: editAssignment } = useQuery<Assignment>({
+  const { data: editAssignment, isLoading: editLoading, isError: editFailed, error: editError, refetch: refetchEdit } = useQuery<Assignment>({
     queryKey: ["/api/assignments", editId],
     enabled: isEdit,
   });
@@ -684,6 +685,16 @@ export default function CreateAssignment() {
           </div>
         )}
 
+        {/* Editing waits for the assignment to arrive. A blank form in its place
+            would be worse than slow: saving it would write the blank form over
+            the real assignment. */}
+        {isEdit && editLoading ? (
+          <div className="flex items-center justify-center py-16" data-testid="edit-assignment-loading">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : isEdit && (editFailed || !editAssignment) ? (
+          <QueryError error={editError} what={t.errors.thing.thisAssignment} variant="page" onRetry={() => refetchEdit()} data-testid="edit-assignment-load-error" />
+        ) : (
         <Card>
           <CardHeader>
             <CardTitle className="text-2xl">{isEdit ? t.createAssignment.editTitle : t.createAssignment.createTitle}</CardTitle>
@@ -1402,6 +1413,7 @@ export default function CreateAssignment() {
             </Form>
           </CardContent>
         </Card>
+        )}
       </main>
     </div>
   );

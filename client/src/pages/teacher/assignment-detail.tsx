@@ -67,17 +67,25 @@ export default function AssignmentDetail() {
     refetchInterval: 30000,
   });
 
-  const { data: submissions, isLoading: submissionsLoading } = useQuery<EnrichedSubmission[]>({
+  const { data: submissions, isLoading: submissionsLoading, isError: submissionsFailed, error: submissionsError, refetch: refetchSubmissions } = useQuery<EnrichedSubmission[]>({
     queryKey: ["/api/submissions", { assignmentId: id }],
     enabled: !!teacher && !!id,
     refetchInterval: 30000,
   });
 
-  const { data: students } = useQuery<Student[]>({
+  const { data: students, isLoading: studentsLoading, isError: studentsFailed, error: studentsError, refetch: refetchStudents } = useQuery<Student[]>({
     queryKey: ["/api/students"],
     enabled: !!teacher,
     refetchInterval: 30000,
   });
+
+  // The two lists below are built from BOTH the hand-ins and the register. If
+  // either is missing they come out wrong rather than empty — no register reads
+  // as "everyone handed in" — so both must have arrived before a list is shown.
+  const listsLoading = submissionsLoading || studentsLoading;
+  const listsFailed = submissionsFailed || studentsFailed;
+  const listsError = submissionsError ?? studentsError;
+  const retryLists = () => { refetchSubmissions(); refetchStudents(); };
 
   const updateAssignmentMutation = useMutation({
     mutationFn: async (data: { title?: string; instructions?: string; dueDate?: string; topic?: string }) => {
@@ -471,10 +479,12 @@ export default function AssignmentDetail() {
                   <CardDescription>{t.assignmentDetail.submitted}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {submissionsLoading ? (
+                  {listsLoading ? (
                     <div className="flex items-center justify-center py-8">
                       <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                     </div>
+                  ) : listsFailed ? (
+                    <QueryError error={listsError} what={t.errors.thing.theHandIns} onRetry={retryLists} data-testid="handed-in-load-error" />
                   ) : submittedList.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
                       <Clock className="h-8 w-8 mx-auto mb-2 opacity-40" />
@@ -536,10 +546,12 @@ export default function AssignmentDetail() {
                   <CardDescription>{t.assignmentDetail.notSubmitted}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {submissionsLoading ? (
+                  {listsLoading ? (
                     <div className="flex items-center justify-center py-8">
                       <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                     </div>
+                  ) : listsFailed ? (
+                    <QueryError error={listsError} what={t.errors.thing.theHandIns} onRetry={retryLists} data-testid="not-handed-in-load-error" />
                   ) : notSubmittedList.length === 0 ? (
                     <div className="text-center py-8 text-green-600 dark:text-green-400">
                       <CheckCircle className="h-8 w-8 mx-auto mb-2" />

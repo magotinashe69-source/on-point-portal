@@ -162,6 +162,9 @@ export default function DailyReport() {
         ...(queryParams.subject !== "all" && { subject: queryParams.subject }),
       });
       const res = await fetch(`/api/reports/daily?${params}`);
+      // A refusal or a server error is a FAILED load, not an empty one. Without
+      // this the error body was read as data, and the page showed nothing at all.
+      if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`);
       return res.json();
     },
     enabled: !!queryParams,

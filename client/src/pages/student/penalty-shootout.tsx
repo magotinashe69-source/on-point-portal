@@ -26,6 +26,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { QueryError } from "@/components/QueryError";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -119,7 +120,7 @@ function PenaltyShootoutContent() {
     if (!isPrimaryForm(student.form)) setLocation("/student/dashboard");
   }, [student, setLocation]);
 
-  const { data: subjectData, isLoading: subjectsLoading } = useQuery<{
+  const { data: subjectData, isLoading: subjectsLoading, isError: subjectsFailed, error: subjectsError, refetch: refetchSubjects } = useQuery<{
     success: boolean;
     subjects: SubjectChoice[];
     // A game they walked out of, waiting to be picked up.
@@ -366,6 +367,10 @@ function PenaltyShootoutContent() {
 
             {subjectsLoading ? (
               <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
+            ) : subjectsFailed ? (
+              // Not "nothing to play yet" — that would tell a child who has
+              // done their homework that it did not count.
+              <QueryError error={subjectsError} what={t.errors.thing.yourGameSubjects} role="student" onRetry={() => refetchSubjects()} data-testid="penalty-subjects-error" />
             ) : subjects.length === 0 ? (
               // The only way to see this now is to have handed nothing in yet.
               // A subject used to disappear when it had fewer than ten

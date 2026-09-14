@@ -90,6 +90,9 @@ export default function TeacherGamePlays() {
         dateFrom === dateTo ? { form, date: dateFrom } : { form, dateFrom, dateTo },
       );
       const res = await fetch(`/api/reports/plays?${params}`);
+      // A refusal or a server error is a FAILED load, not an empty one. Without
+      // this the error body was read as data, and the page showed nothing at all.
+      if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`);
       return res.json();
     },
     // Nothing to ask for until a class is chosen.

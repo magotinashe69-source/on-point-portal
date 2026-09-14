@@ -15,6 +15,7 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { QueryError } from "@/components/QueryError";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -59,10 +60,13 @@ export function AddFromBankDialog({
   if (difficulty !== ANY) params.set("difficulty", difficulty);
   if (search.trim()) params.set("search", search.trim());
 
-  const { data, isLoading } = useQuery<{ success: boolean; questions: BankQuestion[] }>({
+  const { data, isLoading, isError, error, refetch } = useQuery<{ success: boolean; questions: BankQuestion[] }>({
     queryKey: ["/api/question-bank", "picker", params.toString()],
     queryFn: async () => {
       const res = await fetch(`/api/question-bank?${params.toString()}`);
+      // A refusal or a server error is a FAILED load, not an empty one. Without
+      // this the error body was read as data, and the page showed nothing at all.
+      if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`);
       return res.json();
     },
     staleTime: 0,
@@ -149,7 +153,11 @@ export function AddFromBankDialog({
             </div>
           )}
 
-          {!isLoading && questions.length === 0 && (
+          {isError && (
+            <QueryError error={error} what={t.errors.thing.theQuestionBank} onRetry={() => refetch()} data-testid="pick-load-error" />
+          )}
+
+          {!isLoading && !isError && questions.length === 0 && (
             <p className="text-sm text-muted-foreground py-6 text-center" data-testid="text-pick-empty">
               {t.bank.empty}
             </p>

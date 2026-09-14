@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation, Link, useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { QueryError } from "@/components/QueryError";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -68,7 +69,7 @@ export default function MarkSubmission() {
     }
   }, [teacher, setLocation]);
 
-  const { data: submissionData, isLoading: submissionLoading } = useQuery<Submission & { assignment?: Assignment }>({
+  const { data: submissionData, isLoading: submissionLoading, isError: submissionFailed, error: submissionError, refetch: refetchSubmission } = useQuery<Submission & { assignment?: Assignment }>({
     queryKey: ["/api/submissions", id],
     enabled: !!teacher && !!id,
   });
@@ -192,6 +193,8 @@ export default function MarkSubmission() {
           <div className="flex items-center justify-center py-16">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
+        ) : submissionFailed ? (
+          <QueryError error={submissionError} what={t.errors.thing.thisSubmission} variant="page" onRetry={() => refetchSubmission()} data-testid="mark-load-error" />
         ) : submission && assignment && assignment.questions ? (
           <>
             <div className="mb-8">

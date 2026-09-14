@@ -23,6 +23,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { QueryError } from "@/components/QueryError";
 import { apiRequest } from "@/lib/queryClient";
 import { apiErrorMessage } from "@/lib/api-error";
 import { ReportCardSheet, ReportCardPrintStyles } from "@/components/ReportCardSheet";
@@ -324,17 +325,33 @@ function BoundariesDialog({ onClose, onSaved }: { onClose: () => void; onSaved: 
   const { toast } = useToast();
   const [rows, setRows] = useState<GradeBoundary[]>(DEFAULT_BOUNDARIES);
   const [loading, setLoading] = useState(true);
+  // The school's boundaries could not be read. The defaults must NOT be offered
+  // in their place, which is what used to happen: they looked like the school's
+  // own, and pressing Save would have quietly replaced the real ones with them.
+  // (A school that has never set any is not an error — the server answers with
+  // the defaults itself.)
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [saving, setSaving] = useState(false);
 
+  const load = async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const res = await fetch("/api/report-cards/boundaries");
+      if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`);
+      const body = await res.json();
+      if (!body.success) throw new Error("500: Not loaded");
+      setRows(body.boundaries);
+    } catch (error) {
+      setLoadError(error);
+    }
+    setLoading(false);
+  };
+
   useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch("/api/report-cards/boundaries");
-        const body = await res.json();
-        if (body.success) setRows(body.boundaries);
-      } catch { /* the defaults above stand */ }
-      setLoading(false);
-    })();
+    load();
+    // Runs once, when the dialog opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Checked as the teacher types, so a set that cannot be saved says why before
@@ -375,6 +392,8 @@ function BoundariesDialog({ onClose, onSaved }: { onClose: () => void; onSaved: 
 
         {loading ? (
           <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin" /></div>
+        ) : loadError ? (
+          <QueryError error={loadError} what={t.errors.thing.theGradeBoundaries} onRetry={() => load()} data-testid="boundaries-load-error" />
         ) : (
           <div className="space-y-2">
             {sortBoundaries(rows).map((b) => (
@@ -417,7 +436,7 @@ function BoundariesDialog({ onClose, onSaved }: { onClose: () => void; onSaved: 
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose} data-testid="button-cancel-boundaries">Cancel</Button>
-          <Button onClick={save} disabled={saving || problems.length > 0} data-testid="button-save-boundaries">
+          <Button onClick={save} disabled={saving || loading || !!loadError || problems.length > 0} data-testid="button-save-boundaries">
             {saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
             Save
           </Button>

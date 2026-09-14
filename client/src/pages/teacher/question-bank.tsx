@@ -82,6 +82,9 @@ export default function QuestionBankPage() {
     queryKey: ["/api/question-bank", params.toString()],
     queryFn: async () => {
       const res = await fetch(`/api/question-bank?${params.toString()}`);
+      // A refusal or a server error is a FAILED load, not an empty one. Without
+      // this the error body was read as data, and the page showed nothing at all.
+      if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`);
       return res.json();
     },
     enabled: !!teacher,
