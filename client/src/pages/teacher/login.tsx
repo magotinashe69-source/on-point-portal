@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { teacherLoginSchema, type TeacherLogin } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
-import { ArrowLeft, LogIn, Loader2, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, LogIn, Loader2, Eye, EyeOff, Clock } from "lucide-react";
 import { Link } from "wouter";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
@@ -24,6 +24,9 @@ export default function TeacherLogin() {
   const t = useT();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  // Why a teacher who typed the right password still cannot come in: their
+  // account is waiting for the school, or the school said no.
+  const [awaiting, setAwaiting] = useState<string | null>(null);
 
   useEffect(() => {
     if (teacher) {
@@ -55,7 +58,12 @@ export default function TeacherLogin() {
         // copy in step. Not logout(), which would destroy the new session.
         forgetRememberedLogins();
         setTeacher(data.teacher);
+      } else if (data.code === "awaitingApproval" || data.code === "teacherRequestRejected") {
+        // On the page rather than in a toast that disappears: this is the answer
+        // to "why can I not get in?", and it may need reading twice.
+        setAwaiting(serverMessage(t, data));
       } else {
+        setAwaiting(null);
         toast({
           title: t.login.loginFailed,
           description: serverMessage(t, data, t.login.student.invalidCredentials),
@@ -111,6 +119,16 @@ export default function TeacherLogin() {
             {window.location.search.includes("expired=1") && (
               <p className="mt-3 rounded-md bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-sm text-amber-800 dark:text-amber-200" data-testid="text-session-expired">
                 {t.login.teacher.expired}
+              </p>
+            )}
+            {awaiting && (
+              <p
+                role="status"
+                className="mt-3 flex items-start gap-2 rounded-md bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-left text-sm text-amber-800 dark:text-amber-200"
+                data-testid="text-awaiting-approval"
+              >
+                <Clock className="h-4 w-4 mt-0.5 shrink-0" />
+                <span>{awaiting}</span>
               </p>
             )}
           </CardHeader>
@@ -186,7 +204,13 @@ export default function TeacherLogin() {
                 </Button>
               </form>
             </Form>
-                      </CardContent>
+            <p className="mt-6 text-center text-sm text-muted-foreground">
+              {t.login.teacher.newHere}{" "}
+              <Link href="/teacher/register" className="font-semibold text-primary hover:underline" data-testid="link-register-teacher">
+                {t.login.teacher.registerLink}
+              </Link>
+            </p>
+          </CardContent>
         </Card>
       </main>
     </div>

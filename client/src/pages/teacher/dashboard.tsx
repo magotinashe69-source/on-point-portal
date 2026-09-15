@@ -13,6 +13,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
 import { ChangePasswordDialog } from "@/components/ChangePasswordDialog";
 import { useT } from "@/lib/i18n";
+import { staffRoleOf } from "@shared/schema";
 import { 
   PlusCircle, 
   FileText, 
@@ -38,7 +39,8 @@ import {
   Pencil,
   Gamepad2,
   GraduationCap,
-  Award
+  Award,
+  ShieldCheck,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -253,6 +255,9 @@ export default function TeacherDashboard() {
   };
 
   if (!teacher) return null;
+  // Decides which management cards are SHOWN. The server decides what is
+  // allowed, and refuses a regular teacher those screens whatever is shown here.
+  const isAdmin = staffRoleOf(teacher) === "teacher_admin";
 
   const pendingSubmissions = submissions?.filter(s => s.status === "SUBMITTED") || [];
   const markedSubmissions = submissions?.filter(s => s.status === "MARKED") || [];
@@ -560,7 +565,8 @@ export default function TeacherDashboard() {
             </Card>
           </Link>
 
-          <Link href="/teacher/students">
+          {isAdmin && (
+          <Link href="/teacher/students" data-testid="link-students">
             <Card className="hover-elevate cursor-pointer h-full">
               <CardContent className="flex items-center gap-4 py-6">
                 <div className="p-3 rounded-md bg-primary/10">
@@ -573,6 +579,23 @@ export default function TeacherDashboard() {
               </CardContent>
             </Card>
           </Link>
+          )}
+
+          {isAdmin && (
+          <Link href="/teacher/staff" data-testid="link-staff">
+            <Card className="hover-elevate cursor-pointer h-full">
+              <CardContent className="flex items-center gap-4 py-6">
+                <div className="p-3 rounded-md bg-primary/10">
+                  <ShieldCheck className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold">{t.teacherDash.staff}</h3>
+                  <p className="text-sm text-muted-foreground">{t.teacherDash.staffNote}</p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+          )}
 
           <Link href="/teacher/reports" data-testid="link-reports">
             <Card className="hover-elevate cursor-pointer h-full">

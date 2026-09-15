@@ -36,6 +36,18 @@ export const teachers = pgTable("teachers", {
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
   role: text("role").notNull().default("teacher"), // Role for access control
+  // --- Staff roles and approval -------------------------------------------
+  // All three are NULL on accounts created before staff roles existed, and that
+  // NULL is read in the school's favour: staffRoleOf() treats it as
+  // "teacher_admin" and approvalOf() as "approved". So the school's existing
+  // accounts keep exactly the access they had without a row being rewritten —
+  // and without a column default, which `db:push` would apply to those rows
+  // too. Every account created since sets the first two explicitly.
+  staffRole: text("staff_role"),
+  approvalStatus: text("approval_status"),
+  // The classes an administrator has given this teacher. Organisational for
+  // now: nothing is restricted by it yet.
+  assignedClasses: jsonb("assigned_classes").$type<string[]>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -46,9 +58,45 @@ export const teachersRelations = relations(teachers, ({ many }) => ({
   lessons: many(lessons),
 }));
 
-export const insertTeacherSchema = createInsertSchema(teachers).omit({ id: true, createdAt: true });
+// assignedClasses is left out: a new account has no classes until an administrator
+// gives it some, and the generated type for a list column does not fit an insert.
+export const insertTeacherSchema = createInsertSchema(teachers).omit({ id: true, createdAt: true, assignedClasses: true });
 export type Teacher = typeof teachers.$inferSelect;
 export type InsertTeacher = z.infer<typeof insertTeacherSchema>;
+
+/** The two kinds of staff account. */
+export const STAFF_ROLES = ["teacher_admin", "teacher"] as const;
+export type StaffRole = (typeof STAFF_ROLES)[number];
+export type ApprovalStatus = "pending" | "approved" | "rejected";
+
+/**
+ * What a staff account is, read from its row.
+ *
+ * NULL means the account was made before staff roles existed — the school's own
+ * accounts — and is read as an administrator, so nothing they could do before
+ * stops working. Anything else that is not exactly "teacher_admin" is read as a
+ * regular teacher: an unexpected value must never grant MORE access.
+ */
+export function staffRoleOf(teacher: { staffRole?: string | null }): StaffRole {
+  if (teacher.staffRole == null || teacher.staffRole === "teacher_admin") return "teacher_admin";
+  return "teacher";
+}
+
+/**
+ * Whether a staff account may sign in. NULL is an account from before approval
+ * existed. Anything unexpected is read as pending — never as approved.
+ */
+export function approvalOf(teacher: { approvalStatus?: string | null }): ApprovalStatus {
+  if (teacher.approvalStatus == null || teacher.approvalStatus === "approved") return "approved";
+  return teacher.approvalStatus === "rejected" ? "rejected" : "pending";
+}
+
+/** A staff account as the browser may see it: no password, role and status worked out. */
+export type StaffMember = Omit<Teacher, "password" | "staffRole" | "approvalStatus" | "assignedClasses"> & {
+  staffRole: StaffRole;
+  approvalStatus: ApprovalStatus;
+  assignedClasses: string[];
+};
 
 // Role enum for access control
 export const roleEnum = z.enum(["admin", "teacher", "student", "parent"]);
@@ -698,6 +746,15 @@ export const teacherLoginSchema = z.object({
   password: z.string().min(1, "passwordRequired"),
 });
 export type TeacherLogin = z.infer<typeof teacherLoginSchema>;
+
+// Asking to join as a teacher. The account this creates cannot sign in, or do
+// anything else, until an administrator approves it.
+export const teacherRegisterSchema = z.object({
+  fullName: z.string().trim().min(1, "yourNameRequired"),
+  email: z.string().trim().email("emailRequired"),
+  password: z.string().min(8, "newPasswordTooShort"),
+});
+export type TeacherRegister = z.infer<typeof teacherRegisterSchema>;
 
 export const studentLoginSchema = z.object({
   fullName: z.string().min(1, "yourNameRequired"),

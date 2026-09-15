@@ -9,7 +9,7 @@ import {
 } from "./db";
 // The TypeScript types are the same for both databases, so they come from the shared schema.
 import {
-  type Teacher, type InsertTeacher,
+  type Teacher, type InsertTeacher, type StaffRole, type ApprovalStatus,
   type Student, type InsertStudent,
   type Parent, type InsertParent,
   type Assignment, type InsertAssignment,
@@ -56,7 +56,12 @@ export interface IStorage {
   // Teachers
   getTeacher(id: number): Promise<Teacher | undefined>;
   getTeacherByEmail(email: string): Promise<Teacher | undefined>;
-  createTeacher(teacher: InsertTeacher): Promise<Teacher>;
+  createTeacher(teacher: InsertTeacher & { staffRole: StaffRole; approvalStatus: ApprovalStatus }): Promise<Teacher>;
+  getAllTeachers(): Promise<Teacher[]>;
+  updateTeacherStaffDetails(
+    id: number,
+    details: { approvalStatus?: ApprovalStatus; assignedClasses?: string[] },
+  ): Promise<Teacher | undefined>;
   
   // Students
   getStudent(id: number): Promise<Student | undefined>;
@@ -208,12 +213,41 @@ export class DatabaseStorage implements IStorage {
     return teacher || undefined;
   }
 
-  async createTeacher(teacher: InsertTeacher): Promise<Teacher> {
+  /**
+   * A new staff account.
+   *
+   * The role and the approval status are REQUIRED here rather than left to the
+   * database, because a missing value is read as the school's own
+   * administrator (see staffRoleOf in shared/schema.ts). Nothing may create a
+   * staff account without saying which kind it is.
+   */
+  async createTeacher(
+    teacher: InsertTeacher & { staffRole: StaffRole; approvalStatus: ApprovalStatus },
+  ): Promise<Teacher> {
+    if (!teacher.staffRole || !teacher.approvalStatus) {
+      throw new Error("A staff account needs a role and an approval status.");
+    }
     const [newTeacher] = await db
       .insert(teachers)
       .values({ ...teacher, password: await hashPassword(teacher.password) })
       .returning();
     return newTeacher;
+  }
+
+  async getAllTeachers(): Promise<Teacher[]> {
+    return db.select().from(teachers);
+  }
+
+  /** Approve or reject a staff account, or set its classes. Nothing else can be changed here. */
+  async updateTeacherStaffDetails(
+    id: number,
+    details: { approvalStatus?: ApprovalStatus; assignedClasses?: string[] },
+  ): Promise<Teacher | undefined> {
+    const changes: { approvalStatus?: ApprovalStatus; assignedClasses?: string[] } = {};
+    if (details.approvalStatus) changes.approvalStatus = details.approvalStatus;
+    if (details.assignedClasses) changes.assignedClasses = details.assignedClasses;
+    const [updated] = await db.update(teachers).set(changes).where(eq(teachers.id, id)).returning();
+    return updated || undefined;
   }
 
   // Students
@@ -1221,6 +1255,9 @@ export class DatabaseStorage implements IStorage {
       fullName: "On Point Education Centre",
       email: "onpointeducationcentremoza@gmail.com",
       password: this.seedTeacherPassword(),
+      // The first account on a new database runs the school.
+      staffRole: "teacher_admin",
+      approvalStatus: "approved",
     });
 
     // Example students used to seed a fresh database.

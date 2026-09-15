@@ -748,6 +748,42 @@ export const pt: Translation = {
     doNotMatch: "Essas duas não coincidem.",
   },
 
+  staff: {
+    registerTitle: "Registar-se como professor",
+    registerNote: "A escola verifica todos os pedidos. Poderá entrar assim que um administrador aprovar o seu.",
+    fullName: "Nome completo",
+    fullNamePlaceholder: "O seu nome completo",
+    email: "Correio eletrónico profissional",
+    password: "Escolha uma palavra-passe",
+    passwordAgain: "Escreva a palavra-passe outra vez",
+    passwordRule: "Pelo menos 8 caracteres.",
+    send: "Enviar o meu pedido",
+    awaitingTitle: "A aguardar aprovação",
+    backToLogin: "Voltar ao início de sessão do professor",
+
+    adminOnlyTitle: "Só para administradores",
+    adminOnlyNote: "Só os administradores da escola podem usar este ecrã. Fale com o diretor da escola se for preciso mudar algo aqui.",
+
+    title: "Pessoal",
+    subtitle: "Aprove os professores que pediram para entrar e atribua-lhes as suas turmas.",
+    waiting: "Pedidos por aprovar",
+    noneWaiting: "Não há ninguém à espera de aprovação.",
+    requested: (date: string) => `Pediu para entrar em ${date}`,
+    approve: "Aprovar",
+    reject: "Rejeitar",
+    approvedToast: (name: string) => `${name} já pode entrar.`,
+    rejectedToast: (name: string) => `O pedido de ${name} foi rejeitado.`,
+    accounts: "Contas do pessoal",
+    administrator: "Administrador",
+    teacher: "Professor",
+    classes: "Turmas",
+    classesNote: "Para organizar o pessoal. Todos os professores continuam a ver o trabalho de todos os alunos.",
+    saveClasses: "Guardar turmas",
+    classesSaved: (name: string) => `Turmas guardadas para ${name}.`,
+    rejected: "Pedidos rejeitados",
+    couldNotSave: "Não foi possível guardar. Verifique a sua ligação e tente novamente.",
+  },
+
   notFoundPage: {
     title: "Não encontrámos essa página",
     note: "O endereço pode ter um erro de escrita, ou a página pode ter mudado de lugar.",
@@ -792,6 +828,7 @@ export const pt: Translation = {
       thePreview: "a pré-visualização",
       theQuestionBank: "o banco de perguntas",
       theGradeBoundaries: "os limites das notas",
+      theStaffList: "a lista do pessoal",
     },
   },
 
@@ -862,6 +899,8 @@ export const pt: Translation = {
       passwordPlaceholder: "Introduza a sua palavra-passe",
       tryAgain: "Verifique o seu correio eletrónico e a sua palavra-passe e tente novamente.",
       loggedInAs: (fullName: string) => `Sessão iniciada como ${fullName}`,
+      newHere: "É novo na escola?",
+      registerLink: "Registar-se como professor",
     },
 
     parent: {
@@ -940,6 +979,8 @@ export const pt: Translation = {
     lessonsNote: "Carregue ou grave aulas para os alunos",
     students: "Gerir alunos",
     studentsNote: "Adicionar, alterar ou remover alunos",
+    staff: "Pessoal",
+    staffNote: "Aprovar professores e atribuir-lhes turmas",
     reports: "Relatórios e Análises",
     reportsNote: "Ver gráficos e acompanhar o progresso",
     gradeBook: "Pauta",
@@ -1121,6 +1162,16 @@ export const pt: Translation = {
     notLoggedIn: "Não tem a sessão iniciada. Entre e tente novamente.",
     notLoggedInTeacher: "Não tem a sessão iniciada como professor. Entre e tente novamente.",
     notLoggedInParent: "Não tem a sessão iniciada como encarregado de educação. Entre e tente novamente.",
+    awaitingApproval: "A sua conta aguarda a aprovação da escola. Poderá entrar assim que um administrador a aprovar.",
+    teacherRequestRejected: "A escola não aprovou esta conta. Se acha que é um engano, fale com a secretaria da escola.",
+    teacherEmailTaken: "Já existe uma conta com esse correio eletrónico. Entre na sua conta ou fale com a secretaria da escola.",
+
+    // Pessoal
+    adminOnly: "Só os administradores da escola podem fazer isso.",
+    staffNotFound: "Essa conta de funcionário não foi encontrada.",
+    cannotRejectAdmin: "A conta de um administrador não pode ser rejeitada.",
+    approveBeforeClasses: "Aprove o professor antes de lhe atribuir turmas.",
+    notAClass: "Escolha turmas da lista da própria escola.",
 
     // Cartões
     cardNotRecognised: "Cartão não reconhecido. Peça ao seu professor para o verificar.",
