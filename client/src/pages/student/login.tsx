@@ -26,8 +26,8 @@ export default function StudentLoginPage() {
   const t = useT();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  // A first sign-in: the teacher's code was right, and now the pupil chooses
-  // their own password in two more boxes on this same form.
+  // A first sign-in: this pupil has no password yet, so they choose one in
+  // two more boxes on this same form.
   const [choosing, setChoosing] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [again, setAgain] = useState("");
@@ -125,7 +125,8 @@ export default function StudentLoginPage() {
         });
         setStudent(data.student);
       } else if (data.choosePassword) {
-        // The code was right. Stay on this form and ask for the password they want.
+        // This pupil has no password yet. Stay on this form and ask for the
+        // one they want to use from now on.
         setChoosing(true);
       } else {
         toast({

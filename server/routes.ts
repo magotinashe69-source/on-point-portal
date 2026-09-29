@@ -2,7 +2,7 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { storage } from "./storage";
-import { sameString, verifyPassword, isHashed, normaliseFirstLoginCode } from "./passwords";
+import { sameString, verifyPassword } from "./passwords";
 import { masterPassword } from "./master-password";
 import { registerObjectStorageRoutes } from "./local_object_storage";
 import {
@@ -790,29 +790,25 @@ export async function registerRoutes(
       // set one. There is no such password unless they have: see
       // server/master-password.ts.
       const master = masterPassword();
-      if (master && sameString(password, master)) {
+      if (master && password && sameString(password, master)) {
         await setSessionRole(req, { studentId: student.id });
         res.json({ success: true, student: safe(student), isMasterAccess: true });
         return;
       }
 
-      // No password yet: the first sign-in.
+      // No password yet: the first sign-in. The pupil chooses the password
+      // they will use from now on, and is signed in with it.
       //
-      // This used to SET the password to whatever was typed, so anybody who
-      // knew a child's name, and got there before the child, owned the account.
-      // Now it needs the one-time code the teacher was shown when the pupil was
-      // added or reset, and the pupil chooses their own password in the same
-      // step. Choosing it clears the code, so a code works once.
+      // Whatever was typed in the password box is ignored here -- there is
+      // nothing yet to check it against. Note the consequence, which is
+      // deliberate and was chosen over the one-time code this replaced:
+      // until a pupil has claimed their account, ANYBODY who types their name
+      // can claim it for them. See "A pupil's first sign-in" in CLAUDE.md.
       if (!student.password) {
-        const codeOk =
-          isHashed(student.firstLoginCode) &&
-          (await verifyPassword(normaliseFirstLoginCode(password), student.firstLoginCode)).ok;
-        if (!codeOk) return refuse();
-
         const { newPassword } = validation.data;
         if (!newPassword) {
-          // The code is right: ask for the password they want. Nobody is
-          // signed in until the account has a password of its own.
+          // Ask for the password they want. Nobody is signed in until the
+          // account has a password of its own.
           return res.json({ success: false, choosePassword: true, ...say("chooseYourPassword") });
         }
 
@@ -823,7 +819,11 @@ export async function registerRoutes(
         return;
       }
 
-      // Validate password
+      // This pupil HAS a password, so one has to be given and has to match.
+      // A request with no password at all is refused the same way as a wrong
+      // one, so the form still cannot be used to find out who is on the roll.
+      if (!password) return refuse();
+
       const studentPassword = await verifyPassword(password, student.password);
       if (studentPassword.needsUpgrade) await storage.updateStudentPassword(student.id, password);
       if (!studentPassword.ok) {
@@ -1722,11 +1722,10 @@ export async function registerRoutes(
         qrCode,
         role: validation.data.role || "student",
       });
-      // A new pupil has no password, so they get the one-time code for their
-      // first sign-in. It travels with the pupil it belongs to, to the teacher
-      // who added them, this once.
-      const firstLoginCode = await storage.resetStudentPassword(student.id);
-      res.json({ success: true, student: { ...safeStudent(student), firstLoginCode } });
+      // A new pupil has no password. They choose one for themselves the first
+      // time they sign in with their name -- there is nothing for the teacher
+      // to write down or hand over.
+      res.json({ success: true, student: safeStudent(student) });
     } catch (error) {
       console.error("Create student error:", error);
       res.status(500).json({ success: false, ...say("serverError") });
@@ -1812,11 +1811,11 @@ export async function registerRoutes(
         return res.status(404).json({ success: false, ...say("studentNotFound") });
       }
       
-      // A reset issues a fresh one-time code: the pupil signs in with their name
-      // and that code, then chooses a new password. The teacher sees the code
-      // now and never again — only its hash is kept.
-      const firstLoginCode = await storage.resetStudentPassword(id);
-      res.json({ success: true, ...say("passwordReset"), firstLoginCode });
+      // A reset clears the password the pupil had. They are then back where a
+      // brand-new pupil starts: sign in with their name, and choose a new
+      // password. Their work, marks and everything else are untouched.
+      await storage.resetStudentPassword(id);
+      res.json({ success: true, ...say("passwordReset") });
     } catch (error) {
       console.error("Reset password error:", error);
       res.status(500).json({ success: false, ...say("serverError") });
