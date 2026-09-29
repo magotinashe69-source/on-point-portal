@@ -412,17 +412,21 @@ export default function StudentManagement() {
       <main className="container mx-auto px-4 py-8 max-w-4xl">
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between flex-wrap gap-4">
-              <div>
+            {/* On a phone the title sits above the buttons; side by side only
+                once there is room for both. */}
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
                 <CardTitle className="text-2xl flex items-center gap-2">
-                  <Users className="h-6 w-6" />
+                  <Users className="h-6 w-6 shrink-0" />
                   Student Management
                 </CardTitle>
                 <CardDescription>
                   Add, edit, or remove students from the system
                 </CardDescription>
               </div>
-              <div className="flex items-center gap-2">
+              {/* The three buttons wrap onto as many lines as the screen needs,
+                  so none of them is ever pushed off the side. */}
+              <div className="flex flex-wrap items-center gap-2">
               {/* Bulk paste — enrol a whole class from a pasted list. */}
               <Button variant="outline" onClick={() => setIsPasteDialogOpen(true)} data-testid="button-paste-students">
                 <ClipboardPaste className="h-4 w-4 mr-2" />
@@ -623,7 +627,7 @@ export default function StudentManagement() {
           <CardContent>
             <div className="mb-4">
               <Select value={filterForm} onValueChange={setFilterForm}>
-                <SelectTrigger className="w-48" data-testid="select-filter-form">
+                <SelectTrigger className="w-full sm:w-48" data-testid="select-filter-form">
                   <SelectValue placeholder={t.register.filterByForm} />
                 </SelectTrigger>
                 <SelectContent>
@@ -648,15 +652,17 @@ export default function StudentManagement() {
               <p className="text-center text-muted-foreground py-8">{t.register.noStudents}</p>
             ) : (
               <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
+                {/* On a phone a pupil's details sit above their buttons; the
+                    two sit side by side once there is room. */}
                 {filteredStudents.map((student) => (
-                  <div 
-                    key={student.id} 
-                    className="flex items-center justify-between p-4 rounded-md border"
+                  <div
+                    key={student.id}
+                    className="flex flex-col gap-3 p-3 rounded-md border sm:flex-row sm:items-center sm:justify-between sm:p-4"
                     data-testid={`student-row-${student.id}`}
                   >
-                    <div className="flex items-center gap-4">
-                      <div>
-                        <p className="font-medium">{student.fullName}</p>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 min-w-0">
+                      <div className="min-w-0">
+                        <p className="font-medium break-words">{student.fullName}</p>
                         <p className="text-sm text-muted-foreground">{student.studentId}</p>
                       </div>
                       <Badge variant="outline">{student.form}</Badge>
@@ -672,7 +678,7 @@ export default function StudentManagement() {
                         </Badge>
                       )}
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-1 sm:gap-2 sm:shrink-0">
                       {/* This child's weekly report, ready to send to a parent. */}
                       <Button
                         size="icon"
