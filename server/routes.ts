@@ -716,7 +716,7 @@ export async function registerRoutes(
       // this browser is dropped rather than carried alongside.
       await setSessionRole(req, { studentId: student.id });
 
-      const { password: _pw, firstLoginCode: _code, ...safeStudentRow } = student;
+      const { password: _pw, ...safeStudentRow } = student;
       res.json({ success: true, student: safeStudentRow });
     } catch (error) {
       console.error("Scan login error:", error);
@@ -736,7 +736,7 @@ export async function registerRoutes(
     if (!student) {
       return res.status(401).json({ success: false, ...say("notLoggedIn") });
     }
-    const { password: _pw, firstLoginCode: _code, ...safeStudentRow } = student;
+    const { password: _pw, ...safeStudentRow } = student;
     res.json({ success: true, student: safeStudentRow });
   });
 
@@ -782,7 +782,7 @@ export async function registerRoutes(
       // teacher handler, which strips it too).
       const safe = (s: typeof student | undefined) => {
         if (!s) return s;
-        const { password: _pw, firstLoginCode: _code, ...rest } = s;
+        const { password: _pw, ...rest } = s;
         return rest;
       };
 
@@ -1449,9 +1449,9 @@ export async function registerRoutes(
   // -------------------------------------------------------------------------
 
   /** A stored password must never leave the server, whoever is asking. */
-  function safeStudent<T extends Record<string, any>>(s: T): Omit<T, "password" | "firstLoginCode"> {
-    const { password: _pw, firstLoginCode: _code, ...rest } = s;
-    return rest as Omit<T, "password" | "firstLoginCode">;
+  function safeStudent<T extends Record<string, any>>(s: T): Omit<T, "password"> {
+    const { password: _pw, ...rest } = s;
+    return rest as Omit<T, "password">;
   }
   const safeStudents = <T extends Record<string, any>>(list: T[]) => list.map(safeStudent);
 

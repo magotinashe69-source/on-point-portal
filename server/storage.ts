@@ -321,10 +321,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateStudentPassword(id: number, password: string): Promise<void> {
-    // firstLoginCode is cleared as well, to tidy away any code left on a row
-    // from before sign-in codes were removed. Nothing reads that column now.
     await db.update(students)
-      .set({ password: await hashPassword(password), firstLoginCode: null })
+      .set({ password: await hashPassword(password) })
       .where(eq(students.id, id));
   }
 
@@ -335,7 +333,7 @@ export class DatabaseStorage implements IStorage {
    */
   async resetStudentPassword(id: number): Promise<void> {
     await db.update(students)
-      .set({ password: null, firstLoginCode: null })
+      .set({ password: null })
       .where(eq(students.id, id));
   }
 

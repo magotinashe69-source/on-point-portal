@@ -1648,10 +1648,8 @@ password rather than a generated code.
 that nobody is signed in until a password exists, and that once one does the
 account cannot be claimed off them.
 
-`students.first_login_code` **is still in the schema** and is written as `null`
-by `updateStudentPassword()` and `resetStudentPassword()`. Nothing reads it.
-It was left in place rather than dropped so that no migration runs against a
-live school database; a later migration can remove it.
+The `students.first_login_code` column that held the codes has been dropped —
+see "Retiring a column" under Database notes.
 
 ### One answer for every failed pupil sign-in
 
@@ -1997,6 +1995,40 @@ and fails if any of them calls `logout()` again.
   registered students, and sample assignments if they don't already exist.
 - The same TypeScript types are used for both databases (from `shared/schema.ts`);
   `shared/schema.sqlite.ts` holds the matching SQLite table definitions.
+
+### Retiring a column — `server/retired-columns.ts`
+
+To remove a column from the database, take it out of both schema files and add
+it to `RETIRED_COLUMNS`. Do not just delete it from the schema and leave the
+rest to `db:push`.
+
+**Why.** When a column disappears from `shared/schema.ts`, `drizzle-kit push`
+wants to drop it, and on a table with rows it stops to ask "Do you still want to
+push changes?". A deploy has nobody to answer, so drizzle-kit gives up — and
+**still exits 0**. The deploy looks fine, the column stays, and every other
+change in that push is skipped with it.
+
+So `npm run db:push` runs `script/drop-retired-columns.ts` first, which drops
+each listed column itself, and drizzle-kit then has nothing to ask about.
+`ensureSchema()` in `server/db.ts` drops them at startup too, which is what
+cleans a local SQLite database. Every drop is "if it exists", so a retired
+column can stay on the list.
+
+**A drop on deploy briefly breaks the old server.** The column goes during the
+build, while the previous version is still serving, and that version's queries
+still name it — so anything reading pupils fails until the new version takes
+over, about a minute. Deploy a drop when the school is not using the portal.
+
+**The same trap is already sprung by the `session` table.** It is created by
+hand (`docs/DEPLOYMENT-SESSION-TABLE.sql`) and is not in `shared/schema.ts`, so
+every `db:push` offers to drop it, finds rows, asks, and gives up. In practice
+`db:push` on Render changes nothing, and it is `ensureSchema()` that adds new
+tables and columns. Worse, if the session table were ever EMPTY at deploy time
+drizzle-kit would drop it without asking, and every login would fail with
+`relation "session" does not exist`. The fix is `tablesFilter` in
+`drizzle.config.ts` — but turning `db:push` back on will apply whatever has
+drifted between the schema and the live database since, so diff it against a
+copy of the live database first.
 
 ### Taking a backup — `npm run backup:db`
 

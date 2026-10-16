@@ -116,11 +116,6 @@ export const students = pgTable("students", {
   gender: text("gender").notNull(), // Male/Female
   form: text("form").notNull(), // Form 1, Form 2
   password: text("password"), // Personalized password - set by student on first login
-  // The one-time code a teacher hands a pupil who has no password yet, kept
-  // as a hash like a password. The first sign-in needs it, and choosing a
-  // password clears it. Before this, typing a child's name was enough to set
-  // their first password — whoever got there first owned the account.
-  firstLoginCode: text("first_login_code"),
   role: text("role").notNull().default("student"), // Role for access control
   // Whether this pupil may still use the portal. There was no such idea until
   // card login arrived: a pupil who left was simply deleted, which also took
