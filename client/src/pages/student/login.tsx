@@ -5,7 +5,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
@@ -26,12 +25,6 @@ export default function StudentLoginPage() {
   const t = useT();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  // A first sign-in: this pupil has no password yet, so they choose one in
-  // two more boxes on this same form.
-  const [choosing, setChoosing] = useState(false);
-  const [newPassword, setNewPassword] = useState("");
-  const [again, setAgain] = useState("");
-  const [chooseProblem, setChooseProblem] = useState<string | null>(null);
 
   useEffect(() => {
     if (student) {
@@ -97,17 +90,11 @@ export default function StudentLoginPage() {
   }
 
   async function onSubmit(values: StudentLogin) {
-    // Checked here, before anything is sent, so a typo costs no trip to the
-    // server and no attempt against the login limit.
-    if (choosing) {
-      if (newPassword.length < 8) return setChooseProblem(t.password.tooShort);
-      if (newPassword !== again) return setChooseProblem(t.password.doNotMatch);
-    }
-    setChooseProblem(null);
     setIsLoading(true);
     try {
-      const body = choosing ? { ...values, newPassword } : values;
-      const response = await apiRequest("POST", "/api/auth/student/login", body);
+      // On a pupil's first sign-in, the password they type here becomes
+      // their password -- the server saves it and signs them straight in.
+      const response = await apiRequest("POST", "/api/auth/student/login", values);
       const data = await response.json();
       
       if (data.success) {
@@ -124,10 +111,6 @@ export default function StudentLoginPage() {
           description: message,
         });
         setStudent(data.student);
-      } else if (data.choosePassword) {
-        // This pupil has no password yet. Stay on this form and ask for the
-        // one they want to use from now on.
-        setChoosing(true);
       } else {
         toast({
           title: t.login.loginFailed,
@@ -236,42 +219,6 @@ export default function StudentLoginPage() {
                     </FormItem>
                   )}
                 />
-                {choosing && (
-                  <div className="space-y-3 rounded-md border p-3" data-testid="section-choose-password">
-                    <div>
-                      <p className="font-medium">{t.login.student.choosePasswordTitle}</p>
-                      <p className="text-sm text-muted-foreground">{t.login.student.choosePasswordNote}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="choose-password">{t.password.next}</Label>
-                      <Input
-                        id="choose-password"
-                        type="password"
-                        autoComplete="new-password"
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        data-testid="input-choose-password"
-                      />
-                      <p className="text-xs text-muted-foreground">{t.password.rule}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="choose-password-again">{t.password.again}</Label>
-                      <Input
-                        id="choose-password-again"
-                        type="password"
-                        autoComplete="new-password"
-                        value={again}
-                        onChange={(e) => setAgain(e.target.value)}
-                        data-testid="input-choose-password-again"
-                      />
-                    </div>
-                    {chooseProblem && (
-                      <p className="text-sm text-destructive" data-testid="text-choose-password-problem">
-                        {chooseProblem}
-                      </p>
-                    )}
-                  </div>
-                )}
                 <Button 
                   type="submit" 
                   className="w-full" 

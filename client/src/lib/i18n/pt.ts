@@ -90,7 +90,7 @@ export const pt: Translation = {
     studentNotUpdated: "O aluno não foi atualizado",
     studentRemoved: "Aluno removido",
     passwordReset: "Palavra-passe reposta",
-    passwordResetNote: "O aluno entra com o seu nome e escolhe uma nova palavra-passe. O trabalho e as notas não são afetados.",
+    passwordResetNote: "Da próxima vez, o aluno escreve o seu nome e uma nova palavra-passe, que passa a ser a sua palavra-passe. O trabalho e as notas não são afetados.",
     passwordNotReset: "A palavra-passe não foi reposta",
 
     weeklyReport: "Relatório semanal",
@@ -877,10 +877,8 @@ export const pt: Translation = {
       passwordPlaceholder: "Introduza a sua palavra-passe",
       scanCard: "Digitalizar cartão QR para entrar",
       cardNotRecognised: "Cartão não reconhecido. Peça ao seu professor para o verificar.",
-      firstTime: "É a primeira vez? Basta introduzir o seu nome e deixar a palavra-passe vazia. Ser-lhe-á pedido que escolha a sua própria palavra-passe.",
+      firstTime: "É a primeira vez? Escreva o seu nome e invente uma palavra-passe. Essa passa a ser a sua palavra-passe daqui em diante.",
       passwordSet: "A sua palavra-passe ficou definida. Use-a da próxima vez que entrar.",
-      choosePasswordTitle: "Escolha a sua palavra-passe",
-      choosePasswordNote: "Ainda não tem palavra-passe. Escolha a que vai usar daqui em diante.",
       welcome: (firstName: string) => `Bem-vindo, ${firstName}`,
       welcomeBack: (fullName: string) => `Bem-vindo de volta, ${fullName}!`,
       invalidCredentials: "Dados de acesso incorretos",
@@ -1150,8 +1148,7 @@ export const pt: Translation = {
     passwordChanged: "A sua palavra-passe foi alterada.",
 
     // Iniciar sessão
-    nameOrPasswordWrong: "Esse nome e essa palavra-passe não correspondem. Verifique os dois e tente novamente. É a primeira vez que entra? Introduza o seu nome e deixe a palavra-passe vazia.",
-    chooseYourPassword: "Ainda não tem palavra-passe. Agora escolha a sua.",
+    nameOrPasswordWrong: "Esse nome e essa palavra-passe não correspondem. Verifique os dois e tente novamente.",
     wrongEmailOrPassword: "Esse correio eletrónico e essa palavra-passe não correspondem. Verifique os dois e tente novamente.",
     wrongUsernameOrPassword: "Esse nome de utilizador e essa palavra-passe não correspondem. Verifique os dois e tente novamente.",
     tooManyAttempts: "Demasiadas tentativas. Espere alguns minutos e tente novamente.",
@@ -1271,7 +1268,7 @@ export const pt: Translation = {
 
     // Coisas que correram bem
     deadlineExtended: "Prazo alargado com sucesso",
-    passwordReset: "Palavra-passe reposta. O aluno entra com o seu nome e escolhe uma nova palavra-passe.",
+    passwordReset: "Palavra-passe reposta. Da próxima vez, o aluno escreve o seu nome e uma nova palavra-passe, que passa a ser a sua palavra-passe.",
     streakFreezeUsed: "O teu congelamento manteve a tua sequência.",
 
     // Quando a culpa é nossa
