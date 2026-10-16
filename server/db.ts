@@ -20,6 +20,7 @@ import { createClient } from "@libsql/client";
 
 import * as pgSchema from "@shared/schema";
 import * as sqliteSchema from "@shared/schema.sqlite";
+import { RETIRED_COLUMNS } from "./retired-columns";
 
 // True when a PostgreSQL connection string is provided.
 export const usePostgres = !!process.env.DATABASE_URL;
@@ -220,9 +221,6 @@ const STUDENTS_ADDED_COLUMNS: { name: string; type: string }[] = [
   // Card login needs a way to stop a card working. Defaults true so every
   // pupil already on the register keeps working exactly as before.
   { name: "active", type: "BOOLEAN NOT NULL DEFAULT true" },
-  // The hashed one-time code for a first sign-in. Nullable, no default:
-  // nobody has one until a teacher adds or resets them.
-  { name: "first_login_code", type: "TEXT" },
 ];
 
 // Columns added to teachers for staff roles. All three are nullable with NO
@@ -287,6 +285,10 @@ if (usePostgres) {
     }
     for (const col of SUBMISSIONS_ADDED_COLUMNS) {
       await pgPoolInstance!.query(`ALTER TABLE submissions ADD COLUMN IF NOT EXISTS ${col.name} ${col.type}`);
+    }
+    // Columns the app no longer uses (see server/retired-columns.ts).
+    for (const { table, column } of RETIRED_COLUMNS) {
+      await pgPoolInstance!.query(`ALTER TABLE ${table} DROP COLUMN IF EXISTS ${column}`);
     }
     // The unique index is separate: ADD COLUMN cannot carry UNIQUE in Postgres.
     await pgPoolInstance!.query(
@@ -353,6 +355,12 @@ if (usePostgres) {
       const type = col.type.replace("TIMESTAMP", "INTEGER");
       try { await client.execute(`ALTER TABLE submissions ADD COLUMN ${col.name} ${type}`); }
       catch { /* column already present */ }
+    }
+    // Columns the app no longer uses (see server/retired-columns.ts). SQLite
+    // has no "DROP COLUMN IF EXISTS", so ignore the error when it is gone.
+    for (const { table, column } of RETIRED_COLUMNS) {
+      try { await client.execute(`ALTER TABLE ${table} DROP COLUMN ${column}`); }
+      catch { /* column already gone */ }
     }
     try {
       await client.execute(

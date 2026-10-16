@@ -24,7 +24,7 @@
     "set-teacher-password": "tsx script/set-teacher-password.ts",
     "check:offline:browser": "tsx script/check-offline-browser.ts",
     "check:offline:pwa": "tsx script/check-offline-pwa.ts",
-    "db:push": "drizzle-kit push"
+    "db:push": "tsx script/drop-retired-columns.ts && drizzle-kit push"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
