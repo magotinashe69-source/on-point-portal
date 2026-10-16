@@ -759,8 +759,7 @@ export async function registerRoutes(
       const { fullName, password } = validation.data;
       
       // ONE answer for every way this can fail: a name not on the register, a
-      // pupil who has left, a wrong password, a missing or wrong first sign-in
-      // code. It used to say "not on the class list" for a stranger's name but
+      // pupil who has left, or a wrong password. It used to say "not on the class list" for a stranger's name but
       // "wrong password" for a real one — so the form told anybody which
       // children are enrolled here.
       const refuse = () => res.json({ success: false, ...say("nameOrPasswordWrong") });
@@ -796,34 +795,23 @@ export async function registerRoutes(
         return;
       }
 
-      // No password yet: the first sign-in. The pupil chooses the password
-      // they will use from now on, and is signed in with it.
+      // No password yet: the first sign-in. Whatever the pupil typed in the
+      // password box BECOMES their password, and they are signed straight in.
+      // There is no separate "choose a password" step.
       //
-      // Whatever was typed in the password box is ignored here -- there is
-      // nothing yet to check it against. Note the consequence, which is
-      // deliberate and was chosen over the one-time code this replaced:
-      // until a pupil has claimed their account, ANYBODY who types their name
-      // can claim it for them. See "A pupil's first sign-in" in CLAUDE.md.
+      // Note the consequence, which is deliberate: until a pupil has signed in
+      // for the first time, ANYBODY who types their name can claim the account
+      // with a password of their own. See "A pupil's first sign-in" in
+      // CLAUDE.md.
       if (!student.password) {
-        const { newPassword } = validation.data;
-        if (!newPassword) {
-          // Ask for the password they want. Nobody is signed in until the
-          // account has a password of its own.
-          return res.json({ success: false, choosePassword: true, ...say("chooseYourPassword") });
-        }
-
-        await storage.updateStudentPassword(student.id, newPassword);
+        await storage.updateStudentPassword(student.id, password);
         const updatedStudent = await storage.getStudent(student.id);
         await setSessionRole(req, { studentId: student.id });
         res.json({ success: true, student: safe(updatedStudent), isFirstLogin: true });
         return;
       }
 
-      // This pupil HAS a password, so one has to be given and has to match.
-      // A request with no password at all is refused the same way as a wrong
-      // one, so the form still cannot be used to find out who is on the roll.
-      if (!password) return refuse();
-
+      // This pupil HAS a password, so what they typed has to match it.
       const studentPassword = await verifyPassword(password, student.password);
       if (studentPassword.needsUpgrade) await storage.updateStudentPassword(student.id, password);
       if (!studentPassword.ok) {

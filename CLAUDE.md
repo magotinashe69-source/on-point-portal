@@ -1608,23 +1608,25 @@ script/
   before any session exists — see "Staff roles".
 - **Student login** (`POST /api/auth/student/login`): student enters their **name**
   (full name, or a first name no other active pupil shares — case-insensitive)
-  plus a password. A pupil with **no password yet** leaves the password empty
-  and chooses one for themselves — see below. A master password also grants
-  admin access.
+  plus a password. For a pupil with **no password yet**, the password they type
+  becomes their password — see below. A master password also grants admin
+  access.
 - **Parent login** (`POST /api/auth/parent/login`): username + password, both set
   by the teacher when the account is created. Usernames are stored and compared
   in lower case. Rate limited, and every failure gives the same message so the
   form cannot be used to discover which usernames exist.
 
-### A pupil's first sign-in — they choose their own password
+### A pupil's first sign-in — the password they type becomes theirs
 
-A pupil starts with no password. The first time they sign in they give their
-name, leave the password box empty, and choose the password they will use from
-then on:
+The login page is a name box and a password box, and nothing else. A pupil
+starts with no password. The first time they sign in, the password they type
+is saved as their password and they go straight to their dashboard. There is
+no separate "choose a password" step and no confirm box; after that they sign
+in with the same name and password every time.
 
-- **Nobody is signed in until a password exists.** A name with no `newPassword`
-  answers `choosePassword: true` and creates no session; the login page then
-  shows two more boxes, and the second request sets the password and signs in.
+- **A password is always required.** `studentLoginSchema` refuses a missing
+  one, or one under six characters, before anything is saved — so a first
+  sign-in cannot leave an account with an empty or too-short password.
 - **A reset (`POST /api/students/:id/reset-password`) clears the password** and
   nothing else, putting the pupil back where a new one starts. Their work,
   marks, streaks and every other row about them are untouched.
@@ -1632,8 +1634,8 @@ then on:
 
 **The hole this leaves, on purpose.** An earlier version issued a one-time code
 so that only the child holding it could claim the account. That is gone, and
-with it the protection: **until a pupil has claimed their account, anybody who
-types their name can claim it for them** — set its password, read that child's
+with it the protection: **until a pupil has signed in for the first time,
+anybody who types their name can claim the account** — set its password, read that child's
 marks and feedback, and lock the real child out. In a school every child knows
 their classmates' names, so this is a realistic thing to happen rather than a
 theoretical one.
@@ -1645,7 +1647,7 @@ revisited, the fix that keeps the simple model is a teacher-set starting
 password rather than a generated code.
 
 `script/check-security.ts` asserts the trade rather than hiding it: it checks
-that nobody is signed in until a password exists, and that once one does the
+that nobody gets in without a password, and that once one is saved the
 account cannot be claimed off them.
 
 The `students.first_login_code` column that held the codes has been dropped —
@@ -1704,7 +1706,7 @@ The consequence, which is worth saying out loud: **an account whose owner never
 signs in again keeps its plain password for ever.** There is no way around that
 short of resetting it. If the school wants the plain rows gone by a date, the
 remaining accounts have to be reset — `resetStudentPassword()` clears a pupil's,
-and they choose a new password the next time they sign in with their name.
+and the next password they sign in with becomes their new one.
 
 Both comparisons are timing-safe, including the legacy one: `===` stops at the
 first character that differs, and how long that takes is a measurement of how
@@ -1846,19 +1848,20 @@ Two things keep that check honest:
 It was proved to fail: an unguarded route planted in `routes.ts` is reported by
 file and line, and the file restored afterwards.
 
-It proves the first sign-in: a pupil with no password is asked to choose one
-and is signed in by nobody until they have; choosing one signs them in; and
-once claimed, the account cannot be claimed again by name alone. It proves a
-reset clears the password and **changes nothing else about the child**, that
-the old password stops working and a new one can be chosen the same way, that
+It proves the first sign-in: a name alone, or a password too short to keep,
+signs nobody in and saves nothing; a name and password sign a new pupil
+straight in with no extra step; and once that has happened a different
+password cannot take the account over. It proves a reset clears the password
+and **changes nothing else about the child**, that the old password stops
+working and the pupil signs in with a new one the same simple way, that
 a shared first name opens neither account, that the register a teacher's
 screen loads carries no codes and no hashes, that a login hands out a new
 session id and the old one stops working, and that an upload cannot be written
 twice, or to an address the server never issued. And in a real browser: the
-teacher adds a pupil on the Student Management screen and is shown no code,
-and that child signs in with their name alone, is told in words when the
-password they choose is too short or typed differently twice, and lands on
-their dashboard signed in with what they chose.
+teacher adds a pupil on the Student Management screen and is shown no code;
+the login page has only a name box and a password box; and that child types
+their name and a password and lands straight on their dashboard, signed in
+with what they typed.
 
 Finally the headers, and that the HTTPS redirect fires on a forwarded request
 but **not** on one that never went through a proxy — a health check must not
