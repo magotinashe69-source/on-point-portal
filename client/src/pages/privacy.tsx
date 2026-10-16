@@ -123,7 +123,7 @@ export default function PrivacyPolicy() {
             allows, and repeated wrong passwords are blocked for a few minutes.
           </li>
           <li><strong>Connections use HTTPS</strong>, so information is encrypted on its way between your device and the platform.</li>
-          <li>A new pupil's first sign-in needs a one-time code from their teacher, so nobody else can claim their account.</li>
+          <li>A new pupil signs in with their name and chooses their own password the first time. If they forget it, a teacher can reset it and they choose a new one.</li>
         </Points>
         <p>No system can be made perfectly secure, but we work to keep this information safe and to fix problems quickly.</p>
       </Section>

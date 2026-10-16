@@ -1,6 +1,6 @@
 import { eq, and, inArray, or, isNull, desc, gte, lte } from "drizzle-orm";
 import { randomBytes } from "node:crypto";
-import { hashPassword, newFirstLoginCode, normaliseFirstLoginCode } from "./passwords";
+import { hashPassword } from "./passwords";
 // The database connection AND the table objects come from ./db, which picks
 // the right database (SQLite or PostgreSQL) at runtime.
 import {
@@ -75,7 +75,7 @@ export interface IStorage {
   updateStudentPassword(id: number, password: string): Promise<void>;
   updateTeacherPassword(id: number, password: string): Promise<void>;
   updateParentPassword(id: number, password: string): Promise<void>;
-  resetStudentPassword(id: number): Promise<string>;
+  resetStudentPassword(id: number): Promise<void>;
   deleteStudent(id: number): Promise<void>;
 
   // Parents
@@ -321,23 +321,22 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateStudentPassword(id: number, password: string): Promise<void> {
-    // A real password ends the first sign-in code, so a code only ever works once.
+    // firstLoginCode is cleared as well, to tidy away any code left on a row
+    // from before sign-in codes were removed. Nothing reads that column now.
     await db.update(students)
       .set({ password: await hashPassword(password), firstLoginCode: null })
       .where(eq(students.id, id));
   }
 
   /**
-   * Clear a pupil's password and issue the one-time code for their next first
-   * sign-in. The code is returned ONCE, for the teacher to hand over; only its
-   * hash is kept, and any code issued before this one stops working.
+   * Clear a pupil's password, putting them back where a brand-new pupil
+   * starts: they sign in with their name and choose a new password. Their
+   * work, marks and every other row about them are untouched.
    */
-  async resetStudentPassword(id: number): Promise<string> {
-    const code = newFirstLoginCode();
+  async resetStudentPassword(id: number): Promise<void> {
     await db.update(students)
-      .set({ password: null, firstLoginCode: await hashPassword(normaliseFirstLoginCode(code)) })
+      .set({ password: null, firstLoginCode: null })
       .where(eq(students.id, id));
-    return code;
   }
 
   async updateStudent(id: number, data: Partial<InsertStudent>): Promise<Student> {

@@ -5,7 +5,7 @@ import { LegalPage, Points, Section, ToConfirm } from "@/components/LegalPage";
 //
 // Like the Privacy Policy, it describes the platform as it really is: accounts
 // are made by the school (nobody can sign themselves up), a parent's view is
-// read-only, and a pupil's first sign-in uses a code from their teacher.
+// read-only, and a pupil chooses their own password on their first sign-in.
 export default function TermsOfService() {
   return (
     <LegalPage title="Terms of Service" testId="page-terms-of-service">
@@ -29,8 +29,8 @@ export default function TermsOfService() {
         <Points>
           <li>
             <strong>Accounts are provided by the school.</strong> You cannot create one yourself. The school
-            creates pupil and parent accounts, and a teacher gives a new pupil a one-time code for their
-            first sign-in.
+            creates pupil and parent accounts. A new pupil signs in with their name and chooses their own
+            password the first time.
           </li>
           <li><strong>Keep your password private.</strong> Do not share it, and do not use anyone else's account.</li>
           <li>If you think someone else knows your password, change it and tell the school.</li>

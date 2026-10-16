@@ -148,7 +148,7 @@ async function main() {
   onCleanup(`assignment ${set.id}`, () => admin.delete(`/api/assignments/${set.id}`));
 
   const child = new Session();
-  await child.post("/api/auth/student/login", { fullName: pupil.fullName, password: pupil.firstLoginCode, newPassword: "staffchild123" });
+  await child.post("/api/auth/student/login", { fullName: pupil.fullName, newPassword: "staffchild123" });
   const handIn = await child.post("/api/submissions", {
     assignmentId: set.id, studentId: pupil.id, answers: [{ questionId: "q1", answerText: "Add 20 and 23, then take away 1." }],
   });

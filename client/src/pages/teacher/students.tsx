@@ -125,9 +125,6 @@ export default function StudentManagement() {
   const [pasteForm, setPasteForm] = useState<"Stage 3" | "Stage 4" | "Stage 5" | "Stage 6" | "Form 1" | "Form 2">("Form 1");
   const [pasteGender, setPasteGender] = useState<"Male" | "Female">("Male");
   const [pasteBusy, setPasteBusy] = useState(false);
-  // First sign-in codes just issued, to show the teacher once. The server keeps
-  // only a hash, so once this dialog closes nobody can read them again.
-  const [issuedCodes, setIssuedCodes] = useState<{ fullName: string; code: string }[]>([]);
 
 
   useEffect(() => {
@@ -216,9 +213,6 @@ export default function StudentManagement() {
       if (data.success) {
         queryClient.invalidateQueries({ queryKey: ["/api/students"] });
         toast({ title: t.register.studentAdded });
-        if (data.student?.firstLoginCode) {
-          setIssuedCodes([{ fullName: data.student.fullName, code: data.student.firstLoginCode }]);
-        }
         setIsAddDialogOpen(false);
         setNewStudent({ studentId: "", qrCode: "", fullName: "", gender: "Male", form: "Form 1" });
       } else {
@@ -264,10 +258,6 @@ export default function StudentManagement() {
       if (data.success) {
         queryClient.invalidateQueries({ queryKey: ["/api/students"] });
         toast({ title: t.register.passwordReset, description: t.register.passwordResetNote });
-        if (data.firstLoginCode) {
-          const fullName = students.find(s => s.id === id)?.fullName ?? "";
-          setIssuedCodes([{ fullName, code: data.firstLoginCode }]);
-        }
       } else {
         toast({ title: t.register.passwordNotReset, description: serverMessage(t, data), variant: "destructive" });
       }
@@ -345,7 +335,6 @@ export default function StudentManagement() {
     const ids = nextIdsForBatch(pasteForm, rows.length);
     let added = 0;
     const failed: string[] = [];
-    const codes: { fullName: string; code: string }[] = [];
 
     for (let i = 0; i < rows.length; i++) {
       try {
@@ -356,12 +345,7 @@ export default function StudentManagement() {
           form: pasteForm,
         });
         const data = await response.json();
-        if (data.success) {
-          added++;
-          if (data.student?.firstLoginCode) {
-            codes.push({ fullName: rows[i].fullName, code: data.student.firstLoginCode });
-          }
-        }
+        if (data.success) added++;
         else failed.push(rows[i].fullName);
       } catch {
         failed.push(rows[i].fullName);
@@ -382,7 +366,6 @@ export default function StudentManagement() {
       ].filter(Boolean).join(" ") || "Everyone on the list was added.",
       variant: failed.length > 0 ? "destructive" : undefined,
     });
-    if (codes.length > 0) setIssuedCodes(codes);
   };
 
   // The account already linked to the child whose dialog is open, if any.
@@ -412,17 +395,21 @@ export default function StudentManagement() {
       <main className="container mx-auto px-4 py-8 max-w-4xl">
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between flex-wrap gap-4">
-              <div>
+            {/* On a phone the title sits above the buttons; side by side only
+                once there is room for both. */}
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
                 <CardTitle className="text-2xl flex items-center gap-2">
-                  <Users className="h-6 w-6" />
+                  <Users className="h-6 w-6 shrink-0" />
                   Student Management
                 </CardTitle>
                 <CardDescription>
                   Add, edit, or remove students from the system
                 </CardDescription>
               </div>
-              <div className="flex items-center gap-2">
+              {/* The three buttons wrap onto as many lines as the screen needs,
+                  so none of them is ever pushed off the side. */}
+              <div className="flex flex-wrap items-center gap-2">
               {/* Bulk paste — enrol a whole class from a pasted list. */}
               <Button variant="outline" onClick={() => setIsPasteDialogOpen(true)} data-testid="button-paste-students">
                 <ClipboardPaste className="h-4 w-4 mr-2" />
@@ -623,7 +610,7 @@ export default function StudentManagement() {
           <CardContent>
             <div className="mb-4">
               <Select value={filterForm} onValueChange={setFilterForm}>
-                <SelectTrigger className="w-48" data-testid="select-filter-form">
+                <SelectTrigger className="w-full sm:w-48" data-testid="select-filter-form">
                   <SelectValue placeholder={t.register.filterByForm} />
                 </SelectTrigger>
                 <SelectContent>
@@ -648,15 +635,17 @@ export default function StudentManagement() {
               <p className="text-center text-muted-foreground py-8">{t.register.noStudents}</p>
             ) : (
               <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
+                {/* On a phone a pupil's details sit above their buttons; the
+                    two sit side by side once there is room. */}
                 {filteredStudents.map((student) => (
-                  <div 
-                    key={student.id} 
-                    className="flex items-center justify-between p-4 rounded-md border"
+                  <div
+                    key={student.id}
+                    className="flex flex-col gap-3 p-3 rounded-md border sm:flex-row sm:items-center sm:justify-between sm:p-4"
                     data-testid={`student-row-${student.id}`}
                   >
-                    <div className="flex items-center gap-4">
-                      <div>
-                        <p className="font-medium">{student.fullName}</p>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 min-w-0">
+                      <div className="min-w-0">
+                        <p className="font-medium break-words">{student.fullName}</p>
                         <p className="text-sm text-muted-foreground">{student.studentId}</p>
                       </div>
                       <Badge variant="outline">{student.form}</Badge>
@@ -672,7 +661,7 @@ export default function StudentManagement() {
                         </Badge>
                       )}
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-1 sm:gap-2 sm:shrink-0">
                       {/* This child's weekly report, ready to send to a parent. */}
                       <Button
                         size="icon"
@@ -1136,34 +1125,6 @@ export default function StudentManagement() {
               >
                 {updateMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 Save Changes
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-        {/* First sign-in codes. Shown once: the server keeps only a hash, so
-            closing this is the last time anybody can read them. */}
-        <Dialog open={issuedCodes.length > 0} onOpenChange={(open) => { if (!open) setIssuedCodes([]); }}>
-          <DialogContent data-testid="dialog-first-login-codes">
-            <DialogHeader>
-              <DialogTitle>{t.register.firstLoginCodeTitle}</DialogTitle>
-              <DialogDescription>{t.register.firstLoginCodesNote}</DialogDescription>
-            </DialogHeader>
-            <ul className="space-y-2 max-h-[60vh] overflow-y-auto">
-              {issuedCodes.map((item) => (
-                <li
-                  key={item.fullName + item.code}
-                  className="flex items-center justify-between gap-4 rounded-md border px-3 py-2"
-                >
-                  <span>{item.fullName}</span>
-                  <span className="font-mono text-lg tracking-wider select-all" data-testid="text-first-login-code">
-                    {item.code}
-                  </span>
-                </li>
-              ))}
-            </ul>
-            <DialogFooter>
-              <Button onClick={() => setIssuedCodes([])} data-testid="button-first-login-codes-done">
-                {t.register.firstLoginCodeDone}
               </Button>
             </DialogFooter>
           </DialogContent>

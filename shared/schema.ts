@@ -758,9 +758,13 @@ export type TeacherRegister = z.infer<typeof teacherRegisterSchema>;
 
 export const studentLoginSchema = z.object({
   fullName: z.string().min(1, "yourNameRequired"),
-  password: z.string().min(6, "passwordTooShort"),
-  // Only on a first sign-in: the password the pupil chooses, sent along with
-  // the one-time code from their teacher.
+  // Optional, because a pupil signing in for the very first time has no
+  // password yet -- they give only their name, and are asked to choose one.
+  // The empty string is allowed for the same reason: it is what the login
+  // form sends when the box is left blank. A password that IS typed still has
+  // to be long enough, so a short one is still caught on the form.
+  password: z.string().min(6, "passwordTooShort").optional().or(z.literal("")),
+  // Only on a first sign-in: the password the pupil chooses for themselves.
   newPassword: z.string().min(8, "newPasswordTooShort").optional(),
 });
 export type StudentLogin = z.infer<typeof studentLoginSchema>;
